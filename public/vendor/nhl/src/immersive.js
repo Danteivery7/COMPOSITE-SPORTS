@@ -10,7 +10,6 @@ export function createImmersiveLayer({
   canvas,
   introScreen,
   enterButton,
-  skipButton,
 }) {
   if (!canvas) {
     return {
@@ -327,17 +326,12 @@ export function createImmersiveLayer({
         enterRink(false);
       }, 70);
     });
-    skipButton?.addEventListener("click", () => enterRink(true));
 
     window.addEventListener("keydown", (event) => {
       if (!state.introVisible) return;
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         enterRink(false);
-      }
-      if (event.key === "Escape") {
-        event.preventDefault();
-        enterRink(true);
       }
     });
   }

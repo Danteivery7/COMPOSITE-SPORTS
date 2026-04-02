@@ -51,7 +51,6 @@ const dom = {
   fxCanvas: document.querySelector("#ice-fx-layer"),
   introScreen: document.querySelector("#intro-screen"),
   enterRinkButton: document.querySelector("#enter-rink-button"),
-  skipIntroButton: document.querySelector("#skip-intro-button"),
 };
 
 const state = {
@@ -94,7 +93,6 @@ const immersiveLayer = createImmersiveLayer({
   canvas: dom.fxCanvas,
   introScreen: dom.introScreen,
   enterButton: dom.enterRinkButton,
-  skipButton: dom.skipIntroButton,
 });
 
 function saveSettings() {
