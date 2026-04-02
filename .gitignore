@@ -1,0 +1,8 @@
+node_modules/
+.next/
+dist/
+
+mlb-source/
+nba-source/
+
+.DS_Store

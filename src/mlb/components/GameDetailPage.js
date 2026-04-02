@@ -1,0 +1,602 @@
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+
+export default function GameDetailPage({ gameId, onBack }) {
+    const [game, setGame] = useState(null);
+    const [plays, setPlays] = useState([]);
+    const [keyPlays, setKeyPlays] = useState([]);
+    const [boxscore, setBoxscore] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const timerRef = useRef(null);
+
+    const fetchGame = async () => {
+        try {
+            const res = await fetch(`/api/mlb/games/${gameId}`);
+            if (!res.ok) throw new Error('Failed');
+            const json = await res.json();
+            setGame(json.game);
+            setPlays(json.plays || []);
+            setKeyPlays(json.keyPlays || []);
+            setBoxscore(json.boxscore || null);
+        } catch (err) {
+            console.error('Game fetch error:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!gameId) return;
+        fetchGame();
+        timerRef.current = setInterval(fetchGame, 10000);
+        return () => clearInterval(timerRef.current);
+    }, [gameId]);
+
+    if (loading) {
+        return (
+            <div className="page-container">
+                <button className="back-btn" onClick={onBack}>Back</button>
+                <div className="game-detail">
+                    <div className="skeleton" style={{ height: '140px', borderRadius: '16px', marginBottom: '16px' }} />
+                    <div className="skeleton" style={{ height: '300px', borderRadius: '12px' }} />
+                </div>
+            </div>
+        );
+    }
+
+    if (!game) {
+        return (
+            <div className="page-container">
+                <button className="back-btn" onClick={onBack}>Back</button>
+                <div className="empty-state"><h3>Game Not Found</h3></div>
+            </div>
+        );
+    }
+
+    const isLive = game.state === 'in';
+    const isFinal = game.state === 'post';
+    const isPregame = game.state === 'pre';
+    const status = game.shortDetail || game.statusDetail || '';
+    const sit = game.situation;
+
+    return (
+        <div className="page-container">
+            <button className="back-btn" onClick={onBack}>Back to Scores</button>
+
+            <div className="game-detail">
+                {/* Scoreboard */}
+                {!isPregame && (
+                <div className="game-detail-header">
+                    <div className="game-detail-team">
+                        <img src={game.away?.logo} alt={game.away?.name} className="team-logo" onError={(e) => { e.target.style.display = 'none'; }} />
+                        <span className="team-name">{game.away?.abbr || game.away?.name}</span>
+                        <span className="team-record">{game.away?.record}</span>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                        <div className="game-detail-score">
+                            {game.away?.score ?? 0} &ndash; {game.home?.score ?? 0}
+                        </div>
+                        <div className="game-detail-status">
+                            {isLive && <span className="live-dot" style={{ display: 'inline-block', marginRight: '6px' }} />}
+                            {status || (isFinal ? 'Final' : '')}
+                        </div>
+                    </div>
+                    <div className="game-detail-team">
+                        <img src={game.home?.logo} alt={game.home?.name} className="team-logo" onError={(e) => { e.target.style.display = 'none'; }} />
+                        <span className="team-name">{game.home?.abbr || game.home?.name}</span>
+                        <span className="team-record">{game.home?.record}</span>
+                    </div>
+                </div>
+                )}
+
+                {isFinal && game.postGameOptions && (
+                    <div className="card" style={{ marginBottom: '16px', padding: '14px 18px' }}>
+                        {game.postGameOptions.pog && (
+                            <div className="pog-banner" style={{ padding: '12px 16px', marginBottom: '12px' }}>
+                                <div className="pog-tag" style={{ fontSize: '12px' }}>👑 POG</div>
+                                <img src={game.postGameOptions.pog.headshot} alt="POG" className="pog-headshot" style={{ width: '40px', height: '40px' }} onError={(e) => e.target.style.display='none'} />
+                                <div className="pog-info">
+                                    <span className="pog-name" style={{ fontSize: '15px' }}>{game.postGameOptions.pog.name}</span>
+                                    <span className="pog-stats" style={{ fontSize: '13px' }}>{game.postGameOptions.pog.statLine}</span>
+                                </div>
+                            </div>
+                        )}
+                        <div className="postgame-decisions">
+                            {game.postGameOptions.winningPitcher && (
+                                <div className="decision-pill" style={{ fontSize: '13px' }}>
+                                    <strong>W:</strong>
+                                    <img src={game.postGameOptions.winningPitcher.headshot} alt="W" style={{ width: '24px', height: '24px' }} onError={(e) => e.target.style.display='none'} />
+                                    <span>{game.postGameOptions.winningPitcher.name}</span>
+                                </div>
+                            )}
+                            {game.postGameOptions.losingPitcher && (
+                                <div className="decision-pill" style={{ fontSize: '13px', marginLeft: '8px' }}>
+                                    <strong>L:</strong>
+                                    <img src={game.postGameOptions.losingPitcher.headshot} alt="L" style={{ width: '24px', height: '24px' }} onError={(e) => e.target.style.display='none'} />
+                                    <span>{game.postGameOptions.losingPitcher.name}</span>
+                                </div>
+                            )}
+                            {game.postGameOptions.savingPitcher && (
+                                <div className="decision-pill" style={{ fontSize: '13px', marginLeft: '8px' }}>
+                                    <strong>S:</strong>
+                                    <img src={game.postGameOptions.savingPitcher.headshot} alt="S" style={{ width: '24px', height: '24px' }} onError={(e) => e.target.style.display='none'} />
+                                    <span>{game.postGameOptions.savingPitcher.name}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Pre-Game "Tale of the Tape" Hero Display */}
+                {isPregame && (
+                    <div className="card" style={{ padding: '48px 20px', textAlign: 'center', marginBottom: '16px', background: 'var(--gradient-card)', border: '1px solid var(--border-color)', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8vw', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <img src={game.away?.logo} alt={game.away?.name} style={{ width: '100px', height: '100px', marginBottom: '16px', filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.15))' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                                <h3 style={{ fontSize: '28px', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>{game.away?.abbr || game.away?.name}</h3>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                                    <p style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{game.away?.record}</p>
+                                    {game.away?.streak && (
+                                        <span style={{ 
+                                            fontSize: '10px', 
+                                            fontWeight: 900, 
+                                            padding: '2px 6px', 
+                                            borderRadius: '4px', 
+                                            background: game.away.streak.startsWith('W') ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+                                            color: game.away.streak.startsWith('W') ? '#10b981' : '#ef4444',
+                                            border: `1px solid ${game.away.streak.startsWith('W') ? '#10b98133' : '#ef444433'}`
+                                        }}>
+                                            {game.away.streak}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <div style={{ fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '3px', color: 'var(--accent)', marginBottom: '8px' }}>MATCHUP</div>
+                                <div style={{ fontSize: '42px', fontWeight: 900, color: 'var(--text-muted)', opacity: 0.3, fontStyle: 'italic', lineHeight: 1 }}>VS</div>
+                            </div>
+                            
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <img src={game.home?.logo} alt={game.home?.name} style={{ width: '100px', height: '100px', marginBottom: '16px', filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.15))' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                                <h3 style={{ fontSize: '28px', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>{game.home?.abbr || game.home?.name}</h3>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                                    <p style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{game.home?.record}</p>
+                                    {game.home?.streak && (
+                                        <span style={{ 
+                                            fontSize: '10px', 
+                                            fontWeight: 900, 
+                                            padding: '2px 6px', 
+                                            borderRadius: '4px', 
+                                            background: game.home.streak.startsWith('W') ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+                                            color: game.home.streak.startsWith('W') ? '#10b981' : '#ef4444',
+                                            border: `1px solid ${game.home.streak.startsWith('W') ? '#10b98133' : '#ef444433'}`
+                                        }}>
+                                            {game.home.streak}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style={{ marginTop: '48px', padding: '24px 48px', background: 'var(--bg-primary)', borderRadius: '12px', display: 'inline-block', border: '1px solid var(--border-color)' }}>
+                            <div style={{ fontSize: '12px', textTransform: 'uppercase', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '8px', letterSpacing: '1px' }}>Scheduled First Pitch</div>
+                            <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                                {game.startTime ? new Date(game.startTime).toLocaleString('en-US', { weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'TBD'}
+                            </div>
+                            <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', marginTop: '12px' }}>
+                                {game.venue && <div style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: 500 }}>🏟️ {game.venue}</div>}
+                                {game.broadcast && <div style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: 500 }}>📺 {game.broadcast}</div>}
+                            </div>
+                        </div>
+
+                        {/* Monte Carlo Prediction Section */}
+                        {game.prediction && (
+                            <div className="card" style={{ marginTop: '32px', padding: '24px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '12px', textAlign: 'left', boxShadow: 'var(--shadow-sm)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
+                                    <h4 style={{ margin: 0, fontSize: '13px', textTransform: 'uppercase', letterSpacing: '1.5px', color: 'var(--text-muted)', fontWeight: 800 }}>
+                                        Live App Simulation <span style={{ opacity: 0.6, fontWeight: 500, marginLeft: '6px' }}>(3,000 Sims)</span>
+                                    </h4>
+                                    <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 800, padding: '4px 10px', borderRadius: '4px', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--accent)' }}>
+                                        {game.prediction.confidence} Confidence
+                                    </span>
+                                </div>
+                                
+                                <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                    <div style={{ flex: '1 1 200px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                            <span style={{ fontWeight: 800, fontSize: '15px' }}>{game.prediction.teamA.abbr}</span>
+                                            <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{game.prediction.teamA.winPct}%</span>
+                                        </div>
+                                        <div style={{ width: '100%', height: '8px', background: 'var(--bg-secondary)', borderRadius: '4px', overflow: 'hidden' }}>
+                                            <div style={{ width: `${game.prediction.teamA.winPct}%`, height: '100%', background: game.prediction.teamA.winPct > game.prediction.teamB.winPct ? 'var(--accent)' : 'var(--text-muted)' }} />
+                                        </div>
+                                    </div>
+                                    
+                                    <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '0 16px' }}>
+                                        <span style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 800, letterSpacing: '1px', marginBottom: '4px' }}>Projected</span>
+                                        <span style={{ fontSize: '24px', fontWeight: 900, color: 'var(--text-primary)' }}>
+                                            {game.prediction.teamA.projectedScore} - {game.prediction.teamB.projectedScore}
+                                        </span>
+                                    </div>
+                                    
+                                    <div style={{ flex: '1 1 200px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                            <span style={{ fontWeight: 800, fontSize: '15px' }}>{game.prediction.teamB.abbr}</span>
+                                            <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{game.prediction.teamB.winPct}%</span>
+                                        </div>
+                                        <div style={{ width: '100%', height: '8px', background: 'var(--bg-secondary)', borderRadius: '4px', overflow: 'hidden' }}>
+                                            <div style={{ width: `${game.prediction.teamB.winPct}%`, height: '100%', background: game.prediction.teamB.winPct > game.prediction.teamA.winPct ? 'var(--accent-red, #ef4444)' : 'var(--text-muted)' }} />
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {game.prediction.spread && (
+                                    <div style={{ marginTop: '24px', fontSize: '13px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                        <div style={{ padding: '6px 12px', borderRadius: '6px', background: 'var(--bg-secondary)', fontWeight: 700, color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>
+                                            Spread: {game.prediction.teamA.winPct > game.prediction.teamB.winPct ? game.prediction.teamA.abbr : game.prediction.teamB.abbr} -{game.prediction.spread}
+                                        </div>
+                                        {game.prediction.why && game.prediction.why[0] && (
+                                            <div style={{ fontStyle: 'italic', color: 'var(--text-secondary)', fontSize: '12px', fontWeight: 500 }}>
+                                                "{game.prediction.why[0]}"
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* ESPN Odds vs Our Model Comparison */}
+                        {game.odds && game.prediction && (
+                            <div className="card" style={{ marginTop: '24px', padding: '20px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '12px', textAlign: 'left' }}>
+                                <h4 style={{ margin: '0 0 16px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1.5px', color: 'var(--text-muted)', fontWeight: 800, borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
+                                    Odds Comparison
+                                </h4>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', alignItems: 'center' }}>
+                                    {/* Away team column */}
+                                    <div style={{ textAlign: 'center' }}>
+                                        <div style={{ fontWeight: 800, fontSize: '14px', marginBottom: '8px' }}>{game.away?.abbr}</div>
+                                        {game.odds.awayMoneyLine != null && (
+                                            <div style={{ padding: '6px 10px', background: 'var(--bg-secondary)', borderRadius: '6px', marginBottom: '6px' }}>
+                                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>{game.odds.provider}</div>
+                                                <div style={{ fontSize: '16px', fontWeight: 900, color: 'var(--text-primary)' }}>{game.odds.awayMoneyLine > 0 ? '+' : ''}{game.odds.awayMoneyLine}</div>
+                                            </div>
+                                        )}
+                                        <div style={{ padding: '6px 10px', background: 'rgba(99,102,241,0.08)', borderRadius: '6px', border: '1px solid rgba(99,102,241,0.15)' }}>
+                                            <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 700, textTransform: 'uppercase' }}>Our Model</div>
+                                            <div style={{ fontSize: '16px', fontWeight: 900, color: 'var(--text-primary)' }}>{game.prediction.teamA.americanOdds > 0 ? '+' : ''}{game.prediction.teamA.americanOdds}</div>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Center divider */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                                        {game.odds.overUnder > 0 && (
+                                            <div style={{ padding: '6px 12px', background: 'var(--bg-secondary)', borderRadius: '6px', textAlign: 'center' }}>
+                                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 700 }}>O/U</div>
+                                                <div style={{ fontSize: '14px', fontWeight: 800 }}>{game.odds.overUnder}</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    
+                                    {/* Home team column */}
+                                    <div style={{ textAlign: 'center' }}>
+                                        <div style={{ fontWeight: 800, fontSize: '14px', marginBottom: '8px' }}>{game.home?.abbr}</div>
+                                        {game.odds.homeMoneyLine != null && (
+                                            <div style={{ padding: '6px 10px', background: 'var(--bg-secondary)', borderRadius: '6px', marginBottom: '6px' }}>
+                                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>{game.odds.provider}</div>
+                                                <div style={{ fontSize: '16px', fontWeight: 900, color: 'var(--text-primary)' }}>{game.odds.homeMoneyLine > 0 ? '+' : ''}{game.odds.homeMoneyLine}</div>
+                                            </div>
+                                        )}
+                                        <div style={{ padding: '6px 10px', background: 'rgba(99,102,241,0.08)', borderRadius: '6px', border: '1px solid rgba(99,102,241,0.15)' }}>
+                                            <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 700, textTransform: 'uppercase' }}>Our Model</div>
+                                            <div style={{ fontSize: '16px', fontWeight: 900, color: 'var(--text-primary)' }}>{game.prediction.teamB.americanOdds > 0 ? '+' : ''}{game.prediction.teamB.americanOdds}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Player Prop Picks */}
+                        {game.playerProps && (game.playerProps.modelProps?.length > 0) && (
+                            <div className="card" style={{ marginTop: '24px', padding: '20px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '12px', textAlign: 'left' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+                                    <h4 style={{ margin: 0, fontSize: '13px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--accent-green, #10b981)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        🎯 Player Prop Picks
+                                    </h4>
+                                    {game.playerProps.modelProps?.[0]?.isModel && (
+                                        <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>🤖 AI PROJECTION</span>
+                                    )}
+                                </div>
+                                
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    {(game.playerProps.modelProps || []).map((prop, i) => (
+                                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', background: 'var(--bg-secondary)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                                            {prop.headshot && (
+                                                <img src={prop.headshot} alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} onError={e => e.target.style.display='none'} />
+                                            )}
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)' }}>{prop.name} <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>({prop.team})</span></div>
+                                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{prop.category}</div>
+                                            </div>
+                                            <div style={{ textAlign: 'center', minWidth: '60px' }}>
+                                                <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--text-primary)' }}>{prop.modelLine}</div>
+                                                <div style={{ fontSize: '10px', fontWeight: 800, color: prop.modelPick === 'Over' ? 'var(--accent-green, #10b981)' : 'var(--accent-red, #ef4444)', textTransform: 'uppercase' }}>{prop.modelPick}</div>
+                                            </div>
+                                            <div style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 800, background: 'var(--bg-primary)', color: 'var(--accent)', border: '1px solid var(--border-color)' }}>
+                                                {prop.confidence}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {game.playerProps.espnProps?.length > 0 && (
+                                    <div style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+                                        <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.5px' }}>DraftKings Lines</div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '8px' }}>
+                                            {game.playerProps.espnProps.slice(0, 8).map((prop, i) => (
+                                                <div key={i} style={{ padding: '8px 10px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '11px' }}>
+                                                    <div style={{ fontWeight: 700, marginBottom: '3px' }}>{prop.name}</div>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                                                        <span>{prop.category}</span>
+                                                        <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{prop.line}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Upper Matrix: Matchup & Linescore (Desktop Side-by-Side) */}
+                {!isPregame && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', marginBottom: '16px', alignItems: 'stretch' }}>
+                    
+                    {/* Live Situation: Batter/Pitcher + Diamond (Left) */}
+                    {isLive && sit && (
+                        <div className="card" style={{ flex: '1 1 320px', padding: '14px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '10px' }}>
+                                <Diamond situation={sit} />
+                                <Outs count={sit.outs} />
+                                <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                                    {sit.balls}-{sit.strikes}
+                                </span>
+                            </div>
+                            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                                {sit.batter && (
+                                    <div style={{ flex: 1, minWidth: '140px', padding: '8px 12px', background: 'rgba(var(--accent-rgb, 99,102,241), 0.08)', borderRadius: '8px' }}>
+                                        <div style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '4px' }}>At Bat</div>
+                                        <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>{sit.batter}</div>
+                                        {sit.batterSummary && <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>{sit.batterSummary}</div>}
+                                    </div>
+                                )}
+                                {sit.pitcher && (
+                                    <div style={{ flex: 1, minWidth: '140px', padding: '8px 12px', background: 'rgba(var(--accent-rgb, 99,102,241), 0.08)', borderRadius: '8px' }}>
+                                        <div style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '4px' }}>Pitching</div>
+                                        <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>{sit.pitcher}</div>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                            {sit.pitcherSummary || ''}
+                                            {sit.pitchCount != null && <span> · {sit.pitchCount}P{sit.strikeCount ? ` (${sit.strikeCount}S)` : ''}</span>}
+                                            {sit.pitcherERA != null && <span> · {sit.pitcherERA} ERA</span>}
+                                            {sit.pitcherK != null && <span> · {sit.pitcherK}K</span>}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Linescore (Right) */}
+                    {game.linescore && (
+                        <div className="card" style={{ flex: '2 1 400px', padding: '12px', overflow: 'auto' }}>
+                        <h3 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)' }}>Linescore</h3>
+                        <table className="linescore-table">
+                            <thead>
+                                <tr>
+                                    <th className="team-col"></th>
+                                    {game.linescore.innings?.map((_, i) => (<th key={i}>{i + 1}</th>))}
+                                    <th className="total-col">R</th>
+                                    <th className="total-col">H</th>
+                                    <th className="total-col">E</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td className="team-col">{game.away?.abbr}</td>
+                                    {game.linescore.innings?.map((inn, i) => (<td key={i}>{inn.away ?? '-'}</td>))}
+                                    <td className="total-col">{game.away?.score ?? 0}</td>
+                                    <td className="total-col">{game.linescore.awayHits ?? '-'}</td>
+                                    <td className="total-col">{game.linescore.awayErrors ?? '-'}</td>
+                                </tr>
+                                <tr>
+                                    <td className="team-col">{game.home?.abbr}</td>
+                                    {game.linescore.innings?.map((inn, i) => (<td key={i}>{inn.home ?? '-'}</td>))}
+                                    <td className="total-col">{game.home?.score ?? 0}</td>
+                                    <td className="total-col">{game.linescore.homeHits ?? '-'}</td>
+                                    <td className="total-col">{game.linescore.homeErrors ?? '-'}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+                </div>
+                )}
+
+                {/* Lower Matrix: Live Box Score & Play-by-Play Wrapper */}
+                {!isPregame && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', marginBottom: '16px', alignItems: 'flex-start' }}>
+                    
+                    {/* Live Box Score (Wide Left) */}
+                    {boxscore && (boxscore.home?.batters?.length > 0 || boxscore.away?.batters?.length > 0) ? (
+                        <div style={{ flex: '2 1 600px', minWidth: '0' }}>
+                            <BoxscoreTabs boxscore={boxscore} away={game.away} home={game.home} />
+                        </div>
+                    ) : (
+                        <div style={{ flex: '2 1 600px', minWidth: '0' }}></div>
+                    )}
+
+                    {/* Play-by-Play Wrapper (Sidebar Right) */}
+                    <div style={{ flex: '1 1 320px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        {/* Key Plays */}
+                        {keyPlays.length > 0 && (
+                            <div className="card" style={{ padding: '16px' }}>
+                                <h3 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--accent-green)' }}>
+                                    Key Plays
+                                </h3>
+                                <div className="play-by-play">
+                                    {keyPlays.map((play, i) => (
+                                        <div key={i} className="play-item scoring">
+                                            <span className="play-inning">{play.inning}</span>
+                                            <span className="play-text">{play.text}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Play-by-Play */}
+                        <div className="card" style={{ padding: '16px' }}>
+                            <h3 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)' }}>
+                                Play-by-Play
+                                {isLive && <span style={{ fontSize: '10px', color: 'var(--accent-green)', fontWeight: 600 }}>LIVE</span>}
+                            </h3>
+                            <div style={{ maxHeight: '350px', overflowY: 'auto', paddingRight: '8px' }}>
+                                {plays.length === 0 ? (
+                                    <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
+                                        {isLive ? 'Waiting for plays...' : 'No play-by-play available.'}
+                                    </p>
+                                ) : (
+                                    <div className="play-by-play">
+                                        {plays.map((play, i) => (
+                                            <div key={i} className={`play-item ${play.isScoring ? 'scoring' : ''}`}>
+                                                <span className="play-inning">{play.inning}</span>
+                                                <span className="play-text">{play.text}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                )}
+
+                {/* Game Info (Only if not pregame, since pregame block has it) */}
+                {!isPregame && (game.venue || game.broadcast) && (
+                    <div className="card" style={{ padding: '16px', marginTop: '16px' }}>
+                        <h3 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)' }}>Game Info</h3>
+                        {game.venue && <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>{game.venue}</p>}
+                        {game.broadcast && <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>{game.broadcast}</p>}
+                        {game.startTime && (
+                            <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '4px' }}>
+                                {new Date(game.startTime).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+                            </p>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function BoxscoreTabs({ boxscore, away, home }) {
+    const [activeTab, setActiveTab] = useState('away');
+
+    const data = activeTab === 'away' ? boxscore.away : boxscore.home;
+    const team = activeTab === 'away' ? away : home;
+    if (!data) return null;
+
+    return (
+        <div className="card" style={{ padding: '16px', marginBottom: '16px', marginTop: '16px' }}>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                <button 
+                    style={{ flex: 1, padding: '10px', border: 'none', background: activeTab === 'away' ? 'var(--accent)' : 'rgba(255,255,255,0.05)', color: activeTab === 'away' ? '#fff' : 'var(--text-primary)', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, transition: 'all 0.2s' }}
+                    onClick={() => setActiveTab('away')}>{away?.abbr || away?.name} Box</button>
+                <button 
+                    style={{ flex: 1, padding: '10px', border: 'none', background: activeTab === 'home' ? 'var(--accent)' : 'rgba(255,255,255,0.05)', color: activeTab === 'home' ? '#fff' : 'var(--text-primary)', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, transition: 'all 0.2s' }}
+                    onClick={() => setActiveTab('home')}>{home?.abbr || home?.name} Box</button>
+            </div>
+
+            <h4 style={{ fontSize: '13px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '8px' }}>Hitters</h4>
+            <div style={{ overflowX: 'auto', marginBottom: '24px' }}>
+                <table className="linescore-table" style={{ width: '100%', fontSize: '13px' }}>
+                    <thead>
+                        <tr>
+                            <th style={{ textAlign: 'left', minWidth: '140px' }}>Batter</th>
+                            {data.labels?.batting?.map((l, i) => <th key={i} style={{ textAlign: 'right' }}>{l}</th>)}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {data.batters?.map((b, idx) => (
+                            <tr key={b.id || idx}>
+                                <td style={{ textAlign: 'left', fontWeight: b.starter ? 600 : 400 }}>
+                                    {b.name} <span style={{ color: 'var(--text-muted)', fontSize: '11px', marginLeft: '4px' }}>{b.position}</span>
+                                </td>
+                                {b.stats?.map((s, i) => <td key={i} style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>{s}</td>)}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            <h4 style={{ fontSize: '13px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '8px' }}>Pitchers</h4>
+            <div style={{ overflowX: 'auto' }}>
+                <table className="linescore-table" style={{ width: '100%', fontSize: '13px' }}>
+                    <thead>
+                        <tr>
+                            <th style={{ textAlign: 'left', minWidth: '140px' }}>Pitcher</th>
+                            {data.labels?.pitching?.map((l, i) => <th key={i} style={{ textAlign: 'right' }}>{l}</th>)}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {data.pitchers?.map((p, idx) => (
+                            <tr key={p.id || idx}>
+                                <td style={{ textAlign: 'left', fontWeight: p.starter ? 600 : 400 }}>
+                                    {p.name}
+                                </td>
+                                {p.stats?.map((s, i) => <td key={i} style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>{s}</td>)}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
+function Diamond({ situation }) {
+    const fill = 'rgba(245,158,11,1)';
+    const empty = 'transparent';
+    const stroke = 'rgba(100,116,139,0.6)';
+    return (
+        <div className="diamond-wrap">
+            <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                <rect x="16" y="2" width="8" height="8" rx="1"
+                    transform="rotate(45 20 6)"
+                    fill={situation.onSecond ? fill : empty}
+                    stroke={situation.onSecond ? fill : stroke} strokeWidth="1.5" />
+                <rect x="2" y="16" width="8" height="8" rx="1"
+                    transform="rotate(45 6 20)"
+                    fill={situation.onThird ? fill : empty}
+                    stroke={situation.onThird ? fill : stroke} strokeWidth="1.5" />
+                <rect x="30" y="16" width="8" height="8" rx="1"
+                    transform="rotate(45 34 20)"
+                    fill={situation.onFirst ? fill : empty}
+                    stroke={situation.onFirst ? fill : stroke} strokeWidth="1.5" />
+            </svg>
+        </div>
+    );
+}
+
+function Outs({ count }) {
+    return (
+        <div className="outs-indicator">
+            {[0, 1, 2].map(i => (
+                <div key={i} className={`out-dot ${i < count ? 'active' : ''}`} />
+            ))}
+        </div>
+    );
+}

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>COMPOSITE NHL</title>
+    <meta
+      name="description"
+      content="COMPOSITE NHL is a live predictive hockey dashboard with scores, odds, rankings, players, and model-driven matchup projections."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-theme="light">
+    <canvas id="ice-fx-layer" class="ice-fx-layer" aria-hidden="true"></canvas>
+
+    <section id="intro-screen" class="intro-screen" aria-label="Enter the rink">
+      <div class="intro-boards intro-boards-left" aria-hidden="true"></div>
+      <div class="intro-boards intro-boards-right" aria-hidden="true"></div>
+      <div class="intro-ice-markings" aria-hidden="true">
+        <span class="intro-circle intro-circle-left"></span>
+        <span class="intro-circle intro-circle-right"></span>
+        <span class="intro-red-line"></span>
+        <span class="intro-blue-line intro-blue-line-top"></span>
+        <span class="intro-blue-line intro-blue-line-bottom"></span>
+      </div>
+      <div class="intro-fog intro-fog-a" aria-hidden="true"></div>
+      <div class="intro-fog intro-fog-b" aria-hidden="true"></div>
+
+      <div class="intro-stage">
+        <p class="eyebrow intro-eyebrow">Arena Tunnel</p>
+        <h1 class="intro-title">Enter The Rink</h1>
+        <p class="intro-copy">
+          Step through the tunnel into COMPOSITE NHL. Live ice, live edges,
+          live movement.
+        </p>
+
+        <div class="intro-actions">
+          <button id="enter-rink-button" class="intro-button" type="button">
+            Tap The Ice
+          </button>
+          <button id="skip-intro-button" class="intro-link" type="button">
+            Skip intro
+          </button>
+        </div>
+
+        <div class="intro-legend">
+          <span>Live scores</span>
+          <span>Composite ratings</span>
+          <span>Ice trail cursor</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="app-shell">
+      <div class="ambient ambient-a"></div>
+      <div class="ambient ambient-b"></div>
+      <div class="ambient ambient-c"></div>
+
+      <aside class="sidebar glass-panel">
+        <div class="brand-lockup">
+          <div class="brand-badge">CN</div>
+          <div>
+            <p class="eyebrow">Composite Tracking Suite</p>
+            <h1>COMPOSITE NHL</h1>
+          </div>
+        </div>
+
+        <nav class="nav-links" id="nav-links">
+          <button class="nav-link is-active" data-route="overview">Overview</button>
+          <button class="nav-link" data-route="scores">Live Scores</button>
+          <button class="nav-link" data-route="rankings">Rankings</button>
+          <button class="nav-link" data-route="players">Players</button>
+          <button class="nav-link" data-route="predictor">Predictor</button>
+          <button class="nav-link" data-route="news">News</button>
+          <button class="nav-link" data-route="settings">Settings</button>
+        </nav>
+
+        <section class="sidebar-footer">
+          <p class="sidebar-title">Live State</p>
+          <div class="status-pills" id="sidebar-status">
+            <span class="status-pill">Booting data engine</span>
+          </div>
+          <p class="sidebar-meta" id="last-updated">Awaiting first sync</p>
+        </section>
+      </aside>
+
+      <div class="main-stage">
+        <header class="topbar glass-panel">
+          <div class="topbar-copy">
+            <p class="eyebrow" id="route-eyebrow">League Intelligence</p>
+            <h2 id="route-title">Overview</h2>
+          </div>
+
+          <div class="topbar-controls">
+            <label class="search-shell">
+              <input
+                type="search"
+                id="global-search"
+                placeholder="Search teams, players, or a live matchup"
+                autocomplete="off"
+              />
+            </label>
+            <button class="ghost-button" id="refresh-button" type="button">Refresh</button>
+            <button class="ghost-button" id="theme-button" type="button">Theme</button>
+          </div>
+
+          <div class="search-results glass-panel hidden" id="search-results"></div>
+        </header>
+
+        <main id="app-content" class="content-stage" aria-live="polite">
+          <section class="glass-panel loading-shell">
+            <div class="loading-bar"></div>
+            <div class="loading-copy">
+              <p class="eyebrow">Initializing</p>
+              <h3>Warming up the live NHL model.</h3>
+              <p>Pulling scores, standings, odds, player leaders, and team trend lines.</p>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <nav class="mobile-nav glass-panel" id="mobile-nav">
+      <button class="mobile-link is-active" data-route="overview">Home</button>
+      <button class="mobile-link" data-route="scores">Scores</button>
+      <button class="mobile-link" data-route="rankings">Ranks</button>
+      <button class="mobile-link" data-route="players">Players</button>
+      <button class="mobile-link" data-route="predictor">Odds</button>
+      <button class="mobile-link" data-route="settings">Prefs</button>
+    </nav>
+
+    <template id="empty-state-template">
+      <section class="glass-panel empty-state">
+        <p class="eyebrow">No Data Yet</p>
+        <h3>That panel is still syncing.</h3>
+        <p>Give the live feeds a moment or tap refresh to force a new pull.</p>
+      </section>
+    </template>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
