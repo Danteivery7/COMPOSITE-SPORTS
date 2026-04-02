@@ -7,6 +7,7 @@ export default function Navbar({ currentPage, onNavigate, theme, toggleTheme }) 
     const [mobileOpen, setMobileOpen] = useState(false);
 
     const navItems = [
+        { id: 'overview', label: 'Overview' },
         { id: 'live', label: 'Live' },
         { id: 'news', label: 'News' },
         { id: 'rankings', label: 'Rankings' },
@@ -26,7 +27,7 @@ export default function Navbar({ currentPage, onNavigate, theme, toggleTheme }) 
             <div className="navbar-inner">
                 <div className="navbar-brand-shell">
                     <p className="navbar-kicker">Composite Tracking Suite</p>
-                    <div className="navbar-brand" onClick={() => handleNav('live')}>
+                    <div className="navbar-brand" onClick={() => handleNav('overview')}>
                         <span className="brand-word">COMPOSITE</span>
                         <span className="brand-accent">MLB</span>
                     </div>

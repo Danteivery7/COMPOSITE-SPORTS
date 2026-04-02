@@ -309,14 +309,113 @@ const models = {
             : `The model grades his current run at ${tone.label} ${stats.hotnessScore}/5 based on the live season profile.`;
 
         const teamSentence = teamStats
-            ? `${teamName} sits at ${teamStats.wins}-${teamStats.losses} with a ${Number(teamStats.ovrRating || 0).toFixed(1)} team OVR, so his role is being measured inside a real team context rather than empty volume.`
-            : `${teamName} context remains part of the blend, but the rating is driven mostly by his own on-court output.`;
+            ? `${teamName} sits at ${teamStats.wins}-${teamStats.losses} with a ${Number(teamStats.ovrRating || 0).toFixed(1)} team OVR, but the player grade is still being driven by his own production, efficiency, and form rather than team record.`
+            : `${teamName} context helps with matchup framing, but the player grade is driven by his own on-court output.`;
 
         const weaknessSentence = weaknessNotes.length
             ? ` The next gains would come from ${weaknessNotes.join(' and ')}.`
             : '';
 
         return `${name} is ${pillars.join(', ')}. ${baselineSentence} The rest-of-season projection holds him around ${projection.points.toFixed(1)} PPG, ${projection.rebounds.toFixed(1)} RPG, and ${projection.assists.toFixed(1)} APG, with an expected OVR band of ${projection.floor.toFixed(1)}-${projection.ceiling.toFixed(1)}. ${teamSentence}${weaknessSentence}`;
+    },
+
+    normalizeSkillScore(value) {
+        return Math.max(0, Math.min(99, Math.round(value)));
+    },
+
+    buildPlayerIdentity(posAbbrev, archetype, buckets) {
+        const ordered = Object.entries(buckets)
+            .map(([key, value]) => ({ key, value: this.normalizeSkillScore(value) }))
+            .sort((a, b) => b.value - a.value);
+
+        const bucketMap = Object.fromEntries(ordered.map((entry) => [entry.key, entry.value]));
+        const top = ordered[0]?.key || 'shotCreation';
+        const second = ordered[1]?.key || top;
+
+        let primaryArchetype = 'Combo Creator';
+        if (archetype === 'guard') {
+            if ((bucketMap.stopPower || 0) >= 80 && (bucketMap.shotCreation || 0) >= 82 && (bucketMap.shootingGravity || 0) >= 76) primaryArchetype = '2-Way 3-Level Creator';
+            else if ((bucketMap.playmaking || 0) >= 84 && (bucketMap.shootingGravity || 0) >= 74) primaryArchetype = 'Inside-Out Playmaker';
+            else if ((bucketMap.rimPressure || 0) >= 82 && (bucketMap.playmaking || 0) >= 78) primaryArchetype = 'Slashing Floor General';
+            else if ((bucketMap.shootingGravity || 0) >= 86 && (bucketMap.shotCreation || 0) >= 74) primaryArchetype = 'Sharpshooting Shot Creator';
+            else if ((bucketMap.playmaking || 0) >= 86) primaryArchetype = 'Floor General';
+            else if ((bucketMap.stopPower || 0) >= 84) primaryArchetype = '2-Way Combo Guard';
+            else if ((bucketMap.shootingGravity || 0) >= 84) primaryArchetype = 'Sharpshooting Guard';
+        } else if (archetype === 'wing') {
+            if ((bucketMap.stopPower || 0) >= 80 && (bucketMap.shotCreation || 0) >= 78 && (bucketMap.shootingGravity || 0) >= 75) primaryArchetype = '2-Way 3-Level Creator';
+            else if ((bucketMap.shootingGravity || 0) >= 86) primaryArchetype = 'Sharpshooting Wing';
+            else if ((bucketMap.rimPressure || 0) >= 82 && (bucketMap.shotCreation || 0) >= 78) primaryArchetype = 'Slashing Wing Creator';
+            else if ((bucketMap.shotCreation || 0) >= 84) primaryArchetype = '3-Level Creator';
+            else if ((bucketMap.stopPower || 0) >= 85) primaryArchetype = '2-Way Wing Stopper';
+            else if ((bucketMap.playmaking || 0) >= 78) primaryArchetype = 'Point Forward';
+            else primaryArchetype = 'Scoring Wing';
+        } else {
+            if ((bucketMap.interiorControl || 0) >= 84 && (bucketMap.stopPower || 0) >= 82) primaryArchetype = 'Glass-Cleaning Rim Protector';
+            else if ((bucketMap.playmaking || 0) >= 76 && (bucketMap.shotCreation || 0) >= 72) primaryArchetype = 'Point Center';
+            else if ((bucketMap.shootingGravity || 0) >= 80) primaryArchetype = /^PF$/i.test(posAbbrev) ? 'Stretch Four' : 'Stretch Five';
+            else if ((bucketMap.rimPressure || 0) >= 82) primaryArchetype = 'Interior Finisher';
+            else if ((bucketMap.stopPower || 0) >= 82) primaryArchetype = 'Paint Protector';
+            else primaryArchetype = 'Inside Big';
+        }
+
+        const secondaryStyleMap = {
+            shotCreation: 'Shot Creation Pressure',
+            shootingGravity: 'Deep Range Gravity',
+            rimPressure: 'Downhill Rim Pressure',
+            playmaking: 'Connector Playmaking',
+            stopPower: 'Point-of-Attack Pressure',
+            interiorControl: 'Board Control',
+        };
+
+        const badgeMap = {
+            shotCreation: ['Space Creator', 'Tough Shot Craft'],
+            shootingGravity: ['Deep Range', 'Catch & Fire'],
+            rimPressure: ['Pressure Finisher', 'Paint Touch'],
+            playmaking: ['Table Setter', 'Drive And Kick'],
+            stopPower: ['On-Ball Menace', 'Lane Jump'],
+            interiorControl: ['Glass Control', 'Paint Patrol'],
+        };
+
+        const selectedBadges = [];
+        ordered.forEach((entry) => {
+            if (entry.value < 72) return;
+            (badgeMap[entry.key] || []).forEach((badge) => {
+                if (selectedBadges.length < 4 && !selectedBadges.includes(badge)) {
+                    selectedBadges.push(badge);
+                }
+            });
+        });
+        while (selectedBadges.length < 4) {
+            ['Competitive Motor', 'Role Flex', 'Late Clock Poise', 'Stability'].forEach((fallbackBadge) => {
+                if (selectedBadges.length < 4 && !selectedBadges.includes(fallbackBadge)) {
+                    selectedBadges.push(fallbackBadge);
+                }
+            });
+        }
+
+        let takeoverStyle = 'Steady Force';
+        if (top === 'shootingGravity' && second === 'shotCreation') takeoverStyle = 'Heat Check';
+        else if (top === 'playmaking') takeoverStyle = 'Point Maestro';
+        else if (top === 'rimPressure') takeoverStyle = 'Pressure Cooker';
+        else if (top === 'stopPower' && second === 'interiorControl') takeoverStyle = 'Anchor Mode';
+        else if (top === 'stopPower') takeoverStyle = 'Lockdown Pressure';
+        else if (top === 'interiorControl') takeoverStyle = 'Paint Patrol';
+        else if (top === 'shotCreation') takeoverStyle = 'Space Creator';
+
+        return {
+            primaryArchetype,
+            secondaryStyle: secondaryStyleMap[second] || 'Balanced Support',
+            skillBadges: selectedBadges.slice(0, 4),
+            takeoverStyle,
+            skillBuckets: {
+                shotCreation: bucketMap.shotCreation || 0,
+                shootingGravity: bucketMap.shootingGravity || 0,
+                rimPressure: bucketMap.rimPressure || 0,
+                playmaking: bucketMap.playmaking || 0,
+                stopPower: bucketMap.stopPower || 0,
+                interiorControl: bucketMap.interiorControl || 0,
+            }
+        };
     },
 
 
@@ -450,6 +549,17 @@ const models = {
             0.45 * this.normFair(s.rpg, 'rpg', archetype) // rebalanced to use DREB/RPG
         );
 
+        const shootingGravity = 100 * (
+            0.45 * this.normFair(s.threePct || 0, 'threePct', archetype) +
+            0.25 * this.normFair(s.threePa || 0, 'threePa', archetype) +
+            0.30 * this.normFair(s.efgPct || 50, 'efgPct', archetype)
+        );
+        const rimPressure = 100 * (
+            0.40 * this.normFair(ftRate, 'fta', archetype) +
+            0.35 * this.normFair(s.ppg, 'ppg', archetype) +
+            0.25 * this.normFair(s.tsPct || 55, 'tsPct', archetype)
+        );
+
         // D) Defensive Discipline
         const defDiscipline = 100 * (
             1.0 * this.normFair(foulRate, 'foulsPg', archetype, true)
@@ -540,13 +650,7 @@ const models = {
         else if (tsPct > 64) efficiencyMult = 1.07;
         else if (tsPct > 61) efficiencyMult = 1.04;
 
-        // 2. Team Success Factor (Winning Matters)
-        // Stars on winning teams get a boost.
-        // We use the first record item's winPercent if available.
-        const winPct = Number(teamStats?.winPct || 0.5);
-        const winFactor = 0.96 + (winPct * 0.08); // Range: 0.96 to 1.04
-
-        // 3. Specialist Penalty (The Dyson Daniels Fix)
+        // 2. Specialist Penalty (The Dyson Daniels Fix)
         // If you are a defensive god but score < 15 PPG, you are a role player, not a superstar.
         const ppg = parseFloat(s.ppg) || 0;
         let specialistPenalty = 1.0;
@@ -554,7 +658,7 @@ const models = {
         else if (ppg < 16 && defImpact > 82) specialistPenalty = 0.92;
 
         let playerOverall = 64 + 31 * Math.pow(playerOverallRaw / 100, 1.15);
-        playerOverall *= (efficiencyMult * winFactor * specialistPenalty);
+        playerOverall *= (efficiencyMult * specialistPenalty);
 
         // Volume Multiplier (MPG Rewards)
         const mpg = parseFloat(s.mpg) || 0;
@@ -619,6 +723,17 @@ const models = {
         else if (defImpact > 80 && (parseFloat(s.spg) > 1.5 || parseFloat(s.bpg) > 1.5)) archetypeLabel = "Two-Way Force";
         else if (efficiency > 85 && parseFloat(s.threePct) > 38) archetypeLabel = "Sharpshooter";
 
+        const stopPower = (0.55 * defImpact) + (0.45 * defDisruption);
+        const interiorControl = (0.60 * defPossessionEnding) + (0.40 * defImpact);
+        const identity = this.buildPlayerIdentity(posAbbrev, archetype, {
+            shotCreation,
+            shootingGravity,
+            rimPressure,
+            playmaking,
+            stopPower,
+            interiorControl,
+        });
+
         const hotnessScore = this.calculatePlayerTrendScore(s, archetype);
         const tone = this.classifyTone(hotnessScore);
         const projection = this.buildPlayerProjection(s, playerOverall, archetype);
@@ -659,7 +774,12 @@ const models = {
             defenseScore: Math.round(defDisruption),
             impactScore: Math.round(impactScoreRaw),
             availabilityScore: Math.round(availabilityScore),
-            archetype: archetypeLabel,
+            archetype: identity.primaryArchetype || archetypeLabel,
+            primaryArchetype: identity.primaryArchetype || archetypeLabel,
+            secondaryStyle: identity.secondaryStyle,
+            skillBadges: identity.skillBadges,
+            takeoverStyle: identity.takeoverStyle,
+            skillBuckets: identity.skillBuckets,
             hotnessScore: hotnessScore,
             tone: tone,
             projection: projection,
@@ -713,6 +833,14 @@ const models = {
             floor: Math.round(Math.max(60, rating - 2.5) * 10) / 10,
             ceiling: Math.round(Math.min(82, rating + 2.0) * 10) / 10,
         };
+        const identity = this.buildPlayerIdentity(posAbbrev, archetype, {
+            shotCreation: 58 + (salaryFactor * 18),
+            shootingGravity: 54 + (salaryFactor * 16),
+            rimPressure: isBig ? 70 + (salaryFactor * 14) : 56 + (salaryFactor * 14),
+            playmaking: isGuard ? 68 + (salaryFactor * 18) : 50 + (salaryFactor * 12),
+            stopPower: 52 + (salaryFactor * 15),
+            interiorControl: isBig ? 70 + (salaryFactor * 16) : 42 + (salaryFactor * 10),
+        });
         const aiOverview = `${athlete.fullName || athlete.displayName} does not have enough live NBA sample yet, so this card is anchored to a conservative baseline blend using contract tier, role context, and team environment. The model currently holds him at ${tone.label.toLowerCase()} ${hotnessScore}/5 with a shadow projection around ${projection.points.toFixed(1)} PPG, ${projection.rebounds.toFixed(1)} RPG, and ${projection.assists.toFixed(1)} APG.`;
 
         return {
@@ -729,7 +857,12 @@ const models = {
             mpg: mpg.toFixed(1),
             posAbbrev,
             hasRealStats: false,
-            archetype: rating >= 72 ? 'Rotation Piece' : 'Depth Piece',
+            archetype: identity.primaryArchetype || (rating >= 72 ? 'Rotation Piece' : 'Depth Piece'),
+            primaryArchetype: identity.primaryArchetype || (rating >= 72 ? 'Rotation Piece' : 'Depth Piece'),
+            secondaryStyle: identity.secondaryStyle,
+            skillBadges: identity.skillBadges,
+            takeoverStyle: identity.takeoverStyle,
+            skillBuckets: identity.skillBuckets,
             hotnessScore,
             tone,
             projection,
@@ -806,6 +939,57 @@ const models = {
         };
     },
 
+    getRecentFormMetrics(teamId) {
+        const games = (window.store.state.teamRecentForm?.[teamId] || []).slice(0, 5);
+        if (!games.length) {
+            return {
+                recentWins: 0,
+                recentLosses: 0,
+                recentWinPct: 0.5,
+                recentMargin: 0,
+                recentStreakValue: 0,
+            };
+        }
+
+        let recentWins = 0;
+        let recentLosses = 0;
+        let totalMargin = 0;
+        let recentStreakValue = 0;
+        let streakSign = null;
+
+        games.forEach((game, index) => {
+            const competition = game?.competitions?.[0];
+            const us = competition?.competitors?.find((competitor) => String(competitor?.team?.id) === String(teamId));
+            const opponent = competition?.competitors?.find((competitor) => String(competitor?.team?.id) !== String(teamId));
+            if (!us || !opponent) return;
+
+            const ourScore = Number(us?.score?.value ?? us?.score?.displayValue ?? 0);
+            const oppScore = Number(opponent?.score?.value ?? opponent?.score?.displayValue ?? 0);
+            const margin = ourScore - oppScore;
+            const won = Boolean(us?.winner);
+
+            if (won) recentWins += 1;
+            else recentLosses += 1;
+            totalMargin += margin;
+
+            if (index === 0) {
+                streakSign = won ? 1 : -1;
+                recentStreakValue = streakSign;
+            } else if ((won && streakSign === 1) || (!won && streakSign === -1)) {
+                recentStreakValue += streakSign;
+            }
+        });
+
+        const countedGames = Math.max(1, recentWins + recentLosses);
+        return {
+            recentWins,
+            recentLosses,
+            recentWinPct: recentWins / countedGames,
+            recentMargin: totalMargin / countedGames,
+            recentStreakValue,
+        };
+    },
+
     /**
      * MASTER function: Update all team rankings using the full spec.
      * Computes: Team Offense, Defense, Results, Schedule/Context, Roster Strength.
@@ -818,11 +1002,21 @@ const models = {
         let rankings = [];
         let allPpg = [], allOppPpg = [], allNetRtg = [], allWinPct = [];
         let allOffEff = [], allTrueShooting = [], allAstTo = [], allTurnoverRatio = [], allReboundRate = [], allPressure = [], allPace = [];
+        let allRecentWinPct = [], allRecentMargin = [], allStreakStrength = [], allShootingEfficiency = [];
 
         teams.forEach(team => {
             const baseStats = this.generateAdvancedTeamStats(teamStatsMap[team.id]);
             if (baseStats) {
-                rankings.push({ id: team.id, team, stats: baseStats });
+                const recent = this.getRecentFormMetrics(team.id);
+                const mergedStats = {
+                    ...baseStats,
+                    recentWins: recent.recentWins,
+                    recentLosses: recent.recentLosses,
+                    recentWinPct: recent.recentWinPct,
+                    recentMargin: recent.recentMargin,
+                    recentStreakValue: recent.recentStreakValue,
+                };
+                rankings.push({ id: team.id, team, stats: mergedStats });
                 allPpg.push(baseStats.ppg);
                 allOppPpg.push(baseStats.oppPpg);
                 allNetRtg.push(baseStats.netRtg);
@@ -834,6 +1028,10 @@ const models = {
                 allReboundRate.push(baseStats.reboundRate || 50);
                 allPressure.push(baseStats.pressureRate || 12);
                 allPace.push(baseStats.pace || 98);
+                allRecentWinPct.push(mergedStats.recentWinPct || 0.5);
+                allRecentMargin.push(mergedStats.recentMargin || 0);
+                allStreakStrength.push(this.parseStreakValue(baseStats.streak));
+                allShootingEfficiency.push(baseStats.shootingEfficiency || 53);
             }
         });
 
@@ -852,6 +1050,10 @@ const models = {
         const reboundBounds = tw(allReboundRate);
         const pressureBounds = tw(allPressure);
         const paceBounds = tw(allPace);
+        const recentWinBounds = tw(allRecentWinPct);
+        const recentMarginBounds = tw(allRecentMargin);
+        const streakBounds = tw(allStreakStrength);
+        const shootingEffBounds = tw(allShootingEfficiency);
 
         // Collect roster strength data across all teams first
         const allRosterStrengthRaw = [];
@@ -947,37 +1149,37 @@ const models = {
         rankings.forEach(r => {
             const rd = rosterDataByTeam[r.id] || {};
 
-            // --- Team Offense Score (Section 4B-1) ---
-            // Simplified: use PPG percentile + roster offense
+            const streakStrength = this.parseStreakValue(r.stats.streak);
+
+            // --- Team Offense Score ---
             const teamOffenseScore = 100 * (
-                0.28 * this.norm(r.stats.ppg, ppgBounds.min, ppgBounds.max) +
-                0.20 * this.norm(r.stats.offensiveEfficiency || 110, offEffBounds.min, offEffBounds.max) +
-                0.16 * this.norm(r.stats.trueShootingPct || 57, tsBounds.min, tsBounds.max) +
-                0.14 * this.norm(r.stats.assistTurnoverRatio || 1.7, astToBounds.min, astToBounds.max) +
+                0.22 * this.norm(r.stats.ppg, ppgBounds.min, ppgBounds.max) +
+                0.24 * this.norm(r.stats.offensiveEfficiency || 110, offEffBounds.min, offEffBounds.max) +
+                0.15 * this.norm(r.stats.trueShootingPct || 57, tsBounds.min, tsBounds.max) +
+                0.11 * this.norm(r.stats.shootingEfficiency || 53, shootingEffBounds.min, shootingEffBounds.max) +
+                0.12 * this.norm(r.stats.assistTurnoverRatio || 1.7, astToBounds.min, astToBounds.max) +
                 0.10 * this.normInverse(r.stats.turnoverRatio || 13, turnoverBounds.min, turnoverBounds.max) +
-                0.12 * this.norm(r.stats.pace || 98, paceBounds.min, paceBounds.max)
+                0.06 * this.norm(r.stats.pace || 98, paceBounds.min, paceBounds.max)
             );
 
-            // --- Team Defense Score (Section 4B-2) ---
+            // --- Team Defense Score ---
             const teamDefenseScore = 100 * (
                 0.34 * this.normInverse(r.stats.oppPpg, oppPpgBounds.min, oppPpgBounds.max) +
-                0.16 * this.norm(r.stats.reboundRate || 50, reboundBounds.min, reboundBounds.max) +
-                0.16 * this.norm(r.stats.pressureRate || 12, pressureBounds.min, pressureBounds.max) +
-                0.14 * this.norm(r.stats.winPct, winPctBounds.min, winPctBounds.max) +
-                0.10 * this.norm(r.stats.netRtg, netRtgBounds.min, netRtgBounds.max) +
-                0.10 * this.normInverse(r.stats.turnoverRatio || 13, turnoverBounds.min, turnoverBounds.max)
+                0.20 * this.norm(r.stats.netRtg, netRtgBounds.min, netRtgBounds.max) +
+                0.14 * this.norm(r.stats.reboundRate || 50, reboundBounds.min, reboundBounds.max) +
+                0.12 * this.norm(r.stats.pressureRate || 12, pressureBounds.min, pressureBounds.max) +
+                0.10 * this.normInverse(r.stats.turnoverRatio || 13, turnoverBounds.min, turnoverBounds.max) +
+                0.10 * this.norm(r.stats.recentMargin || 0, recentMarginBounds.min, recentMarginBounds.max)
             );
 
-            // --- Team Results Score (Section 4B-3) ---
+            // --- Results / Form Score ---
             const teamResultsScore = 100 * (
-                0.50 * this.norm(r.stats.winPct, winPctBounds.min, winPctBounds.max) +
-                0.35 * this.norm(r.stats.netRtg, netRtgBounds.min, netRtgBounds.max) +
-                0.15 * this.norm(r.stats.winPct, winPctBounds.min, winPctBounds.max) // proxy for last10
+                0.30 * this.norm(r.stats.winPct, winPctBounds.min, winPctBounds.max) +
+                0.22 * this.norm(r.stats.netRtg, netRtgBounds.min, netRtgBounds.max) +
+                0.20 * this.norm(r.stats.recentWinPct || 0.5, recentWinBounds.min, recentWinBounds.max) +
+                0.16 * this.norm(r.stats.recentMargin || 0, recentMarginBounds.min, recentMarginBounds.max) +
+                0.12 * this.norm(streakStrength, streakBounds.min, streakBounds.max)
             );
-
-            // --- Schedule/Context Score (Section 4B-4) ---
-            // Approximate: use away performance proxy (net rating under-performance = harder schedule)
-            const scheduleContextScore = 50; // Neutral — ESPN doesn't provide SOS directly
 
             // --- Roster Strength Score (Section 4C Step 5) ---
             const rotationStrengthScore = 100 * this.norm(rd.rosterOverallRaw || 60, rosterBounds.min, rosterBounds.max);
@@ -991,28 +1193,24 @@ const models = {
             const teamRosterDefenseScore = 100 * this.norm(rd.rosterDefRaw || 60, rosterDefBounds.min, rosterDefBounds.max);
             const teamRosterOverallScore = rosterStrengthScore;
 
-            // --- Final Team Offensive Score (Section 19A) ---
-            const finalTeamOffenseScore = 0.72 * teamOffenseScore + 0.28 * teamRosterOffenseScore;
+            // --- Final Team Offensive Score ---
+            const finalTeamOffenseScore = teamOffenseScore;
             let teamOffOverall = 64 + 31 * Math.pow(finalTeamOffenseScore / 100, 0.90);
-            teamOffOverall = Math.max(62, Math.min(95, teamOffOverall));
+            teamOffOverall = Math.max(62, Math.min(96, teamOffOverall));
 
-            // --- Final Team Defensive Score (Section 19B) ---
-            const finalTeamDefenseScore = 0.74 * teamDefenseScore + 0.26 * teamRosterDefenseScore;
+            // --- Final Team Defensive Score ---
+            const finalTeamDefenseScore = teamDefenseScore;
             let teamDefOverall = 64 + 31 * Math.pow(finalTeamDefenseScore / 100, 0.90);
-            teamDefOverall = Math.max(62, Math.min(95, teamDefOverall));
+            teamDefOverall = Math.max(62, Math.min(96, teamDefOverall));
 
-            // --- Final Team Overall (Section 19C) ---
-            // Recalibrated to favor Roster Strength (Star Power + Rotation)
-            // 35% Roster influence instead of 22%
+            // --- Final Team Overall ---
             const teamRaw =
-                0.20 * finalTeamOffenseScore +
-                0.20 * finalTeamDefenseScore +
-                0.17 * teamResultsScore +
-                0.08 * scheduleContextScore +
-                0.35 * teamRosterOverallScore;
+                0.32 * finalTeamOffenseScore +
+                0.32 * finalTeamDefenseScore +
+                0.36 * teamResultsScore;
 
             let teamOverall = 62 + 33 * Math.pow(teamRaw / 100, 0.88);
-            teamOverall = Math.max(60, Math.min(95, teamOverall));
+            teamOverall = Math.max(60, Math.min(96.5, teamOverall));
 
             r.stats.offRating = teamOffOverall.toFixed(1);
             r.stats.defRating = teamDefOverall.toFixed(1);
@@ -1022,12 +1220,14 @@ const models = {
             r.stats.rosterStrength = rosterStrengthScore.toFixed(1);
             r.stats.starPower = starPowerScore.toFixed(1);
             r.stats.depth = depthScore.toFixed(1);
+            r.stats.resultsScore = teamResultsScore.toFixed(1);
+            r.stats.recentRecord = `${r.stats.recentWins || 0}-${r.stats.recentLosses || 0}`;
             r.stats.trendScore =
-                (r.stats.winPct >= 0.55 ? 1 : 0) +
+                (r.stats.recentWinPct >= 0.60 ? 1 : 0) +
                 (r.stats.netRtg >= 3 ? 1 : 0) +
-                (this.parseStreakValue(r.stats.streak) >= 2 ? 1 : 0) +
+                (streakStrength >= 2 ? 1 : 0) +
                 ((r.stats.offensiveEfficiency || 110) >= 114 ? 1 : 0) +
-                ((r.stats.reboundRate || 50) >= 51 ? 1 : 0);
+                ((r.stats.recentMargin || 0) >= 4 ? 1 : 0);
             r.stats.tone = this.classifyTone(r.stats.trendScore);
         });
 

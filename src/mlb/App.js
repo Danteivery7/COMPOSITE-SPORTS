@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Navbar from '@/src/mlb/components/Navbar';
+import OverviewPage from '@/src/mlb/components/OverviewPage';
 import LivePage from '@/src/mlb/components/LivePage';
 import RankingsPage from '@/src/mlb/components/RankingsPage';
 import TeamsPage from '@/src/mlb/components/TeamsPage';
@@ -14,7 +15,7 @@ import GameDetailPage from '@/src/mlb/components/GameDetailPage';
 import NewsPage from '@/src/mlb/components/NewsPage';
 
 export default function Home() {
-  const [currentPage, setCurrentPage] = useState('live');
+  const [currentPage, setCurrentPage] = useState('overview');
   const [theme, setTheme] = useState('dark');
   const [favorites, setFavorites] = useState([]);
   const [selectedTeamId, setSelectedTeamId] = useState(null);
@@ -96,6 +97,8 @@ export default function Home() {
 
   const renderPage = () => {
     switch (currentPage) {
+      case 'overview':
+        return <OverviewPage onGameClick={navigateToGame} onTeamClick={navigateToTeam} onPlayerClick={(id) => navigateToPlayer(id, 'overview')} />;
       case 'live':
         return <LivePage onGameClick={navigateToGame} />;
       case 'rankings':
@@ -117,7 +120,7 @@ export default function Home() {
       case 'settings':
         return <SettingsPage favorites={favorites} toggleFavorite={toggleFavorite} theme={theme} toggleTheme={toggleTheme} />;
       default:
-        return <LivePage onGameClick={navigateToGame} />;
+        return <OverviewPage onGameClick={navigateToGame} onTeamClick={navigateToTeam} onPlayerClick={(id) => navigateToPlayer(id, 'overview')} />;
     }
   };
 

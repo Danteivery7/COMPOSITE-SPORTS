@@ -614,6 +614,426 @@ select:focus { outline: none; border-color: var(--brand-primary); box-shadow: 0 
     text-align: center;
 }
 
+/* ======================== OVERVIEW ======================== */
+.overview-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.overview-panel {
+    grid-column: span 4;
+    padding: 20px;
+}
+
+.overview-hero-panel {
+    grid-column: span 12;
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.65fr);
+    gap: 18px;
+    background:
+        radial-gradient(circle at top right, rgba(251, 191, 36, 0.18), transparent 34%),
+        linear-gradient(135deg, rgba(249, 115, 22, 0.16), rgba(17, 11, 9, 0));
+}
+
+.overview-span-two {
+    grid-column: span 8;
+}
+
+.overview-hero-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.overview-kicker {
+    color: var(--brand-secondary);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+}
+
+.overview-kicker + h3,
+.overview-hero-copy h3 {
+    font-size: 26px;
+    font-weight: 900;
+    letter-spacing: -0.03em;
+}
+
+.overview-hero-copy p {
+    color: var(--text-secondary);
+    line-height: 1.7;
+    max-width: 760px;
+}
+
+.overview-chip-row,
+.player-intel-tags {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.overview-chip,
+.player-intel-tag,
+.badge-pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--divider);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    padding: 8px 12px;
+}
+
+.overview-chip.success {
+    color: var(--success-color);
+    border-color: rgba(16, 185, 129, 0.24);
+    background: rgba(16, 185, 129, 0.12);
+}
+
+.overview-chip.warning {
+    color: var(--warning-color);
+    border-color: rgba(245, 158, 11, 0.24);
+    background: rgba(245, 158, 11, 0.12);
+}
+
+.overview-hero-metrics {
+    display: grid;
+    gap: 12px;
+}
+
+.overview-panel-head,
+.section-headline,
+.player-intel-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.overview-panel-sub,
+.section-headline span {
+    color: var(--text-tertiary);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.overview-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.overview-row-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--divider);
+    border-radius: 14px;
+    color: var(--text-primary);
+    cursor: pointer;
+    text-align: left;
+    transition: var(--transition-fast);
+}
+
+.overview-row-btn:hover {
+    transform: translateY(-1px);
+    border-color: rgba(249, 115, 22, 0.24);
+    background: var(--bg-card-hover);
+}
+
+.overview-row-title {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.overview-row-subtitle {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.overview-score-stack,
+.overview-metric-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.overview-score-stack span:first-child,
+.overview-metric-stack strong {
+    font-weight: 800;
+    font-size: 16px;
+}
+
+.overview-score-stack span:last-child,
+.overview-metric-stack span {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    text-align: right;
+    max-width: 150px;
+}
+
+.overview-player-shell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.overview-player-headshot {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    object-fit: cover;
+    background: var(--bg-surface);
+    border: 1px solid var(--divider);
+}
+
+/* ======================== PLAYER DETAIL ======================== */
+.player-detail-layout {
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr);
+    gap: 28px;
+    align-items: start;
+}
+
+.nba2k-player-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 24px;
+    padding: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background:
+        radial-gradient(circle at top right, rgba(251, 191, 36, 0.22), transparent 32%),
+        linear-gradient(145deg, rgba(18, 12, 10, 1) 0%, rgba(32, 18, 14, 1) 52%, rgba(55, 28, 18, 1) 100%);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.38);
+}
+
+.nba2k-player-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 24%),
+        radial-gradient(circle at 20% 20%, rgba(249, 115, 22, 0.18), transparent 26%);
+    pointer-events: none;
+}
+
+.nba2k-card-top,
+.nba2k-card-body,
+.nba2k-card-ratings {
+    position: relative;
+    z-index: 1;
+}
+
+.nba2k-card-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+}
+
+.nba2k-ovr {
+    font-size: 58px;
+    line-height: 0.95;
+    font-weight: 900;
+    letter-spacing: -0.06em;
+    color: #fde68a;
+    text-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
+}
+
+.nba2k-ovr-label {
+    margin-top: 6px;
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--text-secondary);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.nba2k-chip {
+    display: inline-flex;
+    margin-top: 12px;
+    padding: 7px 12px;
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.08);
+    color: white;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.nba2k-chip.tone {
+    color: #08111d;
+    border-color: transparent;
+}
+
+.nba2k-team-mark {
+    text-align: right;
+}
+
+.nba2k-pos {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text-secondary);
+}
+
+.nba2k-card-body {
+    text-align: center;
+    margin-top: 18px;
+}
+
+.nba2k-player-image {
+    width: 210px;
+    height: 160px;
+    object-fit: contain;
+    filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.48));
+}
+
+.nba2k-card-name {
+    margin-top: 8px;
+    font-size: 23px;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.nba2k-card-meta {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.nba2k-card-style {
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--brand-secondary);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.nba2k-card-ratings {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.nba2k-rating-box {
+    padding: 14px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    text-align: center;
+}
+
+.nba2k-rating-value {
+    font-size: 24px;
+    font-weight: 800;
+}
+
+.player-detail-main {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.player-intel-panel,
+.skill-dna-panel,
+.badge-panel,
+.season-stats-panel {
+    padding: 20px;
+}
+
+.player-intel-panel p {
+    color: var(--text-secondary);
+    font-size: 15px;
+    line-height: 1.75;
+    margin: 0 0 14px 0;
+}
+
+.player-profile-grid,
+.season-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px;
+}
+
+.skill-dna-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.skill-dna-row,
+.context-card {
+    padding: 12px;
+    border-radius: 14px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--divider);
+}
+
+.skill-dna-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.skill-dna-bar {
+    height: 8px;
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.skill-dna-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: var(--brand-gradient);
+}
+
+.badge-list {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.team-context-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.context-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.context-card strong {
+    font-size: 16px;
+}
+
 /* ======================== TEAM CARD ======================== */
 .team-card {
     padding: 16px;
@@ -732,6 +1152,12 @@ select:focus { outline: none; border-color: var(--brand-primary); box-shadow: 0 
     .news-grid { grid-template-columns: 1fr; }
     .teams-grid { grid-template-columns: 1fr 1fr; }
     .stat-value { font-size: 22px; }
+    .overview-hero-metrics { grid-template-columns: 1fr; }
+    .overview-row-btn { padding: 12px; }
+    .overview-row-title { font-size: 13px; }
+    .nba2k-player-card { padding: 18px; }
+    .nba2k-ovr { font-size: 48px; }
+    .skill-dna-grid { grid-template-columns: 1fr; }
 }
 
 /* ======================== LIGHT MODE OVERRIDES ========================
@@ -822,8 +1248,80 @@ select:focus { outline: none; border-color: var(--brand-primary); box-shadow: 0 
     border-color: rgba(0, 0, 0, 0.08);
 }
 
+[data-theme="light"] .overview-row-btn,
+[data-theme="light"] .skill-dna-row,
+[data-theme="light"] .context-card,
+[data-theme="light"] .player-intel-tag,
+[data-theme="light"] .badge-pill,
+[data-theme="light"] .overview-chip {
+    background: #EEF1F6;
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .overview-hero-panel {
+    background:
+        radial-gradient(circle at top right, rgba(249, 115, 22, 0.18), transparent 34%),
+        linear-gradient(135deg, rgba(194, 65, 12, 0.10), rgba(255, 255, 255, 0));
+}
+
+[data-theme="light"] .nba2k-player-card {
+    background:
+        radial-gradient(circle at top right, rgba(245, 158, 11, 0.22), transparent 34%),
+        linear-gradient(145deg, #f7efe5 0%, #f1dfcb 52%, #ebd2b8 100%);
+    border-color: rgba(0, 0, 0, 0.08);
+    box-shadow: 0 18px 34px rgba(0, 0, 0, 0.10);
+}
+
+[data-theme="light"] .nba2k-chip {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.08);
+    color: #111827;
+}
+
+[data-theme="light"] .nba2k-rating-box {
+    background: rgba(255, 255, 255, 0.72);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
 /* Logo */
 [data-theme="light"] .logo-composite { color: #111827; }
+
+@media (max-width: 1100px) {
+    .overview-panel,
+    .overview-span-two {
+        grid-column: span 6;
+    }
+
+    .overview-hero-panel {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 960px) {
+    .player-detail-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .skill-dna-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 780px) {
+    .overview-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .overview-panel,
+    .overview-span-two,
+    .overview-hero-panel {
+        grid-column: span 1;
+    }
+
+    .overview-hero-metrics {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
 
 /* ======================== GAME DETAIL VIEW ======================== */
 .game-detail-hero {

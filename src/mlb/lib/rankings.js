@@ -17,11 +17,13 @@ import { fetchStandings, fetchAllTeamStats, fetchScoreboard, fetchTeamSchedule }
 import { ALL_TEAMS } from './teams';
 import { cacheGet, cacheSet, CACHE_TTL } from './cache';
 
+const RANKINGS_CACHE_KEY = 'computed_rankings_v7';
+
 /* ======================================================================
    COMPOSITE RANKING COMPUTATION
    ====================================================================== */
 export async function computeRankings() {
-    const cached = cacheGet('computed_rankings_v7');
+    const cached = cacheGet(RANKINGS_CACHE_KEY);
     if (cached) return cached;
 
     // Fetch standings + deep team stats in parallel + scoreboard for live records
@@ -335,7 +337,7 @@ export async function computeRankings() {
         lastUpdated: new Date().toISOString(),
     };
 
-    cacheSet('computed_rankings', result, CACHE_TTL.RANKINGS);
+    cacheSet(RANKINGS_CACHE_KEY, result, CACHE_TTL.RANKINGS);
     return result;
 }
 

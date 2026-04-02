@@ -27,6 +27,9 @@ const app = {
                 // Only show loading progress if we don't have cached data yet
                 if (!window.store.state.cacheLoaded) window.ui.renderLoadingProgress();
             }
+            if (['games', 'news', 'rankings', 'teams', 'players'].includes(key)) {
+                window.ui.renderOverview();
+            }
         });
 
         // ---- INSTANT RENDER from cache ----
@@ -42,6 +45,7 @@ const app = {
             window.ui.renderTeamsList(window.store.state.teams);
             window.ui.renderPlayersList(window.store.state.players);
             window.ui.renderPredictorSetup();
+            window.ui.renderOverview();
         }
 
         // ---- Background refresh (non-blocking) ----
@@ -75,9 +79,10 @@ const app = {
             window.store.setTeams(teams);
 
             // Fetch team profile stats + Core API detailed stats — all 30 in parallel
-            const [teamProfiles, teamDetailedStats] = await Promise.all([
+            const [teamProfiles, teamDetailedStats, teamRecentForms] = await Promise.all([
                 Promise.all(teams.map(t => window.api.fetchTeamStats(t.id))),
-                Promise.all(teams.map(t => window.api.fetchTeamStatistics(t.id)))
+                Promise.all(teams.map(t => window.api.fetchTeamStatistics(t.id))),
+                Promise.all(teams.map(t => window.api.fetchTeamSchedule(t.id)))
             ]);
 
             teamProfiles.forEach((profile, idx) => {
@@ -86,6 +91,10 @@ const app = {
 
             teamDetailedStats.forEach((stats, idx) => {
                 if (stats) window.store.state.teamDetailedStats[teams[idx].id] = stats;
+            });
+
+            teamRecentForms.forEach((games, idx) => {
+                window.store.setTeamRecentForm(teams[idx].id, games || []);
             });
 
             // Generate initial rankings
@@ -191,6 +200,7 @@ const app = {
             if (document.getElementById('pane-players')?.classList.contains('active')) {
                 window.ui.renderPlayersList(window.store.state.players);
             }
+            window.ui.renderOverview();
             console.log(`[CompositeNBA] Stats sync complete: ${allPlayerEntries.length} players tracked.`);
         };
 
@@ -243,8 +253,18 @@ const app = {
             if (teams && teams.length) {
                 window.store.setTeams(teams);
 
-                const profiles = await Promise.all(teams.map(t => window.api.fetchTeamStats(t.id)));
+                const [profiles, detailedStats, recentForms] = await Promise.all([
+                    Promise.all(teams.map(t => window.api.fetchTeamStats(t.id))),
+                    Promise.all(teams.map(t => window.api.fetchTeamStatistics(t.id))),
+                    Promise.all(teams.map(t => window.api.fetchTeamSchedule(t.id)))
+                ]);
                 profiles.forEach((p, i) => { if (p) window.store.setTeamStats(teams[i].id, p); });
+                detailedStats.forEach((stats, i) => {
+                    if (stats) window.store.state.teamDetailedStats[teams[i].id] = stats;
+                });
+                recentForms.forEach((games, i) => {
+                    window.store.setTeamRecentForm(teams[i].id, games || []);
+                });
 
                 window.models.updateTeamRankings();
                 await this.fetchAllRosters(teams);

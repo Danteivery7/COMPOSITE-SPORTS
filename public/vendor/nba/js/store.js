@@ -10,10 +10,12 @@ const store = {
         teams: [],
         teamStats: {},
         teamDetailedStats: {},     // Core API team statistics
+        teamRecentForm: {},
         teamRankings: [],
         players: [],
         rosters: {},
         leagueStats: {},           // min/max/avg for normalization
+        roleStats: {},
         favorites: {
             teams: [],
             players: []
@@ -93,6 +95,7 @@ const store = {
                 rosters: this.state.rosters,
                 teamStats: this.state.teamStats,
                 teamDetailedStats: this.state.teamDetailedStats,
+                teamRecentForm: this.state.teamRecentForm,
                 lastUpdated: this.state.lastUpdated,
                 timestamp: Date.now()
             };
@@ -140,6 +143,7 @@ const store = {
             if (cache.rosters) this.state.rosters = cache.rosters;
             if (cache.teamStats) this.state.teamStats = cache.teamStats;
             if (cache.teamDetailedStats) this.state.teamDetailedStats = cache.teamDetailedStats;
+            if (cache.teamRecentForm) this.state.teamRecentForm = cache.teamRecentForm;
             if (cache.lastUpdated) this.state.lastUpdated = { ...this.state.lastUpdated, ...cache.lastUpdated };
 
             this.state.cacheLoaded = true;
@@ -176,6 +180,10 @@ const store = {
     setRoster(teamId, roster) {
         this.state.rosters[teamId] = roster;
         this.state.lastUpdated.rosters = Date.now();
+    },
+
+    setTeamRecentForm(teamId, games) {
+        this.state.teamRecentForm[teamId] = games;
     },
 
     setAllPlayers(players) {

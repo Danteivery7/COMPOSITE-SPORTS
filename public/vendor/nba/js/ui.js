@@ -100,7 +100,9 @@ const ui = {
         }
 
         // Trigger renders on tab switch
-        if (tabId === 'rankings') {
+        if (tabId === 'overview') {
+            this.renderOverview();
+        } else if (tabId === 'rankings') {
             this.renderRankings(window.store.state.teamRankings);
             this.renderPredictorSetup();
         } else if (tabId === 'news') {
@@ -121,7 +123,7 @@ const ui = {
             const prev = this.navStack.pop();
             this.switchTab(prev, false); // Don't push to stack when going back
         } else {
-            this.switchTab('live', false);
+            this.switchTab('overview', false);
         }
     },
 
@@ -219,6 +221,301 @@ const ui = {
         if (label === 'Steady') return '#60a5fa';
         if (label === 'Chilly') return '#f59e0b';
         return '#ef4444';
+    },
+
+    getGameSortPriority(game, now = new Date()) {
+        const state = game?.status?.type?.state || 'pre';
+        const start = new Date(game?.date);
+        const minsUntil = (start - now) / 60000;
+        if (state === 'in') return 0;
+        if (state === 'pre') {
+            if (minsUntil > 0 && minsUntil <= 5) return 1;
+            if (minsUntil > 0 && minsUntil <= 30) return 2;
+            return 3;
+        }
+        if (state === 'post') return 4;
+        return 5;
+    },
+
+    getFeaturedGames(limit = 5) {
+        const now = new Date();
+        return [...(window.store.state.games || [])]
+            .sort((a, b) => {
+                const priorityDiff = this.getGameSortPriority(a, now) - this.getGameSortPriority(b, now);
+                if (priorityDiff !== 0) return priorityDiff;
+                return new Date(a.date) - new Date(b.date);
+            })
+            .slice(0, limit);
+    },
+
+    getTrendingPlayers(limit = 8) {
+        const slateTeamIds = new Set(
+            (window.store.state.games || []).flatMap((game) => {
+                const competitors = game?.competitions?.[0]?.competitors || [];
+                return competitors.map((competitor) => String(competitor?.team?.id));
+            }).filter(Boolean)
+        );
+
+        return [...(window.store.state.players || [])]
+            .sort((a, b) => {
+                const aOnSlate = slateTeamIds.has(String(a.teamId)) ? 1 : 0;
+                const bOnSlate = slateTeamIds.has(String(b.teamId)) ? 1 : 0;
+                if (aOnSlate !== bOnSlate) return bOnSlate - aOnSlate;
+                const hotDiff = (b.rating?.hotnessScore || 0) - (a.rating?.hotnessScore || 0);
+                if (hotDiff !== 0) return hotDiff;
+                return (b.rating?.ratingNum || 0) - (a.rating?.ratingNum || 0);
+            })
+            .slice(0, limit);
+    },
+
+    getOverviewEdges(limit = 5) {
+        return (window.store.state.games || [])
+            .filter((game) => game?.status?.type?.state === 'pre')
+            .map((game) => {
+                const competition = game?.competitions?.[0];
+                const away = competition?.competitors?.find((competitor) => competitor.homeAway === 'away');
+                const home = competition?.competitors?.find((competitor) => competitor.homeAway === 'home');
+                if (!away?.team?.id || !home?.team?.id) return null;
+
+                const prediction = window.predictor.predict(away.team.id, home.team.id, true);
+                if (!prediction) return null;
+
+                const leaningHome = Number(prediction.homeWinProbability || 0) >= Number(prediction.awayWinProbability || 0);
+                const leanTeam = leaningHome ? prediction.teamB : prediction.teamA;
+                const edgeScore = Math.max(
+                    Math.abs(Number(prediction.marketEdge || 0) * 100),
+                    Math.abs(Number(prediction.spreadEdge || 0)),
+                    Math.abs(Number(prediction.homeWinProbability || 0) - Number(prediction.awayWinProbability || 0)) * 0.5
+                );
+                const official = Math.abs(Number(prediction.marketEdge || 0)) >= 0.035 ||
+                    Math.abs(Number(prediction.spreadEdge || 0)) >= 1.5 ||
+                    prediction.confidence === 'High';
+
+                return {
+                    gameId: game.id,
+                    matchup: `${away.team.abbreviation} @ ${home.team.abbreviation}`,
+                    startTime: game.date,
+                    prediction,
+                    leanTeam,
+                    official,
+                    edgeScore,
+                };
+            })
+            .filter(Boolean)
+            .sort((a, b) => b.edgeScore - a.edgeScore)
+            .slice(0, limit);
+    },
+
+    getOverviewPick(edges) {
+        if (!edges.length) {
+            return {
+                hasOfficialPick: false,
+                title: 'No official play',
+                summary: 'No NBA game is clearing the current edge threshold right now.',
+                edge: null,
+            };
+        }
+
+        const strongestOfficial = edges.find((edge) => edge.official);
+        const edge = strongestOfficial || edges[0];
+        const leaningHome = Number(edge.prediction.homeWinProbability || 0) >= Number(edge.prediction.awayWinProbability || 0);
+        const lineDisplay = edge.prediction.marketEdge !== null
+            ? `ML ${edge.leanTeam.team.abbreviation} ${this.formatSigned(Math.abs(edge.prediction.marketEdge * 100), 1)} pts`
+            : edge.prediction.spreadEdge !== null
+                ? `${edge.prediction.projectedSpread} edge ${this.formatSigned(Math.abs(edge.prediction.spreadEdge), 1)}`
+                : edge.prediction.bettingLean;
+
+        return {
+            hasOfficialPick: Boolean(strongestOfficial),
+            title: strongestOfficial ? `${edge.leanTeam.team.abbreviation} team bet` : 'No official play',
+            summary: strongestOfficial
+                ? `${edge.prediction.bettingLean} is the strongest qualified side on today’s board, with ${leaningHome ? edge.prediction.teamB.prob : edge.prediction.teamA.prob}% model win odds and ${lineDisplay}.`
+                : `Strongest lean is ${edge.prediction.bettingLean}, but the current NBA board does not clear the official-play threshold.`,
+            edge,
+        };
+    },
+
+    renderOverview() {
+        const container = document.getElementById('overview-container');
+        if (!container) return;
+
+        const featuredGames = this.getFeaturedGames(5);
+        const articles = (window.store.state.news || []).slice(0, 4);
+        const topTeams = (window.store.state.teamRankings || []).slice(0, 6);
+        const trendingPlayers = this.getTrendingPlayers(8);
+        const edges = this.getOverviewEdges(5);
+        const pick = this.getOverviewPick(edges);
+        const hottestPlayer = trendingPlayers[0] || null;
+        const hottestPlayerLabel = hottestPlayer
+            ? (hottestPlayer.fullName || hottestPlayer.displayName || hottestPlayer.teamAbbr || '--').split(' ').slice(-1)[0]
+            : '--';
+
+        const formatPublished = (isoString) => {
+            if (!isoString) return 'Latest';
+            return new Date(isoString).toLocaleString([], {
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+            });
+        };
+
+        container.innerHTML = `
+            <section class="card overview-panel overview-hero-panel">
+                <div class="overview-hero-copy">
+                    <div class="overview-kicker">Pick Of The Day</div>
+                    <h3>${pick.title}</h3>
+                    <p>${pick.summary}</p>
+                    ${pick.edge ? `
+                        <div class="overview-chip-row">
+                            <span class="overview-chip ${pick.hasOfficialPick ? 'success' : 'warning'}">${pick.hasOfficialPick ? 'Official play' : 'Strongest lean'}</span>
+                            <span class="overview-chip">${pick.edge.matchup}</span>
+                            <span class="overview-chip">${pick.edge.prediction.modelScoreLabel}</span>
+                            <span class="overview-chip">${pick.edge.prediction.bettingLean}</span>
+                        </div>
+                    ` : ''}
+                </div>
+                <div class="overview-hero-metrics">
+                    <div class="card stat-card">
+                        <div class="stat-label">Live Games</div>
+                        <div class="stat-value">${(window.store.state.games || []).filter((game) => game?.status?.type?.state === 'in').length}</div>
+                    </div>
+                    <div class="card stat-card">
+                        <div class="stat-label">Top Team</div>
+                        <div class="stat-value" style="font-size:20px;">${topTeams[0]?.team?.abbreviation || '--'}</div>
+                    </div>
+                    <div class="card stat-card">
+                        <div class="stat-label">Hottest Player</div>
+                        <div class="stat-value" style="font-size:20px;">${hottestPlayerLabel}</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="card overview-panel">
+                <div class="overview-panel-head">
+                    <h3>Scores Snapshot</h3>
+                    <span class="overview-panel-sub">Today</span>
+                </div>
+                ${featuredGames.length ? `
+                    <div class="overview-stack">
+                        ${featuredGames.map((game) => {
+                            const competition = game?.competitions?.[0];
+                            const away = competition?.competitors?.find((competitor) => competitor.homeAway === 'away');
+                            const home = competition?.competitors?.find((competitor) => competitor.homeAway === 'home');
+                            return `
+                                <button class="overview-row-btn" onclick="window.ui.renderGameDetail('${game.id}')">
+                                    <div>
+                                        <div class="overview-row-title">${away?.team?.abbreviation || 'AWY'} @ ${home?.team?.abbreviation || 'HME'}</div>
+                                        <div class="overview-row-subtitle">${game?.status?.type?.shortDetail || new Date(game.date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</div>
+                                    </div>
+                                    <div class="overview-score-stack">
+                                        <span>${away?.score || '0'}</span>
+                                        <span>${home?.score || '0'}</span>
+                                    </div>
+                                </button>
+                            `;
+                        }).join('')}
+                    </div>
+                ` : '<div class="news-empty">No games on the board yet.</div>'}
+            </section>
+
+            <section class="card overview-panel">
+                <div class="overview-panel-head">
+                    <h3>Top Teams</h3>
+                    <span class="overview-panel-sub">Official composite</span>
+                </div>
+                ${topTeams.length ? `
+                    <div class="overview-stack">
+                        ${topTeams.map((entry) => `
+                            <button class="overview-row-btn" onclick="window.ui.showTeamDetail('${entry.id}')">
+                                <div>
+                                    <div class="overview-row-title">#${entry.rank} ${entry.team.displayName}</div>
+                                    <div class="overview-row-subtitle">${entry.stats.wins}-${entry.stats.losses} • ${entry.stats.recentRecord || '--'} last 5</div>
+                                </div>
+                                <div class="overview-metric-stack">
+                                    <strong>${entry.stats.ovrRating}</strong>
+                                    <span>OVR</span>
+                                </div>
+                            </button>
+                        `).join('')}
+                    </div>
+                ` : '<div class="news-empty">Team board is still loading.</div>'}
+            </section>
+
+            <section class="card overview-panel overview-span-two">
+                <div class="overview-panel-head">
+                    <h3>Trending News</h3>
+                    <span class="overview-panel-sub">ESPN feed</span>
+                </div>
+                ${articles.length ? `
+                    <div class="news-grid">
+                        ${articles.map((article) => `
+                            <a class="card news-card" href="${article.link}" target="_blank" rel="noreferrer">
+                                ${article.image ? `<img src="${article.image}" alt="${article.headline}" class="news-card-image" onerror="this.remove()">` : ''}
+                                <div class="news-card-body ${article.image ? '' : 'news-card-body-no-image'}">
+                                    <div class="news-card-meta">
+                                        <span>${article.source || 'ESPN'}</span>
+                                        <span>${formatPublished(article.published)}</span>
+                                    </div>
+                                    <h3>${article.headline}</h3>
+                                    ${article.description ? `<p>${article.description}</p>` : ''}
+                                    <span class="news-card-link">Open Story</span>
+                                </div>
+                            </a>
+                        `).join('')}
+                    </div>
+                ` : '<div class="news-empty">No NBA news available.</div>'}
+            </section>
+
+            <section class="card overview-panel">
+                <div class="overview-panel-head">
+                    <h3>Trending Players</h3>
+                    <span class="overview-panel-sub">Pulse + rating</span>
+                </div>
+                ${trendingPlayers.length ? `
+                    <div class="overview-stack">
+                        ${trendingPlayers.map((player) => `
+                            <button class="overview-row-btn" onclick="window.ui.showPlayerDetail('${player.id}')">
+                                <div class="overview-player-shell">
+                                    <img src="${player.headshot?.href || ''}" class="overview-player-headshot" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 36 36%22><rect fill=%22%23232836%22 width=%2236%22 height=%2236%22 rx=%2218%22/></svg>'">
+                                    <div>
+                                        <div class="overview-row-title">${player.fullName || player.displayName}</div>
+                                        <div class="overview-row-subtitle">${player.teamAbbr} • ${player.rating?.tone?.label || 'Steady'} ${player.rating?.hotnessScore || 0}/5</div>
+                                    </div>
+                                </div>
+                                <div class="overview-metric-stack">
+                                    <strong>${player.rating?.rating || '--'}</strong>
+                                    <span>${player.rating?.primaryArchetype || player.rating?.archetype || 'Role Player'}</span>
+                                </div>
+                            </button>
+                        `).join('')}
+                    </div>
+                ` : '<div class="news-empty">No player pulse data available yet.</div>'}
+            </section>
+
+            <section class="card overview-panel">
+                <div class="overview-panel-head">
+                    <h3>Best Model Edges</h3>
+                    <span class="overview-panel-sub">Today only</span>
+                </div>
+                ${edges.length ? `
+                    <div class="overview-stack">
+                        ${edges.map((edge) => `
+                            <button class="overview-row-btn" onclick="window.ui.renderGameDetail('${edge.gameId}')">
+                                <div>
+                                    <div class="overview-row-title">${edge.prediction.bettingLean}</div>
+                                    <div class="overview-row-subtitle">${edge.matchup} • ${edge.prediction.modelScoreLabel}</div>
+                                </div>
+                                <div class="overview-metric-stack">
+                                    <strong>${edge.prediction.marketEdge === null ? edge.prediction.projectedSpread : `ML ${edge.leanTeam.team.abbreviation}`}</strong>
+                                    <span>${edge.prediction.marketEdge === null ? 'Model only' : `${this.formatSigned(Math.abs(edge.prediction.marketEdge * 100), 1)} pts`}</span>
+                                </div>
+                            </button>
+                        `).join('')}
+                    </div>
+                ` : '<div class="news-empty">No scheduled games with model edges right now.</div>'}
+            </section>
+        `;
     },
 
     // ==================== LIVE GAMES ====================
@@ -1086,11 +1383,12 @@ const ui = {
         const statsHtml = displayStats ? `
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px; margin-bottom:28px;">
                 <div class="card stat-card"><div class="stat-label">Record</div><div class="stat-value">${displayStats.wins}-${displayStats.losses}</div></div>
-                <div class="card stat-card"><div class="stat-label">PPG</div><div class="stat-value" style="color:var(--success-color);">${displayStats.ppg?.toFixed?.(1) || displayStats.ppg || '--'}</div></div>
-                <div class="card stat-card"><div class="stat-label">OPP PPG</div><div class="stat-value" style="color:var(--live-color);">${displayStats.oppPpg?.toFixed?.(1) || displayStats.oppPpg || '--'}</div></div>
+                <div class="card stat-card"><div class="stat-label">Results</div><div class="stat-value" style="color:var(--brand-accent);">${displayStats.resultsScore || '--'}</div></div>
+                <div class="card stat-card"><div class="stat-label">Recent 5</div><div class="stat-value">${displayStats.recentRecord || '--'}</div></div>
                 <div class="card stat-card"><div class="stat-label">OVR</div><div class="stat-value" style="color:var(--brand-accent);">${displayStats.ovrRating}</div></div>
                 <div class="card stat-card"><div class="stat-label">OFF</div><div class="stat-value">${displayStats.offRating}</div></div>
                 <div class="card stat-card"><div class="stat-label">DEF</div><div class="stat-value">${displayStats.defRating}</div></div>
+                <div class="card stat-card"><div class="stat-label">Off Eff</div><div class="stat-value">${displayStats.offensiveEfficiency ? Number(displayStats.offensiveEfficiency).toFixed(1) : '--'}</div></div>
                 <div class="card stat-card"><div class="stat-label">Net RTG</div><div class="stat-value" style="color:${displayStats.netRtg >= 0 ? 'var(--success-color)' : 'var(--live-color)'};">${displayStats.netRtg >= 0 ? '+' : ''}${displayStats.netRtg?.toFixed?.(1) || displayStats.netRtg || '--'}</div></div>
                 <div class="card stat-card"><div class="stat-label">Streak</div><div class="stat-value">${displayStats.streak || '--'}</div></div>
             </div>
@@ -1103,17 +1401,17 @@ const ui = {
                         <div style="font-size:10px; color:var(--brand-accent); text-transform:uppercase; font-weight:800; letter-spacing:0.8px; margin-bottom:6px;">Composite Team Read</div>
                         <div style="font-size:16px; font-weight:800; margin-bottom:8px;">${displayStats.tone?.label || 'Steady'} form • ${displayStats.trendScore || 0}/5 pulse</div>
                         <div style="font-size:14px; line-height:1.6; color:var(--text-secondary);">
-                            ${team.displayName} is carrying a ${displayStats.ovrRating} overall built on ${displayStats.offRating} offense, ${displayStats.defRating} defense, and a ${displayStats.rosterStrength || '--'} roster-strength score. ${topPlayer ? `${topPlayer.fullName || topPlayer.displayName} anchors the profile at ${topPlayer.rating?.rating || '--'} OVR.` : ''} ${nextProjection ? `The next slate projection leans ${nextProjection.bettingLean.toLowerCase()} with ${nextProjection.modelScoreLabel}.` : 'No next-game line is active on the current scoreboard.'}
+                            ${team.displayName} is carrying a ${displayStats.ovrRating} overall built from official team outputs, not player rollups: ${displayStats.resultsScore || '--'} results/form, ${displayStats.offRating} offense, and ${displayStats.defRating} defense. The board is leaning on ${displayStats.wins}-${displayStats.losses}, a ${displayStats.netRtg >= 0 ? '+' : ''}${displayStats.netRtg?.toFixed?.(1) || displayStats.netRtg || '--'} net rating, ${displayStats.offensiveEfficiency ? Number(displayStats.offensiveEfficiency).toFixed(1) : '--'} offensive efficiency, ${displayStats.trueShootingPct ? Number(displayStats.trueShootingPct).toFixed(1) : '--'}% true shooting, and a ${displayStats.recentRecord || '--'} run over the last five. ${topPlayer ? `${topPlayer.fullName || topPlayer.displayName} still leads the roster context at ${topPlayer.rating?.rating || '--'} OVR, but star power only shapes matchup context rather than the core team rank.` : ''} ${nextProjection ? `The next slate projection leans ${nextProjection.bettingLean.toLowerCase()} with ${nextProjection.modelScoreLabel}.` : 'No next-game line is active on the current scoreboard.'}
                         </div>
                     </div>
-                    <div style="display:grid; grid-template-columns:repeat(2, minmax(120px, 1fr)); gap:10px; min-width:min(100%, 280px);">
+                    <div style="display:grid; grid-template-columns:repeat(2, minmax(120px, 1fr)); gap:10px; min-width:min(100%, 320px);">
                         <div class="card stat-card" style="padding:12px;">
-                            <div class="stat-label">Star Power</div>
-                            <div class="stat-value">${displayStats.starPower || '--'}</div>
+                            <div class="stat-label">Results</div>
+                            <div class="stat-value">${displayStats.resultsScore || '--'}</div>
                         </div>
                         <div class="card stat-card" style="padding:12px;">
-                            <div class="stat-label">Depth</div>
-                            <div class="stat-value">${displayStats.depth || '--'}</div>
+                            <div class="stat-label">Recent 5</div>
+                            <div class="stat-value">${displayStats.recentRecord || '--'}</div>
                         </div>
                         <div class="card stat-card" style="padding:12px;">
                             <div class="stat-label">Off Eff</div>
@@ -1123,6 +1421,32 @@ const ui = {
                             <div class="stat-label">Pace</div>
                             <div class="stat-value">${displayStats.pace ? Number(displayStats.pace).toFixed(1) : '--'}</div>
                         </div>
+                        <div class="card stat-card" style="padding:12px;">
+                            <div class="stat-label">Star Context</div>
+                            <div class="stat-value">${displayStats.starPower || '--'}</div>
+                        </div>
+                        <div class="card stat-card" style="padding:12px;">
+                            <div class="stat-label">Depth Context</div>
+                            <div class="stat-value">${displayStats.depth || '--'}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="team-context-strip">
+                    <div class="context-card">
+                        <span class="stat-label">True Shooting</span>
+                        <strong>${displayStats.trueShootingPct ? Number(displayStats.trueShootingPct).toFixed(1) : '--'}${displayStats.trueShootingPct ? '%' : ''}</strong>
+                    </div>
+                    <div class="context-card">
+                        <span class="stat-label">AST / TO</span>
+                        <strong>${displayStats.assistTurnoverRatio ? Number(displayStats.assistTurnoverRatio).toFixed(2) : '--'}</strong>
+                    </div>
+                    <div class="context-card">
+                        <span class="stat-label">Rebound Rate</span>
+                        <strong>${displayStats.reboundRate ? Number(displayStats.reboundRate).toFixed(1) : '--'}${displayStats.reboundRate ? '%' : ''}</strong>
+                    </div>
+                    <div class="context-card">
+                        <span class="stat-label">Pressure</span>
+                        <strong>${displayStats.pressureRate ? Number(displayStats.pressureRate).toFixed(1) : '--'}${displayStats.pressureRate ? '%' : ''}</strong>
                     </div>
                 </div>
                 ${nextProjection ? `
@@ -1158,7 +1482,7 @@ const ui = {
             </div>
             <div class="table-container">
                 <table class="data-table">
-                    <thead><tr><th>Player</th><th>Pos</th><th>OVR</th><th>OFF</th><th>DEF</th><th>PTS</th><th>REB</th><th>AST</th><th>GP</th><th>Tier</th></tr></thead>
+                    <thead><tr><th>Player</th><th>Pos</th><th>Style</th><th>OVR</th><th>OFF</th><th>DEF</th><th>PTS</th><th>REB</th><th>AST</th><th>GP</th><th>Tier</th></tr></thead>
                     <tbody>
                         ${roster.map(p => `
                             <tr style="cursor:pointer;" onclick="window.ui.showPlayerDetail('${p.id}')">
@@ -1169,6 +1493,7 @@ const ui = {
                                     </div>
                                 </td>
                                 <td style="font-size:12px; color:var(--text-secondary);">${p.rating?.posAbbrev || p.position?.abbreviation || '--'}</td>
+                                <td style="font-size:12px; color:var(--text-secondary);">${p.rating?.primaryArchetype || p.rating?.archetype || '--'}</td>
                                 <td style="font-weight:700; color:var(--brand-accent);">${p.rating?.rating || '--'}</td>
                                 <td style="font-size:12px; color:var(--success-color);">${p.rating?.offRating || '--'}</td>
                                 <td style="font-size:12px; color:var(--info-color, #5bc0de);">${p.rating?.defRating || '--'}</td>
@@ -1239,6 +1564,16 @@ const ui = {
         const tone = s.tone || { label: 'Steady' };
         const toneColor = this.getToneColor(tone);
         const projection = s.projection || null;
+        const skillBucketLabels = {
+            shotCreation: 'Shot Creation',
+            shootingGravity: 'Shooting Gravity',
+            rimPressure: 'Rim Pressure',
+            playmaking: 'Playmaking',
+            stopPower: 'Defensive Pressure',
+            interiorControl: 'Interior Control',
+        };
+        const skillBuckets = Object.entries(s.skillBuckets || {})
+            .sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0));
         const aiAnalysis = s.aiOverview || (
             s.gp === 0
                 ? `${p.fullName || p.displayName} has not logged enough live NBA data yet, so the current card is leaning on a conservative baseline proxy.`
@@ -1255,58 +1590,54 @@ const ui = {
                 </button>
             </div>
 
-            <div style="display:grid; grid-template-columns:300px 1fr; gap:32px; align-items:start;">
-                <!-- 2K Style Card -->
-                <div style="background: linear-gradient(135deg, rgba(20,24,36,1) 0%, rgba(30,35,50,1) 100%); border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:24px; position:relative; box-shadow:0 20px 40px rgba(0,0,0,0.5); overflow:hidden;">
-                    <div style="position:absolute; top:-20px; right:-20px; opacity:0.05; filter:grayscale(100%);">
-                        <img src="${team?.logos?.[0]?.href || ''}" width="200" height="200">
-                    </div>
-                    
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; position:relative; z-index:2;">
+            <div class="player-detail-layout">
+                <div class="nba2k-player-card">
+                    <div class="nba2k-card-top">
                         <div>
-                            <div style="font-size:48px; font-weight:900; line-height:1; color:${(s.ratingNum || 0) >= 90 ? '#f1c40f' : (s.ratingNum || 0) >= 80 ? '#3498db' : '#95a5a6'}; text-shadow: 0 4px 12px rgba(0,0,0,0.5);">${(s.ratingNum || 0).toFixed(1)}</div>
-                            <div style="font-size:12px; font-weight:800; color:var(--text-secondary); letter-spacing:1px; text-transform:uppercase; margin-top:4px;">OVERALL</div>
-                            <div style="display:inline-block; margin-top:12px; padding:4px 10px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:4px; font-size:10px; font-weight:800; color:#fff; text-transform:uppercase; letter-spacing:1px;">${s.archetype || 'Role Player'}</div>
-                            <div style="display:inline-block; margin-top:10px; padding:4px 10px; background:${toneColor}; border-radius:999px; font-size:10px; font-weight:800; color:#08111d; text-transform:uppercase; letter-spacing:0.8px;">${tone.label} ${s.hotnessScore || 0}/5</div>
+                            <div class="nba2k-ovr">${Number(s.ratingNum || 0).toFixed(1)}</div>
+                            <div class="nba2k-ovr-label">Overall</div>
+                            <div class="nba2k-chip">${s.primaryArchetype || s.archetype || 'Role Player'}</div>
+                            <div class="nba2k-chip tone" style="background:${toneColor};">${tone.label} ${s.hotnessScore || 0}/5</div>
                         </div>
-                        <div style="text-align:right;">
-                            <div style="font-size:24px; font-weight:800; color:var(--text-secondary);">${s.posAbbrev || p.position?.abbreviation || '--'}</div>
-                            <img src="${team?.logos?.[0]?.href || ''}" width="36" height="36" style="margin-top:8px;">
+                        <div class="nba2k-team-mark">
+                            <div class="nba2k-pos">${s.posAbbrev || p.position?.abbreviation || '--'}</div>
+                            <img src="${team?.logos?.[0]?.href || ''}" width="42" height="42" style="margin-top:10px;" onerror="this.style.display='none'">
                         </div>
                     </div>
-
-                    <div style="text-align:center; position:relative; z-index:2; margin:20px 0;">
-                        <img src="${p.headshot?.href || ''}" width="180" height="130" style="object-fit:contain; filter:drop-shadow(0 10px 15px rgba(0,0,0,0.5));" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 30 30%22><rect fill=%22transparent%22 width=%2230%22 height=%2230%22/></svg>'">
+                    <div class="nba2k-card-body">
+                        <img src="${p.headshot?.href || ''}" class="nba2k-player-image" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 30 30%22><rect fill=%22transparent%22 width=%2230%22 height=%2230%22/></svg>'">
+                        <div class="nba2k-card-name">${p.fullName || p.displayName}</div>
+                        <div class="nba2k-card-meta">${team?.displayName || p.teamName || 'NBA'} • ${s.secondaryStyle || 'Balanced Support'}</div>
+                        <div class="nba2k-card-style">Takeover: ${s.takeoverStyle || 'Steady Force'}</div>
                     </div>
-
-                    <div style="text-align:center; position:relative; z-index:2; border-top:1px solid rgba(255,255,255,0.1); padding-top:16px;">
-                        <h2 style="font-size:22px; font-weight:800; text-transform:uppercase; letter-spacing:1px; margin-bottom:16px;">${p.fullName || p.displayName}</h2>
-                        <div style="display:flex; justify-content:space-around; background:rgba(0,0,0,0.3); border-radius:8px; padding:12px;">
-                            <div>
-                                <div style="font-size:18px; font-weight:800; color:var(--success-color);">${s.offRating}</div>
-                                <div style="font-size:10px; color:var(--text-tertiary); text-transform:uppercase;">OFF</div>
-                            </div>
-                            <div style="width:1px; background:rgba(255,255,255,0.1);"></div>
-                            <div>
-                                <div style="font-size:18px; font-weight:800; color:var(--info-color, #5bc0de);">${s.defRating}</div>
-                                <div style="font-size:10px; color:var(--text-tertiary); text-transform:uppercase;">DEF</div>
-                            </div>
+                    <div class="nba2k-card-ratings">
+                        <div class="nba2k-rating-box">
+                            <div class="nba2k-rating-value" style="color:var(--success-color);">${s.offRating}</div>
+                            <div class="nba2k-ovr-label">OFF</div>
+                        </div>
+                        <div class="nba2k-rating-box">
+                            <div class="nba2k-rating-value" style="color:#5bc0de;">${s.defRating}</div>
+                            <div class="nba2k-ovr-label">DEF</div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Stats & Analysis -->
-                <div>
-                    <!-- AI Analysis Box -->
-                    <div style="background:var(--bg-elevated); border-left:4px solid var(--brand-accent); padding:20px; border-radius:0 8px 8px 0; margin-bottom:32px;">
-                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--brand-accent)" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                            <span style="font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:1px; color:var(--brand-accent);">Composite AI Report</span>
+                <div class="player-detail-main">
+                    <div class="card player-intel-panel">
+                        <div class="player-intel-head">
+                            <span class="overview-kicker">Composite AI Report</span>
+                            <span class="overview-chip" style="border-color:${toneColor}; color:${toneColor};">${s.primaryArchetype || s.archetype || 'Role Player'}</span>
                         </div>
-                        <p style="font-size:15px; line-height:1.6; color:var(--text-secondary); margin:0;">${aiAnalysis}</p>
+                        <p>${aiAnalysis}</p>
+                        <div class="player-intel-tags">
+                            <span class="player-intel-tag">Secondary Style: ${s.secondaryStyle || 'Balanced Support'}</span>
+                            <span class="player-intel-tag">Takeover: ${s.takeoverStyle || 'Steady Force'}</span>
+                            <span class="player-intel-tag">Tier: ${this.getBadgeLabel(s.rating)}</span>
+                            <span class="player-intel-tag">Team Context: ${team?.abbreviation || p.teamAbbr || '--'} ${window.store.state.teamRankings.find((entry) => String(entry.id) === String(p.teamId))?.stats?.ovrRating || '--'} OVR</span>
+                        </div>
                     </div>
 
-                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-bottom:24px;">
+                    <div class="player-profile-grid">
                         <div class="card stat-card"><div class="stat-label">Pulse</div><div class="stat-value" style="color:${toneColor};">${tone.label}</div></div>
                         <div class="card stat-card"><div class="stat-label">Hotness</div><div class="stat-value">${s.hotnessScore || 0}/5</div></div>
                         <div class="card stat-card"><div class="stat-label">Proj PPG</div><div class="stat-value">${projection ? projection.points.toFixed(1) : '--'}</div></div>
@@ -1315,8 +1646,44 @@ const ui = {
                         <div class="card stat-card"><div class="stat-label">OVR Band</div><div class="stat-value">${projection ? `${projection.floor.toFixed(1)}-${projection.ceiling.toFixed(1)}` : '--'}</div></div>
                     </div>
 
-                    <h3 style="font-size:16px; font-weight:700; margin-bottom:16px;">Current Season Stats</h3>
-                    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:12px;">
+                    <div class="card skill-dna-panel">
+                        <div class="section-headline">
+                            <h3>Skill DNA</h3>
+                            <span>${s.secondaryStyle || 'Balanced Support'}</span>
+                        </div>
+                        <div class="skill-dna-grid">
+                            ${skillBuckets.map(([key, value]) => `
+                                <div class="skill-dna-row">
+                                    <div class="skill-dna-head">
+                                        <span>${skillBucketLabels[key] || key}</span>
+                                        <strong>${Number(value || 0)}</strong>
+                                    </div>
+                                    <div class="skill-dna-bar">
+                                        <div class="skill-dna-fill" style="width:${Math.max(4, Number(value || 0))}%"></div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div class="card badge-panel">
+                        <div class="section-headline">
+                            <h3>Badge Loadout</h3>
+                            <span>${s.takeoverStyle || 'Steady Force'}</span>
+                        </div>
+                        <div class="badge-list">
+                            ${(s.skillBadges || []).map((badge) => `
+                                <span class="badge-pill">${badge}</span>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div class="card season-stats-panel">
+                        <div class="section-headline">
+                            <h3>Current Season Stats</h3>
+                            <span>${team?.displayName || p.teamName || 'NBA'}</span>
+                        </div>
+                        <div class="season-stats-grid">
                         <div class="card stat-card"><div class="stat-label">PPG</div><div class="stat-value">${s.pts || '--'}</div></div>
                         <div class="card stat-card"><div class="stat-label">RPG</div><div class="stat-value">${s.reb || '--'}</div></div>
                         <div class="card stat-card"><div class="stat-label">APG</div><div class="stat-value">${s.ast || '--'}</div></div>
@@ -1329,6 +1696,7 @@ const ui = {
                         <div class="card stat-card"><div class="stat-label">PER</div><div class="stat-value">${s.per || '--'}</div></div>
                         <div class="card stat-card"><div class="stat-label">MPG</div><div class="stat-value">${s.mpg || '--'}</div></div>
                         <div class="card stat-card"><div class="stat-label">GP</div><div class="stat-value">${s.gp !== undefined ? s.gp : '--'}</div></div>
+                    </div>
                     </div>
                 </div>
             </div>

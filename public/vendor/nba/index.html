@@ -22,7 +22,8 @@
                 </div>
             </div>
             <nav class="desktop-nav">
-                <button class="nav-btn active" data-tab="live">Live</button>
+                <button class="nav-btn active" data-tab="overview">Overview</button>
+                <button class="nav-btn" data-tab="live">Live</button>
                 <button class="nav-btn" data-tab="news">News</button>
                 <button class="nav-btn" data-tab="rankings">Rankings</button>
                 <button class="nav-btn" data-tab="teams">Teams</button>
@@ -58,8 +59,21 @@
         <!-- Main Content -->
         <main id="main-content">
 
+            <!-- OVERVIEW -->
+            <section id="pane-overview" class="pane active">
+                <div class="pane-header">
+                    <h2>Overview</h2>
+                    <p class="subtitle fade">Daily composite dashboard with scores, edges, news, teams, and player heat.</p>
+                </div>
+                <div id="overview-container" class="overview-grid">
+                    <div class="card skeleton-card" style="height:240px;"></div>
+                    <div class="card skeleton-card" style="height:180px;"></div>
+                    <div class="card skeleton-card" style="height:180px;"></div>
+                </div>
+            </section>
+
             <!-- LIVE -->
-            <section id="pane-live" class="pane active">
+            <section id="pane-live" class="pane hidden">
                 <div class="pane-header">
                     <h2>Live Scores</h2>
                     <span class="live-indicator"><span class="dot pulse"></span> <span id="live-status-text">Updating</span></span>
@@ -210,7 +224,8 @@
 
         <!-- Mobile Navigation -->
         <nav class="mobile-nav">
-            <button class="nav-btn active" data-tab="live">Live</button>
+            <button class="nav-btn active" data-tab="overview">Home</button>
+            <button class="nav-btn" data-tab="live">Live</button>
             <button class="nav-btn" data-tab="news">News</button>
             <button class="nav-btn" data-tab="rankings">Rank</button>
             <button class="nav-btn" data-tab="teams">Teams</button>
