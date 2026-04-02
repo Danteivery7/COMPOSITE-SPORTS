@@ -1,4 +1,6 @@
 import { normalizeEspnNewsArticle } from '@/src/lib/espn-news';
+import { extractEspnOdds, moneylineToProbability } from '@/src/lib/odds';
+import { compareByStartTime, getEasternDateKey, isSameEasternDate } from '@/src/lib/time';
 
 const CACHE = new Map();
 
@@ -508,6 +510,7 @@ async function fetchScoreboard(leagueKey) {
     const home = competitors.find((item) => item.homeAway === 'home');
     const status = competition?.status?.type || event.status?.type || {};
     const broadcast = competition?.broadcasts?.[0]?.names?.[0] || '';
+    const odds = extractEspnOdds(competition, event?.pickcenter?.[0] || null);
     return {
       id: event.id,
       league: leagueKey,
@@ -522,6 +525,8 @@ async function fetchScoreboard(leagueKey) {
         minute: '2-digit',
       }),
       broadcast,
+      odds,
+      rawCompetition: competition,
       away: {
         teamId: away?.team?.id ? String(away.team.id) : '',
         abbreviation: away?.team?.abbreviation || away?.team?.shortDisplayName || 'AWAY',
@@ -768,12 +773,57 @@ function buildPredictors(scoreboard, rankings, leagueKey) {
     .map((game) => {
       const home = rankingMap[game.home.teamId];
       const away = rankingMap[game.away.teamId];
-      const homeStrength = (home?.globalScore || home?.ovrScore || 70) + 2.8;
-      const awayStrength = away?.globalScore || away?.ovrScore || 70;
+      const homeStrength =
+        (home?.globalScore || home?.ovrScore || 70) +
+        (home?.resultsScore || 50) * 0.18 +
+        (home?.recentFormPoints || 0) * 0.9 +
+        3.1;
+      const awayStrength =
+        (away?.globalScore || away?.ovrScore || 70) +
+        (away?.resultsScore || 50) * 0.18 +
+        (away?.recentFormPoints || 0) * 0.9;
       const diff = homeStrength - awayStrength;
-      const homeWinProbability = Math.max(8, Math.min(92, Math.round(50 + diff * 1.45)));
-      const projectedHomeScore = Math.max(0, Math.round((1.2 + (homeStrength - (away?.defScore || 50)) / 42) * 10) / 10);
-      const projectedAwayScore = Math.max(0, Math.round((1.05 + (awayStrength - (home?.defScore || 50)) / 42) * 10) / 10);
+      const homeWinProbability = Math.max(8, Math.min(92, Math.round((1 / (1 + Math.exp(-(diff / 14)))) * 100)));
+      const projectedHomeScore = Math.max(
+        0,
+        Math.round((1.2 + (homeStrength - (away?.defScore || 50)) / 42 + ((home?.offScore || 50) - (away?.defScore || 50)) / 70) * 10) / 10,
+      );
+      const projectedAwayScore = Math.max(
+        0,
+        Math.round((1.05 + (awayStrength - (home?.defScore || 50)) / 42 + ((away?.offScore || 50) - (home?.defScore || 50)) / 70) * 10) / 10,
+      );
+      const projectedMargin = Number((projectedHomeScore - projectedAwayScore).toFixed(1));
+      const projectedTotal = Number((projectedHomeScore + projectedAwayScore).toFixed(1));
+      const marketHomeProbability = moneylineToProbability(game.odds?.homeMoneyline);
+      const marketEdge =
+        Number.isFinite(marketHomeProbability) && marketHomeProbability !== null
+          ? Number((homeWinProbability / 100 - marketHomeProbability).toFixed(3))
+          : null;
+      const spreadEdge =
+        Number.isFinite(Number(game.odds?.homeSpread))
+          ? Number((projectedMargin + Number(game.odds.homeSpread)).toFixed(1))
+          : null;
+      const totalEdge =
+        Number.isFinite(Number(game.odds?.overUnder))
+          ? Number((projectedTotal - Number(game.odds.overUnder)).toFixed(1))
+          : null;
+      const leaningHome = homeWinProbability >= 50;
+      let bettingLean = `${leaningHome ? game.home.abbreviation : game.away.abbreviation} model lean`;
+      if (marketEdge !== null && Math.abs(marketEdge) >= 0.045) {
+        bettingLean = `${leaningHome ? game.home.abbreviation : game.away.abbreviation} moneyline lean`;
+      } else if (spreadEdge !== null && Math.abs(spreadEdge) >= 0.55) {
+        bettingLean = `${spreadEdge > 0 ? game.home.abbreviation : game.away.abbreviation} spread lean`;
+      } else if (totalEdge !== null && Math.abs(totalEdge) >= 0.45) {
+        bettingLean = `${totalEdge > 0 ? 'Over' : 'Under'} ${game.odds?.overUnder}`;
+      }
+      const explanation = [
+        `${leaningHome ? game.home.displayName : game.away.displayName} carries the stronger club path with ${homeWinProbability}% home win odds.`,
+        home && away
+          ? `${home.displayName} results ${home.resultsScore} / OFF ${home.offScore} / DEF ${home.defScore} vs ${away.displayName} results ${away.resultsScore} / OFF ${away.offScore} / DEF ${away.defScore}.`
+          : null,
+        spreadEdge !== null ? `Projected margin is ${projectedMargin >= 0 ? '+' : ''}${projectedMargin} against ${game.odds?.homeSpread ?? 'N/A'} on the home spread.` : null,
+        totalEdge !== null ? `Projected total is ${projectedTotal} against ${game.odds?.overUnder}.` : null,
+      ].filter(Boolean);
 
       return {
         gameId: game.id,
@@ -786,10 +836,30 @@ function buildPredictors(scoreboard, rankings, leagueKey) {
           displayName: game.away.displayName,
         },
         homeWinProbability,
+        awayWinProbability: Math.max(8, 100 - homeWinProbability),
         projectedHomeScore,
         projectedAwayScore,
-        confidence: Math.abs(diff) > 12 ? 'High' : Math.abs(diff) > 7 ? 'Medium' : 'Lean',
+        projectedMargin,
+        projectedTotal,
+        odds: game.odds || null,
+        marketEdge,
+        spreadEdge,
+        totalEdge,
+        bettingLean,
+        americanOdds: leaningHome ? game.odds?.homeMoneyline ?? null : game.odds?.awayMoneyline ?? null,
+        explanation,
+        confidence:
+          Math.abs(diff) > 12 || (marketEdge !== null && Math.abs(marketEdge) >= 0.08)
+            ? 'High'
+            : Math.abs(diff) > 6 || (spreadEdge !== null && Math.abs(spreadEdge) >= 0.75)
+              ? 'Medium'
+              : 'Lean',
       };
+    })
+    .sort((left, right) => {
+      const leftEdge = Math.max(Math.abs(left.marketEdge || 0) * 100, Math.abs(left.spreadEdge || 0), Math.abs(left.totalEdge || 0));
+      const rightEdge = Math.max(Math.abs(right.marketEdge || 0) * 100, Math.abs(right.spreadEdge || 0), Math.abs(right.totalEdge || 0));
+      return rightEdge - leftEdge;
     });
 }
 
@@ -964,7 +1034,9 @@ async function getFootballLanding() {
   const topMatches = leagueData
     .flatMap(({ leagueKey, brand, rankings, scoreboard }) => {
       const rankingMap = Object.fromEntries(rankings.map((team) => [team.id, team]));
-      return scoreboard.map((game) => {
+      return scoreboard
+        .filter((game) => isSameEasternDate(game.startTime, new Date()))
+        .map((game) => {
         const away = rankingMap[game.away.teamId];
         const home = rankingMap[game.home.teamId];
         const power = ((away?.globalScore || away?.ovrScore || 70) + (home?.globalScore || home?.ovrScore || 70)) / 2;
@@ -984,7 +1056,8 @@ async function getFootballLanding() {
     .sort((left, right) => {
       if (left.leagueKey === 'champions-league' && right.leagueKey !== 'champions-league') return -1;
       if (right.leagueKey === 'champions-league' && left.leagueKey !== 'champions-league') return 1;
-      return right.matchScore - left.matchScore;
+      if (right.matchScore !== left.matchScore) return right.matchScore - left.matchScore;
+      return compareByStartTime(left.startTime, right.startTime);
     })
     .slice(0, 3);
 

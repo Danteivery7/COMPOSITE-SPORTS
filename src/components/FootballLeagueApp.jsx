@@ -324,6 +324,8 @@ function PredictorView({ predictors }) {
           <div className="football-chip-row">
             <span className="football-chip">{game.home.abbreviation} {game.homeWinProbability}%</span>
             <span className="football-chip">Proj {game.projectedAwayScore}-{game.projectedHomeScore}</span>
+            <span className="football-chip">{game.bettingLean || 'Model edge'}</span>
+            {game.americanOdds != null ? <span className="football-chip">{game.americanOdds > 0 ? '+' : ''}{game.americanOdds}</span> : null}
           </div>
         </article>
       ))}
@@ -518,10 +520,38 @@ function GameDetailView({ detail, predictors, setPage }) {
             <h3>Prediction</h3>
           </div>
           {predictor ? (
-            <div className="football-chip-row">
-              <span className="football-chip">{predictor.home.abbreviation} {predictor.homeWinProbability}%</span>
-              <span className="football-chip">{predictor.confidence}</span>
-              <span className="football-chip">{predictor.projectedAwayScore}-{predictor.projectedHomeScore}</span>
+            <div className="football-list">
+              <div className="football-row-button is-static">
+                <div>
+                  <strong>{predictor.bettingLean || 'Model edge'}</strong>
+                  <span>{predictor.home.abbreviation} {predictor.homeWinProbability}% • {predictor.away.abbreviation} {predictor.awayWinProbability}%</span>
+                </div>
+              </div>
+              <div className="football-row-button is-static">
+                <div>
+                  <strong>Projected Score</strong>
+                  <span>{predictor.projectedAwayScore}-{predictor.projectedHomeScore} • Total {predictor.projectedTotal}</span>
+                </div>
+              </div>
+              {predictor.odds ? (
+                <div className="football-row-button is-static">
+                  <div>
+                    <strong>{predictor.odds.provider || 'Market Context'}</strong>
+                    <span>
+                      {predictor.americanOdds != null ? `ML ${predictor.americanOdds > 0 ? '+' : ''}${predictor.americanOdds}` : 'No ML'}
+                      {predictor.odds.overUnder ? ` • O/U ${predictor.odds.overUnder}` : ''}
+                    </span>
+                  </div>
+                </div>
+              ) : null}
+              {(predictor.explanation || []).slice(0, 2).map((note, index) => (
+                <div className="football-row-button is-static" key={`${note}-${index}`}>
+                  <div>
+                    <strong>Why</strong>
+                    <span>{note}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
             <p className="football-empty-copy">Predictor card is still syncing.</p>
@@ -536,6 +566,7 @@ export default function FootballLeagueApp({ leagueKey }) {
   const leagueConfig = getFootballLeagueConfig(leagueKey);
   const apiBase = `/api/football/${leagueKey}`;
   const [page, setPage] = useState('overview');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [bootstrap, setBootstrap] = useState(null);
   const [playersData, setPlayersData] = useState(null);
   const [teamDetail, setTeamDetail] = useState(null);
@@ -564,6 +595,11 @@ export default function FootballLeagueApp({ leagueKey }) {
 
   useEffect(() => {
     if (page !== 'players') return;
+    if (!playersQuery.trim() && bootstrap?.playersCatalog) {
+      setPlayersData(bootstrap.playersCatalog);
+      setLoadingPlayers(false);
+      return;
+    }
     let ignore = false;
 
     async function fetchPlayers() {
@@ -582,13 +618,14 @@ export default function FootballLeagueApp({ leagueKey }) {
     return () => {
       ignore = true;
     };
-  }, [apiBase, page, playersQuery]);
+  }, [apiBase, page, playersQuery, bootstrap]);
 
   async function openTeam(teamId) {
     const response = await fetch(`${apiBase}/teams/${teamId}`);
     const data = await response.json();
     setTeamDetail(data);
     setPage('team-detail');
+    setMobileNavOpen(false);
   }
 
   async function openPlayer(playerId) {
@@ -596,6 +633,7 @@ export default function FootballLeagueApp({ leagueKey }) {
     const data = await response.json();
     setPlayerDetail(data);
     setPage('player-detail');
+    setMobileNavOpen(false);
   }
 
   async function openGame(gameId) {
@@ -603,6 +641,7 @@ export default function FootballLeagueApp({ leagueKey }) {
     const data = await response.json();
     setGameDetail(data);
     setPage('game-detail');
+    setMobileNavOpen(false);
   }
 
   async function openStory(story, fromPage = 'overview') {
@@ -611,6 +650,7 @@ export default function FootballLeagueApp({ leagueKey }) {
     const data = await response.json();
     setStoryDetail({ ...data, previousPage: fromPage });
     setPage('story-detail');
+    setMobileNavOpen(false);
   }
 
   const rankings = useMemo(() => bootstrap?.rankings || [], [bootstrap]);
@@ -683,7 +723,13 @@ export default function FootballLeagueApp({ leagueKey }) {
         '--football-league-surface': leagueConfig.surface,
       }}
     >
-      <aside className="football-sidebar">
+      <button
+        className={`football-mobile-overlay ${mobileNavOpen ? 'is-open' : ''}`}
+        type="button"
+        aria-label="Close navigation"
+        onClick={() => setMobileNavOpen(false)}
+      />
+      <aside className={`football-sidebar ${mobileNavOpen ? 'is-open' : ''}`}>
         <div className="football-brand-block">
           <span>{leagueConfig.region}</span>
           <h2>{leagueConfig.label}</h2>
@@ -694,7 +740,10 @@ export default function FootballLeagueApp({ leagueKey }) {
               key={item.key}
               className={page === item.key ? 'is-active' : ''}
               type="button"
-              onClick={() => setPage(item.key)}
+              onClick={() => {
+                setPage(item.key);
+                setMobileNavOpen(false);
+              }}
             >
               {item.label}
             </button>
@@ -718,6 +767,9 @@ export default function FootballLeagueApp({ leagueKey }) {
           </div>
           <div className="football-chip-row">
             <span className="football-chip">{bootstrap?.lastUpdated ? `Updated ${new Date(bootstrap.lastUpdated).toLocaleTimeString()}` : 'Sync pending'}</span>
+            <button className="football-refresh football-menu-button" type="button" onClick={() => setMobileNavOpen((value) => !value)}>
+              Menu
+            </button>
             <button className="football-refresh" type="button" onClick={fetchBootstrap}>
               Refresh
             </button>

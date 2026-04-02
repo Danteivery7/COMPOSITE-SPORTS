@@ -46,7 +46,7 @@ export default function FootballLandingRoute() {
   return (
     <FootballIntroGate
       title="Enter Composite Football"
-      copy="Walk through the tunnel, scan the three biggest matches on the planet today, and drop into any league board from one global football control room."
+      copy="Floodlights rise, the tifo lifts, and the match-night board comes alive before you drop into any league inside one global football control room."
       enterLabel="Enter The Pitch"
       accent="#8db1ff"
       accentAlt="#edf3ff"

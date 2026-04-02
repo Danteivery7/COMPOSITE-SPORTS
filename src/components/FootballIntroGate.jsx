@@ -40,7 +40,12 @@ export default function FootballIntroGate({ title, copy, enterLabel, accent = '#
         <section className={`football-intro ${exiting ? 'is-exiting' : ''}`}>
           <div className="football-intro-floodlight floodlight-a" aria-hidden="true" />
           <div className="football-intro-floodlight floodlight-b" aria-hidden="true" />
-          <div className="football-intro-tunnel" aria-hidden="true" />
+          <div className="football-intro-tifo" aria-hidden="true" />
+          <div className="football-intro-scorebug" aria-hidden="true">
+            <span>CHAMPIONS LEAGUE</span>
+            <strong>19:45 ET</strong>
+          </div>
+          <div className="football-intro-net" aria-hidden="true" />
           <div className="football-intro-track" aria-hidden="true" />
           <div className="football-intro-pitch" aria-hidden="true">
             <span className="football-pitch-circle" />
@@ -50,7 +55,7 @@ export default function FootballIntroGate({ title, copy, enterLabel, accent = '#
             <span className="football-pitch-box box-b" />
           </div>
           <div className="football-intro-panel">
-            <p className="eyebrow">Tunnel To Pitch</p>
+            <p className="eyebrow">Match-Night Lights</p>
             <h1>{title}</h1>
             <p>{copy}</p>
             <div className="football-intro-tags">

@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getFootballLanding } from '@/src/lib/football';
+import { getFootballLandingSnapshot } from '@/src/lib/live-sports-backend';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const data = await getFootballLanding();
+    const data = await getFootballLandingSnapshot();
     return NextResponse.json(data);
   } catch (error) {
     return NextResponse.json(

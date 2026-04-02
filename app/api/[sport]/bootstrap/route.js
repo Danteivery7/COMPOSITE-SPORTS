@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getSportBootstrap, isGenericSport } from '@/src/lib/generic-sports';
+import { isGenericSport } from '@/src/lib/generic-sports';
+import { getGenericSportSnapshot } from '@/src/lib/live-sports-backend';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +12,9 @@ export async function GET(_request, { params }) {
   }
 
   try {
-    const data = await getSportBootstrap(sport);
+    const data = await getGenericSportSnapshot(sport, {
+      force: _request.nextUrl.searchParams.get('force') === '1',
+    });
     return NextResponse.json(data);
   } catch (error) {
     return NextResponse.json(

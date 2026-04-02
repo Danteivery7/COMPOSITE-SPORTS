@@ -18,7 +18,7 @@ export default function FootballLeagueRoute({ leagueKey }) {
   return (
     <FootballIntroGate
       title={`Enter ${config.label}`}
-      copy={`Walk out under the lights and into the ${config.label} board. Live scores, club power, player rankings, and match edges all update inside one football control room.`}
+      copy={`Floodlights, pitch lines, and a live scorebug now bring the ${config.label} board online before scores, club power, player rankings, and match edges take over.`}
       enterLabel={`Open ${config.label}`}
       accent={config.accent}
       accentAlt={config.accentAlt}

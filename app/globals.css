@@ -3538,3 +3538,574 @@ body[data-composite-route='football'] {
     text-align: left;
   }
 }
+
+.hub-hero-expanded {
+  gap: 22px;
+}
+
+.hub-hero-stack {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 18px;
+}
+
+.hub-module-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.hub-module-head h2 {
+  margin: 6px 0 0;
+  font-size: clamp(1.2rem, 2vw, 1.8rem);
+}
+
+.hub-module-head > span {
+  color: rgba(224, 231, 255, 0.8);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hub-hero-story-card,
+.hub-hero-bets-card,
+.hub-story-board,
+.hub-bet-board {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    linear-gradient(180deg, rgba(13, 18, 32, 0.88), rgba(6, 10, 20, 0.96)),
+    radial-gradient(circle at top right, rgba(95, 129, 255, 0.2), transparent 55%);
+  border-radius: 28px;
+  padding: 22px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+}
+
+.hub-story-feature {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.15fr);
+  align-items: stretch;
+  gap: 16px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hub-story-feature-image,
+.hub-story-card-image,
+.hub-card-image {
+  width: 100%;
+  object-fit: cover;
+}
+
+.hub-story-feature-image {
+  height: 220px;
+  border-radius: 20px;
+}
+
+.hub-story-feature div,
+.hub-story-card-copy,
+.hub-card-spotlight {
+  min-width: 0;
+}
+
+.hub-story-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(145, 188, 255, 0.92);
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.hub-story-feature strong,
+.hub-story-card strong,
+.hub-bet-card strong,
+.hub-card-spotlight strong {
+  display: block;
+  line-height: 1.08;
+}
+
+.hub-story-feature strong {
+  margin-top: 10px;
+  font-size: clamp(1.35rem, 2.4vw, 2rem);
+}
+
+.hub-story-feature p,
+.hub-story-card p,
+.hub-bet-card p,
+.hub-bet-mini-card p {
+  color: rgba(229, 237, 255, 0.75);
+}
+
+.hub-parlay-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.hub-parlay-summary > div,
+.hub-bet-mini-card,
+.hub-bet-card,
+.hub-story-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 20px;
+}
+
+.hub-parlay-summary > div {
+  padding: 14px;
+}
+
+.hub-parlay-summary span,
+.hub-bet-card-top span,
+.hub-bet-card-bottom span,
+.hub-bet-mini-top span,
+.hub-bet-mini-card span {
+  color: rgba(229, 237, 255, 0.72);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hub-parlay-summary strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 1.1rem;
+}
+
+.hub-bet-mini-list,
+.hub-bet-grid,
+.hub-story-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.hub-bet-mini-list {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.hub-bet-mini-card {
+  padding: 14px;
+}
+
+.hub-bet-mini-top,
+.hub-bet-card-top,
+.hub-bet-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.hub-bet-odds {
+  color: var(--card-accent, #9fd3ff);
+  font-weight: 700;
+}
+
+.hub-story-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.hub-story-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.hub-story-card-image {
+  height: 170px;
+}
+
+.hub-story-card-copy {
+  padding: 14px 14px 16px;
+}
+
+.hub-bet-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.hub-bet-card {
+  padding: 16px;
+}
+
+.hub-story-card.is-loading,
+.hub-bet-card.is-loading,
+.hub-bet-mini-card.is-loading,
+.hub-story-feature.is-loading {
+  min-height: 160px;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.04), rgba(255,255,255,0.1), rgba(255,255,255,0.04));
+  background-size: 220% 100%;
+  animation: hubShimmer 1.6s linear infinite;
+}
+
+.hub-bet-card-mid {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 14px 0;
+}
+
+.hub-bet-logos {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hub-bet-logo {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 6px;
+}
+
+.hub-bet-logo.is-ghost {
+  opacity: 0.6;
+}
+
+.hub-card {
+  overflow: hidden;
+}
+
+.hub-card-image {
+  position: absolute;
+  inset: auto -8% 24% auto;
+  width: min(36%, 180px);
+  height: 46%;
+  opacity: 0.22;
+  filter: saturate(1.2) contrast(1.08);
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+.hub-card-spotlight {
+  position: relative;
+  z-index: 1;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.hub-card-spotlight span {
+  display: block;
+  color: rgba(229, 237, 255, 0.68);
+  font-size: 0.74rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.hub-card-spotlight strong {
+  font-size: 0.96rem;
+}
+
+.hub-story-page {
+  min-height: 100vh;
+  padding: 40px 24px 64px;
+}
+
+.hub-story-page .story-detail-shell {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.sport-intro-scorebug,
+.sport-intro-floor,
+.sport-intro-backboard,
+.sport-intro-bracket-wall,
+.sport-intro-banner,
+.sport-intro-baseline,
+.sport-intro-playbook,
+.football-intro-tifo,
+.football-intro-scorebug,
+.football-intro-net {
+  position: absolute;
+  pointer-events: none;
+}
+
+.sport-intro-scorebug {
+  top: 10%;
+  left: 50%;
+  width: min(26rem, 74vw);
+  height: 3.2rem;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(7, 10, 18, 0.78);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.22);
+}
+
+.sport-intro-floor {
+  bottom: 10%;
+  left: 50%;
+  width: min(48rem, 84vw);
+  height: 17rem;
+  transform: translateX(-50%);
+  border-radius: 28px 28px 10px 10px;
+  background:
+    repeating-linear-gradient(90deg, rgba(174, 104, 58, 0.6) 0 18px, rgba(120, 63, 26, 0.7) 18px 36px),
+    linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.14));
+  opacity: 0.45;
+}
+
+.sport-intro-backboard {
+  top: 20%;
+  right: 22%;
+  width: 11rem;
+  height: 14rem;
+  border: 4px solid rgba(255, 255, 255, 0.45);
+  border-radius: 12px;
+  opacity: 0.32;
+  transform: perspective(600px) rotateY(-18deg);
+}
+
+.sport-intro-bracket-wall {
+  inset: 14% 16% auto;
+  height: 18rem;
+  background:
+    linear-gradient(90deg, transparent 0 10%, rgba(255,255,255,0.08) 10% 11%, transparent 11% 23%, rgba(255,255,255,0.08) 23% 24%, transparent 24% 50%, rgba(255,255,255,0.08) 50% 51%, transparent 51% 77%, rgba(255,255,255,0.08) 77% 78%, transparent 78% 90%, rgba(255,255,255,0.08) 90% 91%, transparent 91%),
+    linear-gradient(180deg, rgba(255,255,255,0.04), transparent 68%);
+  opacity: 0.55;
+}
+
+.sport-intro-banner {
+  top: 12%;
+  left: 50%;
+  width: min(20rem, 56vw);
+  height: 5rem;
+  transform: translateX(-50%) skewX(-10deg);
+  border-radius: 16px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.08), rgba(255,255,255,0.24), rgba(255,255,255,0.08));
+  opacity: 0.4;
+}
+
+.sport-intro-baseline {
+  bottom: 14%;
+  left: 50%;
+  width: min(50rem, 88vw);
+  height: 16rem;
+  transform: translateX(-50%) rotateX(72deg);
+  background:
+    linear-gradient(135deg, transparent 49%, rgba(255,255,255,0.38) 49.4% 50.6%, transparent 51%),
+    radial-gradient(circle at center, rgba(194, 107, 54, 0.54), rgba(42, 20, 10, 0.2) 68%);
+  opacity: 0.55;
+}
+
+.sport-intro-playbook {
+  inset: auto 12% 18% auto;
+  width: 17rem;
+  height: 11rem;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 25% 35%, rgba(255, 205, 84, 0.9) 0 2px, transparent 2.6px),
+    linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)),
+    linear-gradient(90deg, transparent 0 16%, rgba(255,255,255,0.08) 16% 17%, transparent 17% 33%, rgba(255,255,255,0.08) 33% 34%, transparent 34% 50%, rgba(255,255,255,0.08) 50% 51%, transparent 51%);
+  transform: rotate(-8deg);
+  opacity: 0.46;
+}
+
+.football-intro-tifo {
+  inset: 8% 12% auto;
+  height: 16rem;
+  border-radius: 0 0 42px 42px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.02)),
+    radial-gradient(circle at top, rgba(141, 177, 255, 0.28), transparent 55%);
+  opacity: 0.52;
+}
+
+.football-intro-scorebug {
+  top: 9%;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: min(24rem, 80vw);
+  padding: 12px 18px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: rgba(8, 13, 25, 0.82);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: rgba(237, 243, 255, 0.86);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
+}
+
+.football-intro-scorebug span {
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+}
+
+.football-intro-scorebug strong {
+  font-size: 0.92rem;
+}
+
+.football-intro-net {
+  right: 6%;
+  bottom: 12%;
+  width: 18rem;
+  height: 14rem;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.14) 0 1px, transparent 1px 20%),
+    linear-gradient(180deg, rgba(255,255,255,0.14) 0 1px, transparent 1px 20%);
+  background-size: 22% 22%;
+  transform: perspective(700px) rotateY(-28deg);
+  opacity: 0.24;
+}
+
+.football-team-copy,
+.football-row-team,
+.football-marquee-side,
+.football-team-row,
+.football-player-cell {
+  min-width: 0;
+}
+
+.football-team-copy strong,
+.football-row-team strong,
+.football-marquee-side strong,
+.football-team-row strong,
+.football-player-cell strong {
+  overflow-wrap: anywhere;
+}
+
+.generic-menu-button,
+.football-menu-button,
+.generic-mobile-overlay,
+.football-mobile-overlay {
+  display: none;
+}
+
+@media (max-width: 1180px) {
+  .hub-story-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hub-bet-grid,
+  .hub-bet-mini-list,
+  .hub-hero-stack {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 980px) {
+  .generic-menu-button,
+  .football-menu-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .generic-mobile-overlay,
+  .football-mobile-overlay {
+    position: fixed;
+    inset: 0;
+    border: 0;
+    background: rgba(4, 8, 14, 0.6);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 24;
+  }
+
+  .generic-mobile-overlay.is-open,
+  .football-mobile-overlay.is-open {
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .generic-sport-shell,
+  .football-league-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .generic-sidebar,
+  .football-sidebar {
+    position: fixed !important;
+    top: 16px;
+    left: 16px;
+    bottom: 16px;
+    width: min(82vw, 340px);
+    max-width: 340px;
+    transform: translateX(calc(-100% - 24px));
+    transition: transform 220ms ease;
+    z-index: 28;
+    overflow-y: auto;
+  }
+
+  .generic-sidebar.is-open,
+  .football-sidebar.is-open {
+    transform: translateX(0);
+  }
+
+  .generic-stage,
+  .football-stage {
+    min-width: 0;
+  }
+
+  .hub-hero-story-card,
+  .hub-hero-bets-card,
+  .hub-story-board,
+  .hub-bet-board {
+    padding: 18px;
+  }
+}
+
+@media (max-width: 720px) {
+  .hub-hero-stack,
+  .hub-story-grid,
+  .hub-bet-grid,
+  .hub-parlay-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .hub-story-feature {
+    grid-template-columns: 1fr;
+  }
+
+  .hub-card-image {
+    width: min(44%, 140px);
+    height: 34%;
+    inset: auto 4% 28% auto;
+  }
+
+  .hub-story-card-image,
+  .hub-story-feature-image {
+    height: 180px;
+  }
+
+  .sport-intro-baseline,
+  .sport-intro-floor,
+  .sport-intro-bracket-wall,
+  .sport-intro-playbook,
+  .football-intro-net,
+  .football-intro-tifo {
+    opacity: 0.28;
+  }
+}
+
+@keyframes hubShimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -20% 0;
+  }
+}

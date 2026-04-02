@@ -5,6 +5,71 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 const EXIT_DURATION_MS = 1120;
 
 function IntroScene({ motif }) {
+  if (motif === 'court') {
+    return (
+      <div className="sport-intro-scene" data-motif={motif} aria-hidden="true">
+        <div className="sport-intro-spotlight spotlight-a" />
+        <div className="sport-intro-spotlight spotlight-b" />
+        <div className="sport-intro-scorebug" />
+        <div className="sport-intro-floor" />
+        <div className="sport-intro-backboard" />
+        <div className="sport-intro-object">
+          <span className="sport-intro-detail detail-a" />
+          <span className="sport-intro-detail detail-b" />
+          <span className="sport-intro-detail detail-c" />
+        </div>
+      </div>
+    );
+  }
+
+  if (motif === 'bracket') {
+    return (
+      <div className="sport-intro-scene" data-motif={motif} aria-hidden="true">
+        <div className="sport-intro-spotlight spotlight-a" />
+        <div className="sport-intro-spotlight spotlight-b" />
+        <div className="sport-intro-bracket-wall" />
+        <div className="sport-intro-banner" />
+        <div className="sport-intro-object">
+          <span className="sport-intro-detail detail-a" />
+          <span className="sport-intro-detail detail-b" />
+          <span className="sport-intro-detail detail-c" />
+        </div>
+      </div>
+    );
+  }
+
+  if (motif === 'diamond') {
+    return (
+      <div className="sport-intro-scene" data-motif={motif} aria-hidden="true">
+        <div className="sport-intro-spotlight spotlight-a" />
+        <div className="sport-intro-spotlight spotlight-b" />
+        <div className="sport-intro-scorebug" />
+        <div className="sport-intro-baseline" />
+        <div className="sport-intro-object">
+          <span className="sport-intro-detail detail-a" />
+          <span className="sport-intro-detail detail-b" />
+          <span className="sport-intro-detail detail-c" />
+        </div>
+      </div>
+    );
+  }
+
+  if (motif === 'yardline') {
+    return (
+      <div className="sport-intro-scene" data-motif={motif} aria-hidden="true">
+        <div className="sport-intro-spotlight spotlight-a" />
+        <div className="sport-intro-spotlight spotlight-b" />
+        <div className="sport-intro-playbook" />
+        <div className="sport-intro-banner" />
+        <div className="sport-intro-object">
+          <span className="sport-intro-detail detail-a" />
+          <span className="sport-intro-detail detail-b" />
+          <span className="sport-intro-detail detail-c" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="sport-intro-scene" data-motif={motif} aria-hidden="true">
       <div className="sport-intro-spotlight spotlight-a" />

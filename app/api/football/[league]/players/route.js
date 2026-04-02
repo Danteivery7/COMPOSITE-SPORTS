@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getFootballPlayerCatalog, isFootballLeague } from '@/src/lib/football';
+import { isFootballLeague } from '@/src/lib/football';
+import { getFootballLeagueSnapshot } from '@/src/lib/live-sports-backend';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +14,8 @@ export async function GET(request, { params }) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const query = searchParams.get('q')?.trim().toLowerCase() || '';
-    const data = await getFootballPlayerCatalog(league);
+    const snapshot = await getFootballLeagueSnapshot(league);
+    const data = snapshot.playersCatalog || { players: [], lastUpdated: snapshot.lastUpdated };
     const players = query
       ? data.players.filter((player) => {
           const haystack = [

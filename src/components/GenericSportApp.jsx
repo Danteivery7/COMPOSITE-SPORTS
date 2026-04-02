@@ -243,6 +243,11 @@ function PredictorRail({ predictors }) {
           <p className="generic-predictor-score">
             {game.projectedAwayScore} - {game.projectedHomeScore}
           </p>
+          <div className="sportview-chip-row">
+            <span className="sportview-chip">{game.bettingLean || 'Model edge'}</span>
+            {game.odds?.overUnder ? <span className="sportview-chip">O/U {game.odds.overUnder}</span> : null}
+            {game.americanOdds != null ? <span className="sportview-chip">{game.americanOdds > 0 ? '+' : ''}{game.americanOdds}</span> : null}
+          </div>
         </article>
       ))}
     </div>
@@ -711,10 +716,30 @@ function SportGameDetailView({ sportKey, gameDetail, setPage, predictors }) {
 
         <SportPanel title="Prediction Context" subtitle="If the board has a model read">
           {predictor ? (
-            <div className="sportview-chip-row">
-              <span className="sportview-chip">{predictor.home.abbreviation} {predictor.homeWinProbability}%</span>
-              <span className="sportview-chip">{predictor.confidence}</span>
-              <span className="sportview-chip">Projected {predictor.projectedAwayScore}-{predictor.projectedHomeScore}</span>
+            <div className="sportview-note-list">
+              <div className="sportview-note-link static">
+                <strong>{predictor.bettingLean || 'Model edge'}</strong>
+                <span>{predictor.home.abbreviation} {predictor.homeWinProbability}% • {predictor.away.abbreviation} {predictor.awayWinProbability}%</span>
+              </div>
+              <div className="sportview-note-link static">
+                <strong>Projected Score</strong>
+                <span>{predictor.projectedAwayScore} - {predictor.projectedHomeScore} • Total {predictor.projectedTotal}</span>
+              </div>
+              {predictor.odds ? (
+                <div className="sportview-note-link static">
+                  <strong>{predictor.odds.provider || 'Market Context'}</strong>
+                  <span>
+                    {predictor.odds.homeMoneyline != null ? `ML ${predictor.odds.homeMoneyline > 0 ? '+' : ''}${predictor.odds.homeMoneyline}` : 'No ML'}
+                    {predictor.odds.overUnder ? ` • O/U ${predictor.odds.overUnder}` : ''}
+                  </span>
+                </div>
+              ) : null}
+              {(predictor.explanation || []).slice(0, 2).map((note, index) => (
+                <div className="sportview-note-link static" key={`${note}-${index}`}>
+                  <strong>Why</strong>
+                  <span>{note}</span>
+                </div>
+              ))}
             </div>
           ) : (
             <p className="generic-empty-copy">No current predictor card is attached to this matchup.</p>
@@ -729,6 +754,7 @@ export default function GenericSportApp({ sportKey }) {
   const config = getSportConfig(sportKey);
   const apiBase = `/api/${sportKey}`;
   const [page, setPage] = useState('overview');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [bootstrap, setBootstrap] = useState(null);
   const [playersData, setPlayersData] = useState(null);
   const [teamDetail, setTeamDetail] = useState(null);
@@ -757,6 +783,11 @@ export default function GenericSportApp({ sportKey }) {
 
   useEffect(() => {
     if (page !== 'players') return;
+    if (!playersQuery.trim() && bootstrap?.playersCatalog) {
+      setPlayersData(bootstrap.playersCatalog);
+      setLoadingPlayers(false);
+      return;
+    }
     let ignore = false;
 
     async function fetchPlayers() {
@@ -775,13 +806,14 @@ export default function GenericSportApp({ sportKey }) {
     return () => {
       ignore = true;
     };
-  }, [apiBase, page, playersQuery]);
+  }, [apiBase, page, playersQuery, bootstrap]);
 
   async function openTeam(teamId) {
     const response = await fetch(`${apiBase}/teams/${teamId}`);
     const data = await response.json();
     setTeamDetail(data);
     setPage('team-detail');
+    setMobileNavOpen(false);
   }
 
   async function openPlayer(playerId) {
@@ -789,6 +821,7 @@ export default function GenericSportApp({ sportKey }) {
     const data = await response.json();
     setPlayerDetail(data);
     setPage('player-detail');
+    setMobileNavOpen(false);
   }
 
   async function openGame(gameId) {
@@ -796,6 +829,7 @@ export default function GenericSportApp({ sportKey }) {
     const data = await response.json();
     setGameDetail(data);
     setPage('game-detail');
+    setMobileNavOpen(false);
   }
 
   async function openStory(story, fromPage = 'overview') {
@@ -804,6 +838,7 @@ export default function GenericSportApp({ sportKey }) {
     const data = await response.json();
     setStoryDetail({ ...data, previousPage: fromPage });
     setPage('story-detail');
+    setMobileNavOpen(false);
   }
 
   const rankings = useMemo(() => bootstrap?.rankings || [], [bootstrap]);
@@ -906,7 +941,13 @@ export default function GenericSportApp({ sportKey }) {
         '--sport-surface': config.surface,
       }}
     >
-      <aside className="generic-sidebar">
+      <button
+        className={`generic-mobile-overlay ${mobileNavOpen ? 'is-open' : ''}`}
+        type="button"
+        aria-label="Close navigation"
+        onClick={() => setMobileNavOpen(false)}
+      />
+      <aside className={`generic-sidebar ${mobileNavOpen ? 'is-open' : ''}`}>
         <div className="generic-brand">
           <span>{config.label}</span>
           <h2>{config.name}</h2>
@@ -917,7 +958,10 @@ export default function GenericSportApp({ sportKey }) {
               key={item.key}
               className={page === item.key ? 'is-active' : ''}
               type="button"
-              onClick={() => setPage(item.key)}
+              onClick={() => {
+                setPage(item.key);
+                setMobileNavOpen(false);
+              }}
             >
               {item.label}
             </button>
@@ -937,6 +981,9 @@ export default function GenericSportApp({ sportKey }) {
           </div>
           <div className="generic-inline-stats">
             <span>{bootstrap?.lastUpdated ? `Updated ${new Date(bootstrap.lastUpdated).toLocaleTimeString()}` : 'Sync pending'}</span>
+            <button className="generic-menu-button" type="button" onClick={() => setMobileNavOpen((value) => !value)}>
+              Menu
+            </button>
             <button type="button" onClick={fetchBootstrap}>
               Refresh
             </button>

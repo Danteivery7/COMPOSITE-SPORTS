@@ -45,6 +45,8 @@ const dom = {
   searchResults: document.querySelector("#search-results"),
   refreshButton: document.querySelector("#refresh-button"),
   themeButton: document.querySelector("#theme-button"),
+  menuButton: document.querySelector("#menu-button"),
+  navOverlay: document.querySelector("#nav-overlay"),
   routeTitle: document.querySelector("#route-title"),
   routeEyebrow: document.querySelector("#route-eyebrow"),
   sidebarStatus: document.querySelector("#sidebar-status"),
@@ -88,6 +90,7 @@ const state = {
     teamStats: false,
     rosters: false,
   },
+  mobileNavOpen: false,
 };
 
 let pollTimer = null;
@@ -143,6 +146,10 @@ function updateRouteChrome() {
   const chrome = syncRouteChrome(state);
   dom.routeTitle.textContent = chrome.title;
   dom.routeEyebrow.textContent = chrome.eyebrow;
+}
+
+function syncMobileNav() {
+  document.body.classList.toggle("nav-open", state.mobileNavOpen);
 }
 
 function recomputeDerivedState() {
@@ -207,6 +214,8 @@ function render() {
 }
 
 function navigate(hash) {
+  state.mobileNavOpen = false;
+  syncMobileNav();
   if (location.hash === hash) {
     state.route = parseRoute(hash);
     ensureRouteData();
@@ -404,6 +413,8 @@ function handleAppClick(event) {
   if (routeTarget?.dataset.route) {
     event.preventDefault();
     dom.searchResults.classList.add("hidden");
+    state.mobileNavOpen = false;
+    syncMobileNav();
     navigate(toRouteHash(routeTarget.dataset.route));
     return;
   }
@@ -412,6 +423,8 @@ function handleAppClick(event) {
   if (navTarget) {
     event.preventDefault();
     dom.searchResults.classList.add("hidden");
+    state.mobileNavOpen = false;
+    syncMobileNav();
     navigate(navTarget.dataset.navHash);
     return;
   }
@@ -446,6 +459,16 @@ function wireEvents() {
   });
 
   dom.themeButton.addEventListener("click", toggleTheme);
+
+  dom.menuButton?.addEventListener("click", () => {
+    state.mobileNavOpen = !state.mobileNavOpen;
+    syncMobileNav();
+  });
+
+  dom.navOverlay?.addEventListener("click", () => {
+    state.mobileNavOpen = false;
+    syncMobileNav();
+  });
 
   dom.searchInput.addEventListener("input", (event) => {
     state.searchQuery = event.target.value || "";

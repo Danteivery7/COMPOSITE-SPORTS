@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getPlayerCatalog, isGenericSport } from '@/src/lib/generic-sports';
+import { isGenericSport } from '@/src/lib/generic-sports';
+import { getGenericSportSnapshot } from '@/src/lib/live-sports-backend';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,9 +14,10 @@ export async function GET(request, { params }) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const query = searchParams.get('q')?.trim().toLowerCase() || '';
-    const data = await getPlayerCatalog(sport);
+    const snapshot = await getGenericSportSnapshot(sport);
+    const catalog = snapshot.playersCatalog || { players: [], lastUpdated: snapshot.lastUpdated };
     const players = query
-      ? data.players.filter((player) => {
+      ? catalog.players.filter((player) => {
           const haystack = [
             player.displayName,
             player.shortName,
@@ -28,10 +30,10 @@ export async function GET(request, { params }) {
             .toLowerCase();
           return haystack.includes(query);
         })
-      : data.players;
+      : catalog.players;
 
     return NextResponse.json({
-      ...data,
+      ...catalog,
       players,
       query,
       totalReturned: players.length,

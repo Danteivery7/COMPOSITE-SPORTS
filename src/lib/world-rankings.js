@@ -1,6 +1,6 @@
 import { computeTopPlayers } from '@/src/mlb/lib/topPlayers';
-import { getSportBootstrap } from '@/src/lib/generic-sports';
-import { FOOTBALL_LEAGUES, getFootballFeaturedPlayers } from '@/src/lib/football';
+import { FOOTBALL_LEAGUES } from '@/src/lib/football';
+import { getFootballLeagueSnapshot, getGenericSportSnapshot } from '@/src/lib/live-sports-backend';
 
 const CACHE = new Map();
 
@@ -11,6 +11,10 @@ const SOURCE_WEIGHTS = {
   nfl: 1.22,
   cbb: 0.96,
 };
+
+function settledValue(result, fallback) {
+  return result.status === 'fulfilled' ? result.value : fallback;
+}
 
 function cacheKey(scope) {
   return `world:${scope}`;
@@ -207,14 +211,30 @@ async function getNHLCandidates() {
 
 async function getHubCandidates() {
   const footballLeagueKeys = Object.keys(FOOTBALL_LEAGUES);
-  const [mlb, nfl, cbb, nba, nhl, ...footballBoards] = await Promise.all([
+  const [mlbResult, nflResult, cbbResult, nbaResult, nhlResult, ...footballResults] = await Promise.allSettled([
     computeTopPlayers(12),
-    getSportBootstrap('nfl'),
-    getSportBootstrap('cbb'),
+    getGenericSportSnapshot('nfl'),
+    getGenericSportSnapshot('cbb'),
     getNBACandidates(),
     getNHLCandidates(),
-    ...footballLeagueKeys.map((leagueKey) => getFootballFeaturedPlayers(leagueKey)),
+    ...footballLeagueKeys.map((leagueKey) => getFootballLeagueSnapshot(leagueKey)),
   ]);
+
+  const mlb = settledValue(mlbResult, { players: [] });
+  const nfl = settledValue(nflResult, { featuredPlayers: [] });
+  const cbb = settledValue(cbbResult, { featuredPlayers: [] });
+  const nba = settledValue(nbaResult, []);
+  const nhl = settledValue(nhlResult, []);
+  const footballBoards = footballResults
+    .map((result, index) => ({
+      result,
+      leagueKey: footballLeagueKeys[index],
+    }))
+    .filter(({ result }) => result.status === 'fulfilled')
+    .map(({ result, leagueKey }) => ({
+      leagueKey,
+      board: result.value,
+    }));
 
   const mlbCandidates = (mlb.players || []).slice(0, 10).map((player) => ({
     id: `mlb-${player.id}`,
@@ -241,10 +261,9 @@ async function getHubCandidates() {
       signalCount: 1,
     }));
 
-  const footballCandidates = footballBoards.flatMap((players, index) => {
-    const leagueKey = footballLeagueKeys[index];
+  const footballCandidates = footballBoards.flatMap(({ leagueKey, board }) => {
     const league = FOOTBALL_LEAGUES[leagueKey];
-    return (players || []).slice(0, 6).map((player) => ({
+    return (board?.featuredPlayers || []).slice(0, 6).map((player) => ({
       id: `${leagueKey}-${player.id}`,
       playerId: String(player.id),
       displayName: player.displayName,

@@ -1890,3 +1890,56 @@ body[data-theme="dark"] .rank-row:hover {
   display: grid;
   gap: 12px;
 }
+
+.menu-button,
+.nav-overlay {
+  display: none;
+}
+
+@media (max-width: 980px) {
+  .menu-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .nav-overlay {
+    position: fixed;
+    inset: 0;
+    border: 0;
+    background: rgba(4, 10, 18, 0.62);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 24;
+  }
+
+  body.nav-open .nav-overlay {
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    bottom: 16px;
+    width: min(82vw, 340px);
+    transform: translateX(calc(-100% - 26px));
+    transition: transform 220ms ease;
+    z-index: 28;
+    overflow-y: auto;
+  }
+
+  body.nav-open .sidebar {
+    transform: translateX(0);
+  }
+
+  .mobile-nav {
+    display: none !important;
+  }
+
+  .main-stage {
+    min-width: 0;
+  }
+}

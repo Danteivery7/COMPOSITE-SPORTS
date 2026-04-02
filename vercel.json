@@ -1,7 +1,15 @@
 {
   "crons": [
     {
+      "path": "/api/hub/warm",
+      "schedule": "*/2 * * * *"
+    },
+    {
       "path": "/api/nba/warm",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/mlb/warm",
       "schedule": "*/5 * * * *"
     }
   ]
