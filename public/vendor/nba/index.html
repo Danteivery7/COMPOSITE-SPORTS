@@ -15,8 +15,11 @@
     <div id="app-container">
         <!-- Top Navigation -->
         <header class="top-nav">
-            <div class="logo">
-                <span class="logo-composite">COMPOSITE</span><span class="logo-nba">NBA</span>
+            <div class="logo-block">
+                <p class="nav-eyebrow">Composite Tracking Suite</p>
+                <div class="logo">
+                    <span class="logo-composite">COMPOSITE</span><span class="logo-nba">NBA</span>
+                </div>
             </div>
             <nav class="desktop-nav">
                 <button class="nav-btn active" data-tab="live">Live</button>
@@ -25,8 +28,10 @@
                 <button class="nav-btn" data-tab="players">Players</button>
                 <button class="nav-btn" data-tab="predictor">Predictor</button>
                 <button class="nav-btn" data-tab="favorites">Favorites</button>
+                <button class="nav-btn" data-tab="settings">Settings</button>
             </nav>
             <div class="header-actions">
+                <a class="hub-link" href="/" target="_top">Back To Hub</a>
                 <button id="theme-toggle" class="icon-btn" title="Toggle Theme">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
@@ -45,7 +50,7 @@
         <div class="loading-bar">
             <div class="loading-bar-inner" id="loading-bar-inner" style="width:0%"></div>
         </div>
-        <div style="padding:0 24px; max-width:1280px; margin:0 auto; width:100%;">
+        <div class="loading-label-shell">
             <div id="loading-label" style="font-size:11px; color:var(--text-tertiary); margin-bottom:8px;"></div>
         </div>
 

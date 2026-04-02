@@ -706,6 +706,17 @@ button {
   z-index: 11;
 }
 
+@media (min-width: 1024px) {
+  .vendor-shell[data-sport='nba'] .vendor-topbar,
+  .mlb-route-topbar {
+    display: none;
+  }
+
+  .vendor-shell[data-sport='nba'] .vendor-frame {
+    height: 100vh;
+  }
+}
+
 @media (max-width: 980px) {
   .generic-sport-shell {
     grid-template-columns: 1fr;

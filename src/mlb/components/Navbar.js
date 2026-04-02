@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 
 export default function Navbar({ currentPage, onNavigate, theme, toggleTheme }) {
@@ -22,9 +23,12 @@ export default function Navbar({ currentPage, onNavigate, theme, toggleTheme }) 
     return (
         <nav className="navbar">
             <div className="navbar-inner">
-                <div className="navbar-brand" onClick={() => handleNav('live')} style={{ cursor: 'pointer', display: 'flex' }}>
-                    <span style={{ fontWeight: 800, fontSize: '18px', letterSpacing: '-0.5px' }}>COMPOSITE</span>
-                    <span className="brand-accent" style={{ fontWeight: 800, fontSize: '18px', letterSpacing: '-0.5px' }}>MLB</span>
+                <div className="navbar-brand-shell">
+                    <p className="navbar-kicker">Composite Tracking Suite</p>
+                    <div className="navbar-brand" onClick={() => handleNav('live')}>
+                        <span className="brand-word">COMPOSITE</span>
+                        <span className="brand-accent">MLB</span>
+                    </div>
                 </div>
 
                 <ul className={`nav-links ${mobileOpen ? 'open' : ''}`}>
@@ -41,7 +45,10 @@ export default function Navbar({ currentPage, onNavigate, theme, toggleTheme }) 
                     ))}
                 </ul>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="navbar-controls">
+                    <Link href="/" className="nav-hub-link">
+                        Back To Hub
+                    </Link>
                     <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
                         {theme === 'dark' ? 'Light' : 'Dark'}
                     </button>

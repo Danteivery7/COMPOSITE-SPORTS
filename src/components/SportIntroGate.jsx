@@ -8,13 +8,21 @@ export default function SportIntroGate({ config, children }) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
+    if (config.alwaysShowIntro) {
+      setOpen(true);
+      setReady(true);
+      return;
+    }
+
     const seen = window.localStorage.getItem(storageKey) === '1';
     setOpen(!seen);
     setReady(true);
-  }, [storageKey]);
+  }, [config.alwaysShowIntro, storageKey]);
 
   function closeIntro() {
-    window.localStorage.setItem(storageKey, '1');
+    if (!config.alwaysShowIntro) {
+      window.localStorage.setItem(storageKey, '1');
+    }
     setOpen(false);
   }
 
