@@ -3,6 +3,7 @@ import { getWorldTopPlayers } from '@/src/lib/world-rankings';
 import { fetchMLBNews } from '@/src/mlb/lib/news';
 import { fetchScoreboard as fetchMlbScoreboard } from '@/src/mlb/lib/espn';
 import { predict as predictMlbGame } from '@/src/mlb/lib/predictor';
+import { computeTopPlayers } from '@/src/mlb/lib/topPlayers';
 import { getNbaNewsFeed, getNbaBootstrapSnapshot } from '@/src/lib/nba-backend';
 import {
   getFootballLeagueSnapshot,
@@ -12,7 +13,7 @@ import {
 import { FOOTBALL_LEAGUES } from '@/src/lib/football';
 import { americanToDecimal, buildParlayOdds, calculateReturn, extractEspnOdds, formatAmericanOdds } from '@/src/lib/odds';
 import { getHotSnapshot, warmSnapshot } from '@/src/lib/snapshot-store';
-import { formatEasternDisplay, getEasternNowLabel, isSameEasternDate, isWithinLastHours } from '@/src/lib/time';
+import { formatEasternDisplay, getEasternNowLabel, getEasternWeeklyCycleId, isSameEasternDate, isWithinLastHours } from '@/src/lib/time';
 
 const STORY_TTL_MS = 5 * 60 * 1000;
 const BETS_TTL_MS = 90 * 1000;
@@ -120,12 +121,45 @@ function parseRssItems(xml = '', sourceMeta) {
   return items;
 }
 
+function uniqBy(items, getKey) {
+  const map = new Map();
+  items.forEach((item) => {
+    map.set(getKey(item), item);
+  });
+  return Array.from(map.values());
+}
+
+function walk(node, visit, seen = new WeakSet()) {
+  if (!node || typeof node !== 'object') return;
+  if (seen.has(node)) return;
+  seen.add(node);
+  visit(node);
+
+  if (Array.isArray(node)) {
+    node.forEach((entry) => walk(entry, visit, seen));
+    return;
+  }
+
+  Object.values(node).forEach((value) => walk(value, visit, seen));
+}
+
 async function fetchText(url) {
   const response = await fetch(url, { cache: 'no-store' });
   if (!response.ok) {
     throw new Error(`${response.status} ${response.statusText}`);
   }
   return response.text();
+}
+
+async function fetchJson(url) {
+  const response = await fetch(url, {
+    cache: 'no-store',
+    headers: { Accept: 'application/json' },
+  });
+  if (!response.ok) {
+    throw new Error(`${response.status} ${response.statusText}`);
+  }
+  return response.json();
 }
 
 function classifySport(text) {
@@ -187,6 +221,161 @@ function normalizeHubStory(story, { sport, league, sourceWeight = 0.8 }) {
     sourceWeight,
     body: story?.body || '',
   };
+}
+
+function normalizeKey(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function flattenStats(stats = []) {
+  const map = {};
+  stats.forEach((stat) => {
+    const keys = [stat.name, stat.displayName, stat.shortDisplayName, stat.abbreviation].filter(Boolean);
+    keys.forEach((key) => {
+      map[normalizeKey(key)] = stat.value ?? stat.displayValue ?? 0;
+    });
+  });
+  return map;
+}
+
+function getStatValue(stats, keys, fallback = 0) {
+  for (const key of keys) {
+    const value = stats[normalizeKey(key)];
+    if (value !== undefined && value !== null && value !== '') {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : fallback;
+    }
+  }
+  return fallback;
+}
+
+function pickRotatingEntry(items = [], seed = '') {
+  if (!items.length) return null;
+  const cycle = getEasternWeeklyCycleId();
+  const index = Math.abs(cycle + Number.parseInt(hashString(seed), 36)) % items.length;
+  return items[index];
+}
+
+function buildSpotlightCard(player, fallback = {}) {
+  if (!player) return null;
+  const headline = player.displayName || player.name || player.headline || fallback.headline || 'Featured Athlete';
+  const detailBits = [
+    player.position || fallback.position || '',
+    player.teamAbbr || player.team?.abbreviation || fallback.teamAbbr || '',
+  ].filter(Boolean);
+  return {
+    image: player.headshot || player.image || fallback.image || '',
+    league: player.leagueLabel || player.competition || fallback.league || '',
+    headline,
+    subhead: detailBits.join(' • ') || fallback.subhead || '',
+  };
+}
+
+function parseSiteLeaders(payload, { leagueLabel, sportKey }) {
+  const leaders = [];
+  walk(payload, (node) => {
+    if (node?.athlete?.id && (node.rank || node.displayValue || node.value)) {
+      leaders.push({
+        id: `${sportKey}-${node.athlete.id}`,
+        displayName: node.athlete.displayName || node.athlete.shortName || 'Player',
+        headshot: node.athlete.headshot?.href || node.athlete.headshot || '',
+        position:
+          node.athlete.position?.abbreviation ||
+          node.athlete.position?.displayName ||
+          node.athlete.position?.name ||
+          '',
+        teamAbbr: node.team?.abbreviation || node.team?.shortDisplayName || '',
+        leagueLabel,
+        rank: Number(node.rank || 1),
+        leaderLabel: node.name || node.displayName || 'Leader',
+      });
+    }
+  });
+
+  return uniqBy(leaders, (entry) => entry.id)
+    .sort((left, right) => left.rank - right.rank)
+    .slice(0, 16);
+}
+
+async function getNhlSpotlightPool() {
+  const payload = await fetchJson('https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/leaders');
+  return parseSiteLeaders(payload, { leagueLabel: 'NHL', sportKey: 'nhl' });
+}
+
+function scoreNbaPlayer(player) {
+  const stats = player?.realStats;
+  if (!stats) return -1;
+  return (
+    (Number(stats.ppg || 0) * 4.2) +
+    (Number(stats.apg || 0) * 3.1) +
+    (Number(stats.rpg || 0) * 2.1) +
+    (Number(stats.spg || 0) * 6.4) +
+    (Number(stats.bpg || 0) * 5.6) +
+    (Number(stats.tsPct || 0) * 0.14)
+  );
+}
+
+function buildNbaSpotlightPool(snapshot) {
+  return (snapshot?.playerCatalog || [])
+    .filter((player) => player?.hasOfficialStats && player?.headshot)
+    .sort((left, right) => scoreNbaPlayer(right) - scoreNbaPlayer(left))
+    .slice(0, 24)
+    .map((player) => ({
+      ...player,
+      leagueLabel: 'NBA',
+    }));
+}
+
+function parseStrengthStandings(payload) {
+  const entries = [];
+  walk(payload, (node) => {
+    if (node?.team?.id && Array.isArray(node?.stats)) {
+      const stats = flattenStats(node.stats);
+      entries.push({
+        teamId: String(node.team.id),
+        winPct: getStatValue(stats, ['winpercent', 'winningpercentage'], 0.5),
+        differential: getStatValue(stats, ['goaldifferential', 'pointdifferential', 'differential'], 0),
+        pointsFor: getStatValue(stats, ['goalsfor', 'pointsfor', 'goalsscored'], 0),
+        pointsAgainst: getStatValue(stats, ['goalsagainst', 'pointsagainst'], 0),
+      });
+    }
+  });
+  return Object.fromEntries(entries.map((entry) => [entry.teamId, entry]));
+}
+
+async function fetchNhlScoreboard() {
+  const payload = await fetchJson('https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard');
+  return (payload.events || []).map((event) => {
+    const competition = event.competitions?.[0];
+    const competitors = competition?.competitors || [];
+    const away = competitors.find((item) => item.homeAway === 'away');
+    const home = competitors.find((item) => item.homeAway === 'home');
+    const status = competition?.status?.type || event.status?.type || {};
+    const odds = extractEspnOdds(competition, event?.pickcenter?.[0] || null);
+    return {
+      id: event.id,
+      state: status.state || 'pre',
+      statusLabel: status.detail || status.shortDetail || status.description || 'Scheduled',
+      startTime: event.date,
+      odds,
+      away: {
+        teamId: away?.team?.id ? String(away.team.id) : '',
+        abbreviation: away?.team?.abbreviation || 'AWY',
+        displayName: away?.team?.displayName || 'Away',
+        logo: away?.team?.logo || away?.team?.logos?.[0]?.href || '',
+        score: away?.score || '0',
+      },
+      home: {
+        teamId: home?.team?.id ? String(home.team.id) : '',
+        abbreviation: home?.team?.abbreviation || 'HME',
+        displayName: home?.team?.displayName || 'Home',
+        logo: home?.team?.logo || home?.team?.logos?.[0]?.href || '',
+        score: home?.score || '0',
+      },
+    };
+  });
 }
 
 async function fetchNhlNewsStories() {
@@ -386,13 +575,236 @@ async function buildMlbBetCandidates() {
     .filter((candidate) => candidate.americanOdds !== null && candidate.americanOdds !== undefined);
 }
 
+async function buildNhlBetCandidates() {
+  const [games, standingsPayload] = await Promise.all([
+    fetchNhlScoreboard(),
+    fetchJson('https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/standings'),
+  ]);
+
+  const strengthMap = parseStrengthStandings(standingsPayload);
+
+  return games
+    .filter((game) => game.state === 'pre')
+    .map((game) => {
+      const homeStrength = strengthMap[game.home.teamId] || {};
+      const awayStrength = strengthMap[game.away.teamId] || {};
+      const homePower =
+        (Number(homeStrength.winPct || 0.5) * 100) +
+        (Number(homeStrength.differential || 0) * 1.7) +
+        ((Number(homeStrength.pointsFor || 0) - Number(homeStrength.pointsAgainst || 0)) * 0.1) +
+        2.3;
+      const awayPower =
+        (Number(awayStrength.winPct || 0.5) * 100) +
+        (Number(awayStrength.differential || 0) * 1.7) +
+        ((Number(awayStrength.pointsFor || 0) - Number(awayStrength.pointsAgainst || 0)) * 0.1);
+      const leaningHome = homePower >= awayPower;
+      return {
+        sport: 'nhl',
+        league: 'NHL',
+        gameId: game.id,
+        selection: leaningHome ? game.home.displayName : game.away.displayName,
+        teamAbbr: leaningHome ? game.home.abbreviation : game.away.abbreviation,
+        predictedWinner: leaningHome ? game.home.displayName : game.away.displayName,
+        lineType: `${leaningHome ? game.home.abbreviation : game.away.abbreviation} moneyline`,
+        americanOdds: leaningHome ? game.odds?.homeMoneyline : game.odds?.awayMoneyline,
+        projectedScore: `${game.away.abbreviation} ${Math.max(1, Math.round(2.2 + awayPower / 28))} - ${game.home.abbreviation} ${Math.max(1, Math.round(2.3 + homePower / 28))}`,
+        winProbability: Math.max(50, Math.min(68, Math.round(50 + Math.abs(homePower - awayPower) * 0.65))),
+        teamLogo: leaningHome ? game.home.logo : game.away.logo,
+        opponentLogo: leaningHome ? game.away.logo : game.home.logo,
+        startTime: game.startTime || null,
+        edgeMagnitude: Math.abs(homePower - awayPower),
+      };
+    })
+    .filter((candidate) => candidate.americanOdds !== null && candidate.americanOdds !== undefined);
+}
+
+function normalizeTickerGame({ league, sport, gameId, state, statusLabel, startTime, away, home }) {
+  const isLive = ['in', 'live'].includes(String(state || '').toLowerCase());
+  const isToday = startTime ? isSameEasternDate(startTime, new Date()) : false;
+  if (!isLive && !isToday) return null;
+
+  return {
+    id: `${league}-${gameId}`,
+    league,
+    sport,
+    state,
+    statusLabel,
+    startTime,
+    sortBucket: isLive ? 0 : 1,
+    matchup: `${away.abbreviation} @ ${home.abbreviation}`,
+    scoreLabel: isLive || String(state) === 'post'
+      ? `${away.score}-${home.score}`
+      : formatEasternDisplay(startTime, { hour: 'numeric', minute: '2-digit' }),
+    awayLogo: away.logo || '',
+    homeLogo: home.logo || '',
+  };
+}
+
+function buildGenericTicker(board, leagueLabel, sportKey = leagueLabel.toLowerCase()) {
+  return (board?.scoreboard || [])
+    .map((game) =>
+      normalizeTickerGame({
+        league: leagueLabel,
+        sport: sportKey,
+        gameId: game.id,
+        state: game.state,
+        statusLabel: game.statusLabel,
+        startTime: game.startTime,
+        away: game.away,
+        home: game.home,
+      }),
+    )
+    .filter(Boolean);
+}
+
+function buildMlbTicker(scoreboard) {
+  return (scoreboard?.games || [])
+    .map((game) =>
+      normalizeTickerGame({
+        league: 'MLB',
+        sport: 'mlb',
+        gameId: game.id,
+        state: game.state,
+        statusLabel: game.statusDetail || game.shortDetail || '',
+        startTime: game.startTime,
+        away: {
+          abbreviation: game.away?.abbr || 'AWY',
+          score: game.away?.score || 0,
+          logo: game.away?.logo || '',
+        },
+        home: {
+          abbreviation: game.home?.abbr || 'HME',
+          score: game.home?.score || 0,
+          logo: game.home?.logo || '',
+        },
+      }),
+    )
+    .filter(Boolean);
+}
+
+function buildNbaTicker(snapshot) {
+  return (snapshot?.games || [])
+    .map((event) => {
+      const competition = event.competitions?.[0];
+      const away = competition?.competitors?.find((team) => team.homeAway === 'away');
+      const home = competition?.competitors?.find((team) => team.homeAway === 'home');
+      const status = competition?.status?.type || event.status?.type || {};
+      if (!away || !home) return null;
+      return normalizeTickerGame({
+        league: 'NBA',
+        sport: 'nba',
+        gameId: event.id,
+        state: status.state,
+        statusLabel: status.detail || status.shortDetail || status.description || '',
+        startTime: event.date,
+        away: {
+          abbreviation: away.team?.abbreviation || 'AWY',
+          score: away.score || 0,
+          logo: away.team?.logo || away.team?.logos?.[0]?.href || '',
+        },
+        home: {
+          abbreviation: home.team?.abbreviation || 'HME',
+          score: home.score || 0,
+          logo: home.team?.logo || home.team?.logos?.[0]?.href || '',
+        },
+      });
+    })
+    .filter(Boolean);
+}
+
+function buildLiveTickerBundle({ mlbScoreboard, nbaSnapshot, nhlGames, nflBoard, cbbBoard, footballBoards }) {
+  return [
+    ...buildMlbTicker(mlbScoreboard),
+    ...buildNbaTicker(nbaSnapshot),
+    ...nhlGames
+      .map((game) =>
+        normalizeTickerGame({
+          league: 'NHL',
+          sport: 'nhl',
+          gameId: game.id,
+          state: game.state,
+          statusLabel: game.statusLabel,
+          startTime: game.startTime,
+          away: game.away,
+          home: game.home,
+        }),
+      )
+      .filter(Boolean),
+    ...buildGenericTicker(nflBoard, 'NFL', 'nfl'),
+    ...buildGenericTicker(cbbBoard, 'CBB', 'cbb'),
+    ...footballBoards.flatMap((board) => buildGenericTicker(board, board?.league?.label || 'Football', 'football')),
+  ]
+    .sort((left, right) => (left.sortBucket - right.sortBucket) || new Date(left.startTime || 0).getTime() - new Date(right.startTime || 0).getTime())
+    .slice(0, 16);
+}
+
+async function buildCardSpotlights(storySpotlights = {}) {
+  const footballLeagueKeys = Object.keys(FOOTBALL_LEAGUES);
+  const [
+    mlbResult,
+    nbaResult,
+    nhlResult,
+    nflResult,
+    cbbResult,
+    footballResults,
+  ] = await Promise.allSettled([
+    computeTopPlayers(18),
+    getNbaBootstrapSnapshot(),
+    getNhlSpotlightPool(),
+    getGenericSportSnapshot('nfl'),
+    getGenericSportSnapshot('cbb'),
+    Promise.allSettled(footballLeagueKeys.map((leagueKey) => getFootballLeagueSnapshot(leagueKey))),
+  ]);
+
+  const mlbPlayers = (settledValue(mlbResult, { players: [] }).players || []).map((player) => ({
+    displayName: player.name || player.displayName,
+    headshot: player.headshot,
+    position: player.position || 'MLB',
+    teamAbbr: player.teamAbbr || '',
+    leagueLabel: 'MLB',
+  }));
+  const nbaPlayers = buildNbaSpotlightPool(settledValue(nbaResult, { playerCatalog: [] }));
+  const nhlPlayers = settledValue(nhlResult, []);
+  const nflPlayers = settledValue(nflResult, { featuredPlayers: [] }).featuredPlayers || [];
+  const cbbPlayers = settledValue(cbbResult, { featuredPlayers: [] }).featuredPlayers || [];
+  const footballPlayers = settledValue(footballResults, [])
+    .map((result, index) => ({
+      result,
+      leagueKey: footballLeagueKeys[index],
+    }))
+    .filter(({ result }) => result.status === 'fulfilled')
+    .flatMap(({ result, leagueKey }) =>
+      (result.value?.featuredPlayers || []).map((player) => ({
+        ...player,
+        leagueLabel: FOOTBALL_LEAGUES[leagueKey].label,
+      })),
+    );
+
+  const pools = {
+    nhl: nhlPlayers,
+    mlb: mlbPlayers,
+    nba: nbaPlayers,
+    cbb: cbbPlayers,
+    nfl: nflPlayers,
+    football: footballPlayers,
+  };
+
+  return Object.fromEntries(
+    Object.entries(pools).map(([sportKey, players]) => {
+      const selected = pickRotatingEntry(players.filter((player) => player?.headshot), sportKey) || pickRotatingEntry(players, sportKey);
+      return [sportKey, buildSpotlightCard(selected, storySpotlights[sportKey] || {}) || storySpotlights[sportKey] || null];
+    }),
+  );
+}
+
 async function buildTopBetsSnapshot() {
-  const [nflBoardResult, footballBoardsResult, mlbCandidatesResult, nbaSnapshotResult, footballLandingResult] = await Promise.allSettled([
+  const [nflBoardResult, footballBoardsResult, mlbCandidatesResult, nbaSnapshotResult, footballLandingResult, nhlCandidatesResult] = await Promise.allSettled([
     getGenericSportSnapshot('nfl'),
     Promise.allSettled(Object.keys(FOOTBALL_LEAGUES).map((leagueKey) => getFootballLeagueSnapshot(leagueKey))),
     buildMlbBetCandidates(),
     getNbaBootstrapSnapshot(),
     getFootballLandingSnapshot(),
+    buildNhlBetCandidates(),
   ]);
 
   const nflBoard = settledValue(nflBoardResult, { predictors: [], scoreboard: [] });
@@ -402,6 +814,7 @@ async function buildTopBetsSnapshot() {
   const mlbCandidates = settledValue(mlbCandidatesResult, []);
   const nbaSnapshot = settledValue(nbaSnapshotResult, null);
   const footballLanding = settledValue(footballLandingResult, null);
+  const nhlCandidates = settledValue(nhlCandidatesResult, []);
 
   const nflCandidates = buildGenericBetCandidates(nflBoard, 'NFL');
   const footballCandidates = footballBoards.flatMap((board) => buildFootballBetCandidates(board));
@@ -441,19 +854,31 @@ async function buildTopBetsSnapshot() {
     })
     .filter(Boolean);
 
-  const candidates = [...mlbCandidates, ...nflCandidates, ...footballCandidates, ...nbaCandidates]
+  const candidates = [...mlbCandidates, ...nflCandidates, ...footballCandidates, ...nbaCandidates, ...nhlCandidates]
     .filter((candidate) => candidate?.americanOdds !== null && candidate?.americanOdds !== undefined)
     .filter((candidate) => candidate?.startTime && isSameEasternDate(candidate.startTime, new Date()))
     .sort((left, right) => (right.edgeMagnitude || 0) - (left.edgeMagnitude || 0));
 
   const selected = [];
-  const byLeague = new Set();
+  const bySport = new Set();
   for (const candidate of candidates) {
     if (selected.length >= 3) break;
     const decimal = americanToDecimal(candidate.americanOdds);
     if (!Number.isFinite(decimal)) continue;
-    if (byLeague.has(candidate.league) && selected.length < 2) continue;
-    byLeague.add(candidate.league);
+    if (bySport.has(candidate.sport)) continue;
+    bySport.add(candidate.sport);
+    selected.push({
+      ...candidate,
+      americanOddsLabel: formatAmericanOdds(candidate.americanOdds),
+      startLabel: formatEasternDisplay(candidate.startTime),
+    });
+  }
+
+  for (const candidate of candidates) {
+    if (selected.length >= 3) break;
+    const decimal = americanToDecimal(candidate.americanOdds);
+    if (!Number.isFinite(decimal)) continue;
+    if (selected.some((entry) => entry.league === candidate.league && entry.gameId === candidate.gameId)) continue;
     selected.push({
       ...candidate,
       americanOddsLabel: formatAmericanOdds(candidate.americanOdds),
@@ -478,17 +903,40 @@ async function buildTopBetsSnapshot() {
 }
 
 async function buildHubHeroSnapshot() {
-  const [storiesResult, betsResult, worldBoardResult] = await Promise.allSettled([
+  const footballLeagueKeys = Object.keys(FOOTBALL_LEAGUES);
+  const [storiesResult, betsResult, worldBoardResult, mlbScoreboardResult, nbaSnapshotResult, nhlGamesResult, nflBoardResult, cbbBoardResult, footballBoardsResult] = await Promise.allSettled([
     getHubTrendingStories(),
     getHubTopBets(),
     getWorldTopPlayers(),
+    fetchMlbScoreboard(),
+    getNbaBootstrapSnapshot(),
+    fetchNhlScoreboard(),
+    getGenericSportSnapshot('nfl'),
+    getGenericSportSnapshot('cbb'),
+    Promise.allSettled(footballLeagueKeys.map((leagueKey) => getFootballLeagueSnapshot(leagueKey))),
   ]);
 
   const stories = settledValue(storiesResult, { stories: [], cardSpotlights: {} });
   const bets = settledValue(betsResult, { bets: [], parlay: null });
   const worldBoard = settledValue(worldBoardResult, { players: [], lastUpdated: null });
+  const mlbScoreboard = settledValue(mlbScoreboardResult, { games: [] });
+  const nbaSnapshot = settledValue(nbaSnapshotResult, { games: [] });
+  const nhlGames = settledValue(nhlGamesResult, []);
+  const nflBoard = settledValue(nflBoardResult, { scoreboard: [] });
+  const cbbBoard = settledValue(cbbBoardResult, { scoreboard: [] });
+  const footballBoards = settledValue(footballBoardsResult, [])
+    .filter((result) => result.status === 'fulfilled')
+    .map((result) => result.value);
 
-  const cardSpotlights = { ...(stories.cardSpotlights || {}) };
+  const liveTicker = buildLiveTickerBundle({
+    mlbScoreboard,
+    nbaSnapshot,
+    nhlGames,
+    nflBoard,
+    cbbBoard,
+    footballBoards,
+  });
+  const cardSpotlights = await buildCardSpotlights(stories.cardSpotlights || {});
   const playerFallbacks = Object.fromEntries(
     (worldBoard?.players || []).map((player) => [String(player.leagueLabel || '').toLowerCase(), player]),
   );
@@ -521,6 +969,7 @@ async function buildHubHeroSnapshot() {
     topBets: bets.bets,
     parlay: bets.parlay,
     cardSpotlights,
+    liveTicker,
     nowLabel: getEasternNowLabel(),
     lastUpdated: new Date().toISOString(),
   };

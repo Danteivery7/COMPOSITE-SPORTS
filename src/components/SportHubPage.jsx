@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { getSportCards, SPORT_CONFIGS } from '@/src/data/sports';
 import StoryDetailCard from '@/src/components/StoryDetailCard';
 
@@ -12,9 +12,11 @@ function MoneylineTag({ value }) {
 
 export default function SportHubPage() {
   const cards = getSportCards();
+  const sportRailRef = useRef(null);
   const [hero, setHero] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeStory, setActiveStory] = useState(null);
+  const [storyIndex, setStoryIndex] = useState(0);
 
   useEffect(() => {
     document.documentElement.removeAttribute('data-theme');
@@ -40,6 +42,10 @@ export default function SportHubPage() {
     };
   }, []);
 
+  useEffect(() => {
+    setStoryIndex(0);
+  }, [hero?.trendingStories?.length]);
+
   async function openStory(storyRef) {
     const storyId = typeof storyRef === 'string' ? storyRef : storyRef?.storyId;
     if (!storyId) return;
@@ -54,6 +60,25 @@ export default function SportHubPage() {
   const bets = hero?.topBets || [];
   const cardSpotlights = hero?.cardSpotlights || {};
   const parlay = hero?.parlay || null;
+  const liveTicker = hero?.liveTicker || [];
+  const featuredStory = stories[storyIndex] || stories[0] || null;
+  const movingStories = stories.length > 1 ? [...stories, ...stories] : stories;
+  const tickerLoop = liveTicker.length > 1 ? [...liveTicker, ...liveTicker] : liveTicker;
+
+  useEffect(() => {
+    if (stories.length <= 1) return undefined;
+    const timer = window.setInterval(() => {
+      setStoryIndex((current) => (current + 1) % stories.length);
+    }, 5200);
+    return () => window.clearInterval(timer);
+  }, [stories.length]);
+
+  function shiftSportRail(direction) {
+    sportRailRef.current?.scrollBy({
+      left: direction * 320,
+      behavior: 'smooth',
+    });
+  }
 
   const enhancedCards = useMemo(
     () =>
@@ -108,17 +133,30 @@ export default function SportHubPage() {
               <span>{hero?.nowLabel || 'Syncing'}</span>
             </div>
             {stories[0] ? (
-              <button className="hub-story-feature" type="button" onClick={() => openStory(stories[0])}>
-                {stories[0].image ? <img src={stories[0].image} alt={stories[0].headline} className="hub-story-feature-image" /> : null}
+              <button className="hub-story-feature" type="button" onClick={() => openStory(featuredStory)}>
+                {featuredStory?.image ? <img src={featuredStory.image} alt={featuredStory.headline} className="hub-story-feature-image" /> : null}
                 <div>
-                  <span className="hub-story-kicker">{stories[0].league}</span>
-                  <strong>{stories[0].headline}</strong>
-                  <p>{stories[0].summary || stories[0].description || 'Open story'}</p>
+                  <span className="hub-story-kicker">{featuredStory?.league}</span>
+                  <strong>{featuredStory?.headline}</strong>
+                  <p>{featuredStory?.summary || featuredStory?.description || 'Open story'}</p>
                 </div>
               </button>
             ) : (
               <div className="hub-story-feature is-loading" />
             )}
+            {stories.length > 1 ? (
+              <div className="hub-story-dots" aria-label="Story rotation">
+                {stories.map((story, index) => (
+                  <button
+                    key={story.storyId}
+                    type="button"
+                    className={index === storyIndex ? 'is-active' : ''}
+                    aria-label={`Show story ${index + 1}`}
+                    onClick={() => setStoryIndex(index)}
+                  />
+                ))}
+              </div>
+            ) : null}
           </article>
 
           <article className="hub-hero-bets-card">
@@ -176,6 +214,55 @@ export default function SportHubPage() {
         </div>
       </section>
 
+      <section className="hub-sport-rail-section">
+        <div className="hub-module-head">
+          <div>
+            <p className="eyebrow">All Sports</p>
+            <h2>Jump Straight Into Any Board</h2>
+          </div>
+          <div className="hub-rail-controls">
+            <button type="button" onClick={() => shiftSportRail(-1)} aria-label="Previous sports">
+              ‹
+            </button>
+            <button type="button" onClick={() => shiftSportRail(1)} aria-label="Next sports">
+              ›
+            </button>
+          </div>
+        </div>
+        <div className="hub-sport-rail" ref={sportRailRef}>
+          {enhancedCards.map((card) => (
+            <Link
+              key={card.key}
+              href={card.path}
+              className="hub-card hub-card-compact"
+              data-sport={card.key}
+              data-motif={card.motif}
+              style={{
+                '--card-accent': card.accent,
+                '--card-accent-alt': card.accentAlt,
+                '--card-surface': card.surface,
+                '--card-glow': card.theme?.hub?.glow || card.accent,
+              }}
+            >
+              <div className="hub-card-surface" />
+              <div className="hub-card-noise" />
+              <div className="hub-card-marking" />
+              {card.spotlight?.image ? <img src={card.spotlight.image} alt={card.spotlight.headline || card.label} className="hub-card-image" /> : null}
+              <p className="eyebrow">{card.label}</p>
+              <h2>{card.label}</h2>
+              <div className="hub-card-spotlight">
+                <strong>{card.spotlight?.headline || `Open ${card.label}`}</strong>
+                <span>{card.spotlight?.subhead || card.hoverLabel || card.theme?.hoverCue}</span>
+              </div>
+              <div className="hub-card-footer compact">
+                <span className="hub-card-hover-label">{card.hoverLabel || card.theme?.hoverCue}</span>
+                <span className="hub-card-cta">Open</span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
       <section className="hub-world-board">
         <div className="hub-world-head">
           <div>
@@ -227,6 +314,18 @@ export default function SportHubPage() {
               ))
             : [...Array(4)].map((_, index) => <div key={index} className="hub-story-card is-loading" />)}
         </div>
+        {movingStories.length ? (
+          <div className="hub-story-marquee" aria-hidden="true">
+            <div className="hub-story-marquee-track">
+              {movingStories.map((story, index) => (
+                <span key={`${story.storyId}-${index}`} className="hub-story-marquee-pill">
+                  <strong>{story.league}</strong>
+                  <span>{story.headline}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <section className="hub-bet-board">
@@ -265,41 +364,22 @@ export default function SportHubPage() {
         </div>
       </section>
 
-      <section className="hub-grid">
-        {enhancedCards.map((card) => (
-          <Link
-            key={card.key}
-            href={card.path}
-            className="hub-card"
-            data-sport={card.key}
-            data-motif={card.motif}
-            style={{
-              '--card-accent': card.accent,
-              '--card-accent-alt': card.accentAlt,
-              '--card-surface': card.surface,
-              '--card-glow': card.theme?.hub?.glow || card.accent,
-            }}
-          >
-            <div className="hub-card-surface" />
-            <div className="hub-card-noise" />
-            <div className="hub-card-marking" />
-            {card.spotlight?.image ? <img src={card.spotlight.image} alt={card.spotlight.headline || card.label} className="hub-card-image" /> : null}
-            <p className="eyebrow">{card.label}</p>
-            <h2>{card.name}</h2>
-            <p>{card.cardBlurb}</p>
-            {card.spotlight ? (
-              <div className="hub-card-spotlight">
-                <span>{card.spotlight.league || card.label}</span>
-                <strong>{card.spotlight.headline}</strong>
-              </div>
-            ) : null}
-            <div className="hub-card-footer">
-              <span className="hub-card-cta">Open {card.label}</span>
-              <span className="hub-card-hover-label">{card.hoverLabel || card.theme?.hoverCue}</span>
-            </div>
-          </Link>
-        ))}
-      </section>
+      {tickerLoop.length ? (
+        <section className="hub-live-ticker" aria-label="Composite Sports live ticker">
+          <div className="hub-live-ticker-track">
+            {tickerLoop.map((item, index) => (
+              <span className="hub-live-ticker-item" key={`${item.id}-${index}`}>
+                <strong>{item.league}</strong>
+                {item.awayLogo ? <img src={item.awayLogo} alt="" className="hub-live-ticker-logo" /> : null}
+                <span>{item.matchup}</span>
+                <span>{item.scoreLabel}</span>
+                {item.homeLogo ? <img src={item.homeLogo} alt="" className="hub-live-ticker-logo" /> : null}
+                <em>{item.statusLabel}</em>
+              </span>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }

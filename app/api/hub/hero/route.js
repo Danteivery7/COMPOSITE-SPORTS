@@ -17,6 +17,7 @@ export async function GET(request) {
         topBets: [],
         parlay: null,
         cardSpotlights: {},
+        liveTicker: [],
         error: error.message,
         lastUpdated: null,
       },

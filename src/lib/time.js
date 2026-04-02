@@ -81,3 +81,18 @@ export function compareByStartTime(left, right) {
   const rightTime = right ? new Date(right).getTime() : 0;
   return leftTime - rightTime;
 }
+
+export function getEasternWeeklyCycleId(input = new Date()) {
+  const parts = getEasternParts(input);
+  const pseudoNow = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+  const dayOfWeek = new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
+  const mondayOffset = (dayOfWeek + 6) % 7;
+  let cycleStart = Date.UTC(parts.year, parts.month - 1, parts.day - mondayOffset, 6, 0, 0);
+
+  if (pseudoNow < cycleStart) {
+    cycleStart -= 7 * 24 * 60 * 60 * 1000;
+  }
+
+  const anchor = Date.UTC(2026, 0, 5, 6, 0, 0);
+  return Math.floor((cycleStart - anchor) / (7 * 24 * 60 * 60 * 1000));
+}
