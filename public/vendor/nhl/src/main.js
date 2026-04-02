@@ -382,6 +382,14 @@ function handleSettingClick(button) {
 }
 
 function handleAppClick(event) {
+  const routeTarget = event.target.closest("[data-route]");
+  if (routeTarget?.dataset.route) {
+    event.preventDefault();
+    dom.searchResults.classList.add("hidden");
+    navigate(toRouteHash(routeTarget.dataset.route));
+    return;
+  }
+
   const navTarget = event.target.closest("[data-nav-hash]");
   if (navTarget) {
     event.preventDefault();
