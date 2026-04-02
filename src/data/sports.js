@@ -19,6 +19,13 @@ export const SPORT_CONFIGS = {
     introCopy: 'This route boots the original NHL composite code directly, wrapped inside the new all-sports shell.',
     enterLabel: 'Open NHL Composite',
     motif: 'ice',
+    hoverLabel: 'Skate-line sweep',
+    theme: {
+      hub: { accent: '#32b7ff', accentAlt: '#86f0ff', glow: 'rgba(50, 183, 255, 0.3)' },
+      dark: { base: '#081019', surface: '#10233b', accent: '#4bb8cb' },
+      light: { base: '#edf4fb', surface: '#f8fbff', accent: '#0d6f7e' },
+      hoverCue: 'Ice glow and puck trail',
+    },
   },
   mlb: {
     key: 'mlb',
@@ -36,6 +43,13 @@ export const SPORT_CONFIGS = {
     introCopy: 'Same MLB logic, but the arrival now leans into dugout shadows, infield dirt, chalk lines, and a stadium-lit baseball atmosphere that feels nothing like NBA.',
     enterLabel: 'Step Into The Park',
     motif: 'diamond',
+    hoverLabel: 'Chalk-line flash',
+    theme: {
+      hub: { accent: '#c46b36', accentAlt: '#f1dfba', glow: 'rgba(196, 107, 54, 0.28)' },
+      dark: { base: '#0a100d', surface: '#241810', accent: '#c46b36' },
+      light: { base: '#ece0c8', surface: '#fff6e7', accent: '#a8572c' },
+      hoverCue: 'Stitched spin and scoreboard flicker',
+    },
   },
   nba: {
     key: 'nba',
@@ -53,6 +67,13 @@ export const SPORT_CONFIGS = {
     introCopy: 'The NBA composite boots from its copied source while the route layers in a cleaner arena-arrival sequence before the floor opens up.',
     enterLabel: 'Take The Court',
     motif: 'court',
+    hoverLabel: 'Court-line pulse',
+    theme: {
+      hub: { accent: '#ff6a3d', accentAlt: '#ffcc70', glow: 'rgba(255, 106, 61, 0.3)' },
+      dark: { base: '#110b09', surface: '#1c120f', accent: '#f97316' },
+      light: { base: '#f6eee6', surface: '#fff9f4', accent: '#c2410c' },
+      hoverCue: 'Ball bounce and hardwood pulse',
+    },
   },
   cbb: {
     key: 'cbb',
@@ -70,6 +91,13 @@ export const SPORT_CONFIGS = {
     introCopy: 'Power conferences, mid-majors, live scoreboards, and a roster-wide player board all feed the same college tunnel.',
     enterLabel: 'Open CBB Board',
     motif: 'bracket',
+    hoverLabel: 'Bracket spark',
+    theme: {
+      hub: { accent: '#f5a623', accentAlt: '#ffe88f', glow: 'rgba(245, 166, 35, 0.28)' },
+      dark: { base: '#140d09', surface: '#25160c', accent: '#f5a623' },
+      light: { base: '#fbf1d8', surface: '#fff7e7', accent: '#b97212' },
+      hoverCue: 'Bracket spark and upset-board flicker',
+    },
   },
   nfl: {
     key: 'nfl',
@@ -87,6 +115,13 @@ export const SPORT_CONFIGS = {
     introCopy: 'The NFL route launches with a field-level intro, live board, and a first-pass team and player composite.',
     enterLabel: 'Charge The Field',
     motif: 'yardline',
+    hoverLabel: 'Play-diagram sweep',
+    theme: {
+      hub: { accent: '#75e44d', accentAlt: '#b9ff9a', glow: 'rgba(117, 228, 77, 0.28)' },
+      dark: { base: '#06100a', surface: '#112216', accent: '#75e44d' },
+      light: { base: '#e1efd6', surface: '#f5fbef', accent: '#4b8a2d' },
+      hoverCue: 'Yard-line sweep and flag flare',
+    },
   },
   mls: {
     key: 'mls',
@@ -104,6 +139,13 @@ export const SPORT_CONFIGS = {
     introCopy: 'MLS gets its own intro, predictor rail, and roster-wide first-pass player board inside the new hub.',
     enterLabel: 'Enter The Pitch',
     motif: 'pitch',
+    hoverLabel: 'Net ripple',
+    theme: {
+      hub: { accent: '#ff507d', accentAlt: '#ffc2d3', glow: 'rgba(255, 80, 125, 0.26)' },
+      dark: { base: '#080b0a', surface: '#141d17', accent: '#ff507d' },
+      light: { base: '#f6ebe8', surface: '#fff8f6', accent: '#d83467' },
+      hoverCue: 'Net ripple and floodlight sweep',
+    },
   },
 };
 

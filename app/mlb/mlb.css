@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Sans:wght@300;400;500;600;700;800&display=swap');
 
 /* ===== DESIGN TOKENS ===== */
-:root {
+.mlb-route-shell {
   /* Dark mode (default) */
   --bg-primary: #0a100d;
   --bg-secondary: #141b15;
@@ -45,26 +45,36 @@
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  min-height: 100vh;
+  isolation: isolate;
+  font-family: var(--font);
+  color: var(--text-primary);
+  line-height: 1.6;
+  overflow-x: clip;
 }
 
-[data-theme="light"] {
+.mlb-route-shell[data-theme="light"] {
   --bg-primary: #efe6d2;
-  --bg-secondary: #f6f0e1;
-  --bg-card: #fffaf0;
-  --bg-card-hover: #f0e7d6;
-  --bg-input: #e8decb;
-  --bg-nav: rgba(241, 234, 218, 0.94);
+  --bg-secondary: #f7f0df;
+  --bg-card: #fff6e7;
+  --bg-card-hover: #f2e4c9;
+  --bg-input: #e8dbc0;
+  --bg-nav: rgba(247, 236, 214, 0.94);
 
-  --text-primary: #251912;
-  --text-secondary: #5b4d3f;
-  --text-muted: #7b6956;
+  --text-primary: #25170f;
+  --text-secondary: #5e4d3e;
+  --text-muted: #7f6b56;
   --text-accent: #9f5128;
 
   --border-color: rgba(76, 47, 24, 0.1);
   --border-hover: rgba(76, 47, 24, 0.18);
 
-  --gradient-hero: linear-gradient(180deg, #f3ead7 0%, #e4eedc 42%, #e0c7ac 100%);
-  --gradient-card: linear-gradient(155deg, rgba(255, 250, 240, 1), rgba(241, 227, 209, 0.92));
+  --gradient-hero: linear-gradient(180deg, #efe2c9 0%, #d9e2c8 38%, #e3c7a6 100%);
+  --gradient-card: linear-gradient(155deg, rgba(255, 246, 231, 1), rgba(241, 225, 197, 0.94));
+  --accent: #aa572b;
+  --accent-green: #5f8554;
+  --accent-yellow: #d2a45b;
 
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
   --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.05);
@@ -81,23 +91,17 @@
   padding: 0;
 }
 
-html {
+.mlb-route-shell {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  scroll-behavior: smooth;
 }
 
-body {
-  font-family: var(--font);
+.mlb-route-shell {
   background: var(--bg-primary);
-  color: var(--text-primary);
-  min-height: 100vh;
-  line-height: 1.6;
-  overflow-x: hidden;
 }
 
 /* Animated background */
-body::before {
+.mlb-route-shell::before {
   content: '';
   position: fixed;
   inset: 0;
@@ -113,7 +117,7 @@ body::before {
   opacity: 0.94;
 }
 
-body::after {
+.mlb-route-shell::after {
   content: '';
   position: fixed;
   inset: 0;
@@ -127,12 +131,12 @@ body::after {
   opacity: 0.82;
 }
 
-a {
+.mlb-route-shell a {
   color: var(--text-accent);
   text-decoration: none;
 }
 
-img {
+.mlb-route-shell img {
   max-width: 100%;
   height: auto;
 }
@@ -3487,7 +3491,7 @@ img {
   border: 1px dashed rgba(241, 225, 192, 0.12);
 }
 
-[data-theme="light"] body::before {
+.mlb-route-shell[data-theme="light"]::before {
   background:
     radial-gradient(circle at 50% -12%, rgba(190, 122, 71, 0.12), transparent 24%),
     radial-gradient(circle at 50% 82%, rgba(180, 128, 86, 0.18), transparent 18%),
@@ -3496,10 +3500,476 @@ img {
     var(--gradient-hero);
 }
 
-[data-theme="light"] body::after {
+.mlb-route-shell[data-theme="light"]::after {
   background:
     linear-gradient(135deg, transparent 0 49.58%, rgba(155, 108, 62, 0.1) 49.58% 50.2%, transparent 50.2%),
     linear-gradient(225deg, transparent 0 49.58%, rgba(155, 108, 62, 0.1) 49.58% 50.2%, transparent 50.2%),
     radial-gradient(circle at 50% 79%, rgba(176, 131, 91, 0.16), transparent 24%),
     repeating-radial-gradient(circle at center, rgba(125, 88, 55, 0.016) 0 1px, transparent 1px 6px);
+}
+
+/* ===== MLB POLISH PASS ===== */
+.mlb-route-shell .page-container,
+.mlb-route-shell .page-header,
+.mlb-route-shell .card,
+.mlb-route-shell .game-card,
+.mlb-route-shell .team-card,
+.mlb-route-shell .news-card,
+.mlb-route-shell .settings-card {
+  position: relative;
+  z-index: 1;
+}
+
+.mlb-route-shell .page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.mlb-route-shell .page-title {
+  font-size: clamp(2.25rem, 3.5vw, 3rem);
+}
+
+.mlb-route-shell .page-subtitle {
+  max-width: 48rem;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.mlb-route-shell .card,
+.mlb-route-shell .game-card,
+.mlb-route-shell .team-card,
+.mlb-route-shell .news-card,
+.mlb-route-shell .overview-row-btn {
+  transition:
+    transform var(--transition-base),
+    border-color var(--transition-base),
+    box-shadow var(--transition-base),
+    background var(--transition-base);
+}
+
+.mlb-route-shell .card:hover,
+.mlb-route-shell .game-card:hover,
+.mlb-route-shell .team-card:hover,
+.mlb-route-shell .news-card:hover,
+.mlb-route-shell .overview-row-btn:hover {
+  box-shadow: 0 26px 60px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(244, 230, 197, 0.06);
+}
+
+.mlb-route-shell .card::before,
+.mlb-route-shell .game-card::before,
+.mlb-route-shell .news-card::before,
+.mlb-route-shell .overview-row-btn::before {
+  background:
+    radial-gradient(circle at top right, rgba(255, 237, 197, 0.1), transparent 30%),
+    linear-gradient(135deg, transparent 0 46%, rgba(247, 238, 218, 0.06) 46% 46.8%, transparent 46.8%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 58%);
+}
+
+.mlb-route-shell .overview-row-btn::after,
+.mlb-route-shell .news-card::after {
+  content: '';
+  position: absolute;
+  inset: auto -16% -10% auto;
+  width: 11rem;
+  height: 6rem;
+  background:
+    linear-gradient(135deg, transparent 0 48.5%, rgba(246, 238, 219, 0.28) 48.5% 50%, transparent 50%),
+    radial-gradient(circle at 70% 30%, rgba(255, 211, 122, 0.16), transparent 38%);
+  opacity: 0;
+  transform: rotate(-10deg) translateY(20px);
+  transition: transform var(--transition-base), opacity var(--transition-base);
+  pointer-events: none;
+}
+
+.mlb-route-shell .overview-row-btn:hover::after,
+.mlb-route-shell .news-card:hover::after {
+  opacity: 0.82;
+  transform: rotate(-10deg) translateY(0);
+}
+
+.mlb-route-shell .overview-grid {
+  align-items: start;
+}
+
+.mlb-route-shell .overview-hero-main {
+  grid-column: span 8;
+  display: grid;
+  grid-template-columns: minmax(0, 1.18fr) minmax(20rem, 0.82fr);
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 104%, rgba(149, 90, 51, 0.34), transparent 29%),
+    linear-gradient(135deg, rgba(15, 21, 16, 0.92), rgba(45, 29, 19, 0.92)),
+    repeating-linear-gradient(90deg, rgba(82, 118, 69, 0.16) 0 8%, rgba(65, 97, 56, 0.24) 8% 16%);
+}
+
+.mlb-route-shell .overview-hero-main::after {
+  content: '';
+  position: absolute;
+  inset: auto 12% 18% 12%;
+  height: 1px;
+  background:
+    linear-gradient(90deg, transparent 0 8%, rgba(249, 240, 221, 0.58) 8% 50%, transparent 50%),
+    linear-gradient(90deg, transparent 50%, rgba(249, 240, 221, 0.58) 50% 92%, transparent 92%);
+  transform: rotate(45deg);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.mlb-route-shell .overview-hero-copy {
+  padding: 32px 32px 30px;
+}
+
+.mlb-route-shell .overview-hero-copy h2 {
+  font-size: clamp(2.6rem, 4vw, 3.35rem);
+  line-height: 0.96;
+}
+
+.mlb-route-shell .overview-hero-copy p {
+  font-size: 15px;
+  line-height: 1.7;
+  color: color-mix(in srgb, var(--text-secondary) 88%, white 12%);
+}
+
+.mlb-route-shell .overview-hero-showcase {
+  display: grid;
+  gap: 14px;
+  padding: 24px;
+  border-left: 1px solid rgba(241, 225, 192, 0.1);
+  background:
+    linear-gradient(180deg, rgba(18, 27, 20, 0.86), rgba(22, 19, 14, 0.78)),
+    repeating-linear-gradient(180deg, transparent 0 22px, rgba(255, 248, 236, 0.02) 22px 23px);
+}
+
+.mlb-route-shell .overview-hero-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.mlb-route-shell .overview-hero-matchup,
+.mlb-route-shell .overview-hero-spotlight,
+.mlb-route-shell .overview-news-feature,
+.mlb-route-shell .overview-news-mini {
+  text-align: left;
+  border: 1px solid rgba(241, 225, 192, 0.1);
+  background:
+    linear-gradient(180deg, rgba(20, 24, 18, 0.92), rgba(39, 30, 21, 0.92));
+  border-radius: 20px;
+  color: var(--text-primary);
+}
+
+.mlb-route-shell .overview-hero-matchup {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  margin-top: 22px;
+}
+
+.mlb-route-shell .overview-hero-matchup-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.mlb-route-shell .overview-hero-matchup-rows {
+  display: grid;
+  gap: 14px;
+}
+
+.mlb-route-shell .overview-hero-team-row,
+.mlb-route-shell .overview-row-team {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mlb-route-shell .overview-hero-team-copy {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mlb-route-shell .overview-hero-team-copy strong,
+.mlb-route-shell .overview-hero-spotlight strong,
+.mlb-route-shell .overview-news-feature h3 {
+  display: block;
+}
+
+.mlb-route-shell .overview-hero-team-copy span,
+.mlb-route-shell .overview-hero-spotlight p {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.mlb-route-shell .overview-hero-team-score {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.45rem;
+}
+
+.mlb-route-shell .overview-team-logo {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+  flex-shrink: 0;
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.18));
+}
+
+.mlb-route-shell .overview-team-logo.is-lg {
+  width: 54px;
+  height: 54px;
+}
+
+.mlb-route-shell .overview-team-logo.is-fallback {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.mlb-route-shell .overview-hero-spotlight-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.mlb-route-shell .overview-hero-spotlight {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+}
+
+.mlb-route-shell .overview-hero-headshot {
+  width: 74px;
+  height: 74px;
+  object-fit: cover;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  flex-shrink: 0;
+}
+
+.mlb-route-shell .overview-news-rail {
+  grid-column: span 4;
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  background:
+    radial-gradient(circle at top right, rgba(255, 224, 169, 0.1), transparent 26%),
+    linear-gradient(180deg, rgba(16, 24, 18, 0.97), rgba(37, 29, 21, 0.97));
+}
+
+.mlb-route-shell .overview-news-rail-body {
+  display: grid;
+  gap: 12px;
+}
+
+.mlb-route-shell .overview-news-feature {
+  overflow: hidden;
+}
+
+.mlb-route-shell .overview-news-feature-image {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-bottom: 1px solid rgba(241, 225, 192, 0.08);
+}
+
+.mlb-route-shell .overview-news-feature-fallback {
+  display: grid;
+  place-items: center;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 3rem;
+  letter-spacing: 0.14em;
+  color: var(--accent-yellow);
+  background:
+    radial-gradient(circle at top, rgba(255, 219, 149, 0.24), transparent 38%),
+    linear-gradient(180deg, rgba(30, 53, 29, 0.76), rgba(67, 42, 23, 0.86));
+}
+
+.mlb-route-shell .overview-news-feature-copy {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
+.mlb-route-shell .overview-news-feature-copy h3 {
+  font-size: 1.36rem;
+  line-height: 1.18;
+}
+
+.mlb-route-shell .overview-news-feature-copy p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.mlb-route-shell .overview-news-mini-list {
+  display: grid;
+  gap: 10px;
+}
+
+.mlb-route-shell .overview-news-mini {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+}
+
+.mlb-route-shell .overview-news-mini span {
+  color: var(--text-muted);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mlb-route-shell .overview-section {
+  grid-column: span 4;
+}
+
+.mlb-route-shell .overview-span-2 {
+  grid-column: span 8;
+}
+
+.mlb-route-shell .overview-list {
+  gap: 12px;
+}
+
+.mlb-route-shell .overview-row-btn {
+  min-height: 86px;
+  padding: 16px 18px;
+  align-items: stretch;
+}
+
+.mlb-route-shell .overview-row-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.mlb-route-shell .overview-player-meta {
+  gap: 12px;
+}
+
+.mlb-route-shell .overview-row-title {
+  font-size: 14px;
+}
+
+.mlb-route-shell .overview-row-subtitle {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.mlb-route-shell .overview-metric-stack strong,
+.mlb-route-shell .overview-scoreline span:first-child {
+  font-size: 1rem;
+}
+
+.mlb-route-shell .overview-scoreline {
+  justify-content: center;
+}
+
+.mlb-route-shell[data-theme="light"] .card,
+.mlb-route-shell[data-theme="light"] .game-card,
+.mlb-route-shell[data-theme="light"] .team-card,
+.mlb-route-shell[data-theme="light"] .news-card,
+.mlb-route-shell[data-theme="light"] .settings-card,
+.mlb-route-shell[data-theme="light"] .overview-row-btn,
+.mlb-route-shell[data-theme="light"] .overview-news-feature,
+.mlb-route-shell[data-theme="light"] .overview-news-mini,
+.mlb-route-shell[data-theme="light"] .overview-hero-matchup,
+.mlb-route-shell[data-theme="light"] .overview-hero-spotlight {
+  background:
+    linear-gradient(180deg, rgba(255, 247, 233, 0.98), rgba(244, 230, 201, 0.94)),
+    repeating-linear-gradient(135deg, rgba(153, 114, 75, 0.02) 0 2px, transparent 2px 12px);
+  border-color: rgba(111, 75, 45, 0.12);
+}
+
+.mlb-route-shell[data-theme="light"] .overview-hero-main {
+  background:
+    radial-gradient(circle at 50% 104%, rgba(201, 154, 106, 0.24), transparent 29%),
+    linear-gradient(180deg, rgba(246, 236, 216, 0.98), rgba(225, 235, 212, 0.98) 38%, rgba(238, 211, 176, 0.98));
+}
+
+.mlb-route-shell[data-theme="light"] .overview-hero-showcase {
+  background:
+    linear-gradient(180deg, rgba(245, 237, 220, 0.92), rgba(233, 224, 203, 0.92)),
+    repeating-linear-gradient(180deg, transparent 0 22px, rgba(117, 90, 59, 0.025) 22px 23px);
+  border-left-color: rgba(111, 75, 45, 0.12);
+}
+
+.mlb-route-shell[data-theme="light"] .overview-news-rail {
+  background:
+    radial-gradient(circle at top right, rgba(199, 145, 89, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(255, 247, 233, 0.98), rgba(239, 226, 197, 0.95));
+}
+
+.mlb-route-shell[data-theme="light"] .overview-hero-copy p,
+.mlb-route-shell[data-theme="light"] .overview-news-feature-copy p,
+.mlb-route-shell[data-theme="light"] .overview-hero-team-copy span,
+.mlb-route-shell[data-theme="light"] .overview-hero-spotlight p {
+  color: var(--text-secondary);
+}
+
+@media (max-width: 1240px) {
+  .mlb-route-shell .overview-hero-main,
+  .mlb-route-shell .overview-news-rail,
+  .mlb-route-shell .overview-section,
+  .mlb-route-shell .overview-span-2 {
+    grid-column: span 12;
+  }
+}
+
+@media (max-width: 980px) {
+  .mlb-route-shell .page-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .mlb-route-shell .overview-hero-main {
+    grid-template-columns: 1fr;
+  }
+
+  .mlb-route-shell .overview-hero-showcase {
+    border-left: 0;
+    border-top: 1px solid rgba(241, 225, 192, 0.1);
+  }
+
+  .mlb-route-shell .overview-hero-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .mlb-route-shell .overview-hero-copy,
+  .mlb-route-shell .overview-hero-showcase,
+  .mlb-route-shell .overview-news-feature-copy {
+    padding: 20px;
+  }
+
+  .mlb-route-shell .overview-hero-matchup-head,
+  .mlb-route-shell .overview-section-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .mlb-route-shell .overview-row-btn {
+    gap: 12px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .mlb-route-shell .overview-scoreline,
+  .mlb-route-shell .overview-metric-stack {
+    align-items: flex-start;
+  }
 }

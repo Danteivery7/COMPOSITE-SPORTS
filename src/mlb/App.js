@@ -29,9 +29,8 @@ const MLB_PRIMARY_REFRESH_ROUTES = [
   '/api/mlb/rankings',
 ];
 
-export default function Home() {
+export default function Home({ theme = 'dark', toggleTheme }) {
   const [currentPage, setCurrentPage] = useState('overview');
-  const [theme, setTheme] = useState('dark');
   const [favorites, setFavorites] = useState([]);
   const [selectedTeamId, setSelectedTeamId] = useState(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
@@ -41,13 +40,6 @@ export default function Home() {
   useEffect(() => {
     const savedFavs = localStorage.getItem('composite-hub-mlb-favorites');
     if (savedFavs) setFavorites(JSON.parse(savedFavs));
-    const savedTheme = localStorage.getItem('composite-hub-mlb-theme');
-    if (savedTheme) {
-      setTheme(savedTheme);
-      document.documentElement.setAttribute('data-theme', savedTheme);
-    } else {
-      document.documentElement.setAttribute('data-theme', 'dark');
-    }
 
     // Warm the server cache first, then keep the main MLB tabs hot in the browser.
     fetchMLBRouteJson('/api/mlb/warm', { force: true, allowStaleOnError: true }).catch(() => { });
@@ -78,15 +70,6 @@ export default function Home() {
         ? prev.filter(id => id !== teamId)
         : [...prev, teamId];
       localStorage.setItem('composite-hub-mlb-favorites', JSON.stringify(next));
-      return next;
-    });
-  }, []);
-
-  const toggleTheme = useCallback(() => {
-    setTheme(prev => {
-      const next = prev === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      localStorage.setItem('composite-hub-mlb-theme', next);
       return next;
     });
   }, []);

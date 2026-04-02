@@ -1,11 +1,20 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect } from 'react';
 import SportIntroGate from '@/src/components/SportIntroGate';
 import { getSportConfig } from '@/src/data/sports';
 
 export default function SportFrameRoute({ sportKey, frameSrc }) {
   const config = getSportConfig(sportKey);
+
+  useEffect(() => {
+    document.body.dataset.compositeRoute = sportKey;
+    return () => {
+      delete document.body.dataset.compositeRoute;
+    };
+  }, [sportKey]);
+
   const content = (
     <section className="vendor-shell" data-sport={sportKey}>
       <div className="vendor-topbar">
