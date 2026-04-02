@@ -36,7 +36,7 @@ export default function MLBRoute() {
       <section className="mlb-route-shell" data-theme={theme}>
         <div className="mlb-route-topbar">
           <div>
-            <p className="eyebrow">COMPOSITE All Sports</p>
+            <p className="eyebrow">COMPOSITE Sports</p>
             <h1>Composite MLB</h1>
           </div>
           <Link href="/" className="hub-back-link">

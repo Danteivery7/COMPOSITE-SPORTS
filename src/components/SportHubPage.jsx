@@ -1,17 +1,34 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { getSportCards, SPORT_CONFIGS } from '@/src/data/sports';
 
 export default function SportHubPage() {
   const cards = getSportCards();
+  const [worldBoard, setWorldBoard] = useState(null);
+  const [worldLoading, setWorldLoading] = useState(true);
 
   useEffect(() => {
     document.documentElement.removeAttribute('data-theme');
     document.body.removeAttribute('data-theme');
     document.body.dataset.compositeRoute = 'hub';
+
+    async function loadWorldBoard() {
+      try {
+        const response = await fetch('/api/hub/world-rankings');
+        const json = await response.json();
+        setWorldBoard(json);
+      } finally {
+        setWorldLoading(false);
+      }
+    }
+
+    loadWorldBoard();
+    const timer = window.setInterval(loadWorldBoard, 60000);
+
     return () => {
+      window.clearInterval(timer);
       delete document.body.dataset.compositeRoute;
     };
   }, []);
@@ -26,9 +43,9 @@ export default function SportHubPage() {
       <div className="hub-orbit orbit-b" aria-hidden="true" />
       <section className="hub-hero">
         <div className="hub-hero-copy">
-          <p className="eyebrow">Composite Tracking Suite</p>
+          <p className="eyebrow">COMPOSITE Sports</p>
           <h1>{SPORT_CONFIGS.hub.title}</h1>
-          <p>{SPORT_CONFIGS.hub.subtitle}</p>
+          <p>Pick a tunnel, step into a sport, and let the board boot around you. Now with a world-ranking board that compares the best players across every league in the system.</p>
         </div>
         <div className="hub-status-strip" aria-hidden="true">
           {cards.map((card) => (
@@ -57,6 +74,35 @@ export default function SportHubPage() {
             <span>Selector</span>
             <strong>Always Hot</strong>
           </div>
+        </div>
+      </section>
+
+      <section className="hub-world-board">
+        <div className="hub-world-head">
+          <div>
+            <p className="eyebrow">Global Player Board</p>
+            <h2>Top 5 Players In The World</h2>
+          </div>
+          <span>{worldBoard?.lastUpdated ? `Updated ${new Date(worldBoard.lastUpdated).toLocaleTimeString()}` : 'Sync pending'}</span>
+        </div>
+        <div className="hub-world-grid">
+          {worldLoading
+            ? [...Array(5)].map((_, index) => <div key={index} className="hub-world-card is-loading" />)
+            : (worldBoard?.players || []).map((player) => (
+                <article className="hub-world-card" key={player.id}>
+                  <div className="hub-world-rank">#{player.worldRank}</div>
+                  {player.headshot ? (
+                    <img src={player.headshot} alt={player.displayName} className="hub-world-headshot" />
+                  ) : (
+                    <div className="hub-world-headshot hub-world-headshot-fallback">{player.displayName?.slice(0, 2)?.toUpperCase() || 'PL'}</div>
+                  )}
+                  <div className="hub-world-copy">
+                    <strong>{player.displayName}</strong>
+                    <span>{player.leagueLabel}</span>
+                    <p>{player.position} • {player.overall} OVR</p>
+                  </div>
+                </article>
+              ))}
         </div>
       </section>
 

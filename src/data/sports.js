@@ -1,6 +1,6 @@
 export const SPORT_CONFIGS = {
   hub: {
-    title: 'COMPOSITE All Sports',
+    title: 'COMPOSITE Sports',
     subtitle: 'Pick a tunnel, step into a sport, and let the board boot around you.',
   },
   nhl: {
@@ -16,7 +16,7 @@ export const SPORT_CONFIGS = {
     cardBlurb: 'The original rink build. Same code, same tunnel, same live ice.',
     introEyebrow: 'Arena Tunnel',
     introTitle: 'Enter The Rink',
-    introCopy: 'This route boots the original NHL composite code directly, wrapped inside the new all-sports shell.',
+    introCopy: 'This route boots the original NHL composite code directly, wrapped inside the COMPOSITE Sports shell.',
     enterLabel: 'Open NHL Composite',
     motif: 'ice',
     hoverLabel: 'Skate-line sweep',
@@ -123,10 +123,34 @@ export const SPORT_CONFIGS = {
       hoverCue: 'Yard-line sweep and flag flare',
     },
   },
+  football: {
+    key: 'football',
+    label: 'Football',
+    name: 'Composite Football',
+    path: '/football',
+    type: 'football',
+    nativeIntro: true,
+    accent: '#8db1ff',
+    accentAlt: '#edf3ff',
+    surface: 'radial-gradient(circle at top, rgba(84, 113, 255, 0.34), rgba(7, 9, 19, 0.97) 72%)',
+    cardBlurb: 'A full football hub with marquee matches, league selection, and club or player boards across MLS and Europe.',
+    introEyebrow: 'Tunnel To Pitch',
+    introTitle: 'Enter Composite Football',
+    introCopy: 'Walk through the tunnel, hit the daily match board, then drop into MLS, the Premier League, La Liga, Serie A, Ligue 1, or Champions League.',
+    enterLabel: 'Enter The Pitch',
+    motif: 'pitch',
+    hoverLabel: 'Floodlight sweep',
+    theme: {
+      hub: { accent: '#8db1ff', accentAlt: '#edf3ff', glow: 'rgba(141, 177, 255, 0.3)' },
+      dark: { base: '#071019', surface: '#131a2d', accent: '#8db1ff' },
+      light: { base: '#e9eefb', surface: '#fbfcff', accent: '#4a67c4' },
+      hoverCue: 'Net ripple and floodlight sweep',
+    },
+  },
   mls: {
     key: 'mls',
     label: 'MLS',
-    name: 'Composite MLS',
+    name: 'Composite Football: MLS',
     path: '/mls',
     type: 'generic',
     alwaysShowIntro: true,
@@ -154,5 +178,5 @@ export function getSportConfig(key) {
 }
 
 export function getSportCards() {
-  return ['nhl', 'mlb', 'nba', 'cbb', 'nfl', 'mls'].map((key) => SPORT_CONFIGS[key]);
+  return ['nhl', 'mlb', 'nba', 'cbb', 'nfl', 'football'].map((key) => SPORT_CONFIGS[key]);
 }

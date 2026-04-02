@@ -1,9 +1,9 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'COMPOSITE All Sports',
+  title: 'COMPOSITE Sports',
   description:
-    'A multi-sport composite hub with cinematic intros, live boards, rankings, players, and predictive views across NHL, MLB, NBA, CBB, NFL, and MLS.',
+    'A multi-sport composite hub with cinematic intros, live boards, rankings, players, and predictive views across NHL, MLB, NBA, CBB, NFL, and global Football.',
 };
 
 export default function RootLayout({ children }) {

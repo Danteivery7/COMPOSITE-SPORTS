@@ -19,7 +19,7 @@ export default function SportFrameRoute({ sportKey, frameSrc }) {
     <section className="vendor-shell" data-sport={sportKey}>
       <div className="vendor-topbar">
         <div>
-          <p className="eyebrow">COMPOSITE All Sports</p>
+          <p className="eyebrow">COMPOSITE Sports</p>
           <h1>{config.name}</h1>
         </div>
         <Link href="/" className="hub-back-link">

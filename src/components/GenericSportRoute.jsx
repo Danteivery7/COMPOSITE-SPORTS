@@ -21,7 +21,7 @@ export default function GenericSportRoute({ sportKey }) {
       <section className="generic-route-shell">
         <div className="generic-route-topbar">
           <div>
-            <p className="eyebrow">COMPOSITE All Sports</p>
+            <p className="eyebrow">COMPOSITE Sports</p>
             <h1>{config.name}</h1>
           </div>
           <Link href="/" className="hub-back-link">

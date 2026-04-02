@@ -1,5 +1,5 @@
-import GenericSportRoute from '@/src/components/GenericSportRoute';
+import { redirect } from 'next/navigation';
 
 export default function MLSPage() {
-  return <GenericSportRoute sportKey="mls" />;
+  redirect('/football/mls');
 }
