@@ -195,6 +195,130 @@ const models = {
         return (s.blk48 || 0) / 48 * 100;
     },
 
+    classifyTone(score) {
+        if (score >= 5) return { label: 'Sizzling', className: 'tone-sizzling' };
+        if (score >= 4) return { label: 'Hot', className: 'tone-hot' };
+        if (score >= 3) return { label: 'Steady', className: 'tone-steady' };
+        if (score >= 2) return { label: 'Chilly', className: 'tone-chilly' };
+        return { label: 'Slump', className: 'tone-slump' };
+    },
+
+    parseStreakValue(streakStr) {
+        if (!streakStr || streakStr === '--') return 0;
+        const match = String(streakStr).match(/^([WL])(\d+)$/i);
+        if (!match) return 0;
+        const value = parseInt(match[2], 10) || 0;
+        return match[1].toUpperCase() === 'W' ? value : -value;
+    },
+
+    estimateBaselineOverall(baseline, archetype = 'wing') {
+        if (!baseline) return null;
+
+        const pts = Number(baseline.ppg || 0);
+        const reb = Number(baseline.rpg || 0);
+        const ast = Number(baseline.apg || 0);
+        const stocks = Number(baseline.spg || 0) + Number(baseline.bpg || 0);
+        const ts = Number(baseline.tsPct || 55);
+        const creation = (pts * 1.15) + (ast * 1.4) + (reb * (archetype === 'big' ? 0.95 : 0.6));
+        const efficiency = Math.max(-8, Math.min(12, (ts - 55) * 0.6));
+        const defense = stocks * 3.2;
+        const rating = 64 + (creation * 0.46) + efficiency + defense;
+        return Math.max(60, Math.min(94.5, rating));
+    },
+
+    calculatePlayerTrendScore(stats, archetype = 'wing') {
+        if (!stats || !stats.gp) return 0;
+
+        const baseline = stats.career?.gp ? stats.career : (stats.lastSeason?.gp ? stats.lastSeason : null);
+        if (!baseline) {
+            let fallbackScore = 0;
+            fallbackScore += stats.ppg >= (archetype === 'guard' ? 18 : 16) ? 1 : 0;
+            fallbackScore += stats.tsPct >= 57 ? 1 : 0;
+            fallbackScore += stats.apg >= (archetype === 'guard' ? 6 : 4) ? 1 : 0;
+            fallbackScore += stats.rpg >= (archetype === 'big' ? 8 : 5) ? 1 : 0;
+            fallbackScore += (stats.spg + stats.bpg) >= 1.8 ? 1 : 0;
+            return Math.max(0, Math.min(5, fallbackScore));
+        }
+
+        let score = 0;
+        score += stats.ppg >= (baseline.ppg + Math.max(1.2, baseline.ppg * 0.06)) ? 1 : 0;
+        score += stats.tsPct >= (baseline.tsPct + 1.0) ? 1 : 0;
+        score += stats.apg >= (baseline.apg + (archetype === 'guard' ? 0.6 : 0.4)) ? 1 : 0;
+        score += stats.rpg >= (baseline.rpg + (archetype === 'big' ? 0.8 : 0.5)) ? 1 : 0;
+
+        const currentStocks = Number(stats.spg || 0) + Number(stats.bpg || 0);
+        const baselineStocks = Number(baseline.spg || 0) + Number(baseline.bpg || 0);
+        const playSecurityGain = Number(stats.astTovRatio || 0) >= (Number(baseline.astTovRatio || 0) + 0.15);
+        score += currentStocks >= (baselineStocks + 0.15) || playSecurityGain ? 1 : 0;
+
+        return Math.max(0, Math.min(5, score));
+    },
+
+    projectValue(current, baseline, gp, fallback) {
+        const currentValue = Number.isFinite(current) ? current : fallback;
+        const baselineValue = Number.isFinite(baseline) && baseline > 0 ? baseline : currentValue;
+        if (!Number.isFinite(currentValue) || currentValue <= 0) return baselineValue || fallback;
+
+        const currentWeight = Math.min(0.86, Math.max(0.45, gp / 55));
+        return (currentValue * currentWeight) + (baselineValue * (1 - currentWeight));
+    },
+
+    buildPlayerProjection(stats, overall, archetype = 'wing') {
+        const baseline = stats?.career?.gp ? stats.career : (stats?.lastSeason?.gp ? stats.lastSeason : null);
+        const projectedPoints = this.projectValue(Number(stats?.ppg || 0), Number(baseline?.ppg || 0), Number(stats?.gp || 0), 10);
+        const projectedRebounds = this.projectValue(Number(stats?.rpg || 0), Number(baseline?.rpg || 0), Number(stats?.gp || 0), 4);
+        const projectedAssists = this.projectValue(Number(stats?.apg || 0), Number(baseline?.apg || 0), Number(stats?.gp || 0), 2);
+        const baselineOverall = this.estimateBaselineOverall(baseline, archetype);
+        const floor = baselineOverall ? ((overall * 0.65) + (baselineOverall * 0.35)) : (overall - 1.5);
+        const ceiling = overall + (Number(stats?.tsPct || 55) >= 60 ? 2.5 : 1.5);
+
+        return {
+            points: Math.round(projectedPoints * 10) / 10,
+            rebounds: Math.round(projectedRebounds * 10) / 10,
+            assists: Math.round(projectedAssists * 10) / 10,
+            floor: Math.round(Math.max(60, floor) * 10) / 10,
+            ceiling: Math.round(Math.min(97, ceiling) * 10) / 10,
+        };
+    },
+
+    buildPlayerNarrative(athlete, stats, teamStats, tone, projection, playerOverall, playerOffenseRating, playerDefenseRating) {
+        const name = athlete?.fullName || athlete?.displayName || 'This player';
+        const teamName = athlete?.teamName || 'his team';
+        const baseline = stats?.career?.gp ? stats.career : (stats?.lastSeason?.gp ? stats.lastSeason : null);
+        const baselineLabel = stats?.career?.gp ? 'career baseline' : (stats?.lastSeason?.gp ? 'last-season baseline' : 'league baseline');
+
+        const pillars = [];
+        if (playerOverall >= 92) pillars.push('operating as a franchise-level engine');
+        else if (playerOverall >= 86) pillars.push('playing at an All-Star standard');
+        else if (playerOverall >= 80) pillars.push('holding down an elite starter lane');
+        else pillars.push('providing stable rotation value');
+
+        if (playerOffenseRating >= 84) pillars.push('driving high-end offensive value');
+        if (playerDefenseRating >= 82) pillars.push('bringing real two-way resistance');
+        if (Number(stats?.ppg || 0) >= 24) pillars.push(`carrying a ${Number(stats.ppg).toFixed(1)} PPG scoring load`);
+        if (Number(stats?.apg || 0) >= 7) pillars.push(`creating ${Number(stats.apg).toFixed(1)} assists per night`);
+        if (Number(stats?.rpg || 0) >= 10) pillars.push(`cleaning the glass at ${Number(stats.rpg).toFixed(1)} boards`);
+
+        const weaknessNotes = [];
+        if (Number(stats?.tsPct || 55) < 54 && Number(stats?.ppg || 0) > 12) weaknessNotes.push('efficiency is lagging behind the shot volume');
+        if (Number(stats?.astTovRatio || 0) < 1.4 && Number(stats?.apg || 0) > 4) weaknessNotes.push('playmaking control can still tighten up');
+        if (Number(playerDefenseRating || 0) < 72) weaknessNotes.push('defensive impact is the softer side of the profile');
+
+        const baselineSentence = baseline
+            ? `Against his ${baselineLabel}, he is grading ${tone.label.toLowerCase()} right now at ${stats.hotnessScore}/5 on the composite pulse meter.`
+            : `The model grades his current run at ${tone.label} ${stats.hotnessScore}/5 based on the live season profile.`;
+
+        const teamSentence = teamStats
+            ? `${teamName} sits at ${teamStats.wins}-${teamStats.losses} with a ${Number(teamStats.ovrRating || 0).toFixed(1)} team OVR, so his role is being measured inside a real team context rather than empty volume.`
+            : `${teamName} context remains part of the blend, but the rating is driven mostly by his own on-court output.`;
+
+        const weaknessSentence = weaknessNotes.length
+            ? ` The next gains would come from ${weaknessNotes.join(' and ')}.`
+            : '';
+
+        return `${name} is ${pillars.join(', ')}. ${baselineSentence} The rest-of-season projection holds him around ${projection.points.toFixed(1)} PPG, ${projection.rebounds.toFixed(1)} RPG, and ${projection.assists.toFixed(1)} APG, with an expected OVR band of ${projection.floor.toFixed(1)}-${projection.ceiling.toFixed(1)}. ${teamSentence}${weaknessSentence}`;
+    },
+
 
     // ==================== PLAYER RATING SYSTEM ====================
 
@@ -413,14 +537,13 @@ const models = {
         let efficiencyMult = 1.0;
         if (tsPct < 52) efficiencyMult = 0.88;
         else if (tsPct < 54) efficiencyMult = 0.94;
-        else if (tsPct > 61) efficiencyMult = 1.04;
         else if (tsPct > 64) efficiencyMult = 1.07;
+        else if (tsPct > 61) efficiencyMult = 1.04;
 
         // 2. Team Success Factor (Winning Matters)
         // Stars on winning teams get a boost.
         // We use the first record item's winPercent if available.
-        const winPctStat = team?.records?.[0]?.stats?.find(st => st.name === 'winPercent');
-        const winPct = winPctStat ? winPctStat.value : 0.5;
+        const winPct = Number(teamStats?.winPct || 0.5);
         const winFactor = 0.96 + (winPct * 0.08); // Range: 0.96 to 1.04
 
         // 3. Specialist Penalty (The Dyson Daniels Fix)
@@ -438,10 +561,19 @@ const models = {
         let volumeMult = 1.0;
         if (mpg < 22) volumeMult = 0.80;
         else if (mpg < 28) volumeMult = 0.90;
-        else if (mpg > 33) volumeMult = 1.04;
         else if (mpg > 35) volumeMult = 1.06;
+        else if (mpg > 33) volumeMult = 1.04;
         
         playerOverall *= volumeMult;
+
+        const baselineProfile = s.career?.gp ? s.career : (s.lastSeason?.gp ? s.lastSeason : null);
+        const baselineOverall = this.estimateBaselineOverall(baselineProfile, archetype);
+        if (baselineOverall) {
+            const experienceFactor = Math.min(1, Number(baselineProfile.gp || 0) / 420);
+            const sampleConfidence = this.clamp01((s.gp || 0) / 28);
+            const anchorWeight = (1 - sampleConfidence) * (0.10 + (0.18 * experienceFactor));
+            playerOverall = (playerOverall * (1 - anchorWeight)) + (baselineOverall * anchorWeight);
+        }
 
         // --- THE "RARE ELITE" BARRIERS ---
         const apg = parseFloat(s.apg) || 0;
@@ -483,15 +615,30 @@ const models = {
         if (shotCreation > 85 && playmaking > 80) archetypeLabel = "Offensive Engine";
         else if (shotCreation > 85 && archetype === 'guard') archetypeLabel = "Elite Shot Creator";
         else if (shotCreation > 80 && efficiency > 80) archetypeLabel = "3-Level Scorer";
-        else if (defImpact > 85 && reboundingScore > 80) archetypeLabel = "Paint Protector";
-        else if (defImpact > 80 && (parseFloat(s.stl) > 1.5 || parseFloat(s.blk) > 1.5)) archetypeLabel = "Two-Way Force";
+        else if (defImpact > 85 && defPossessionEnding > 80) archetypeLabel = "Paint Protector";
+        else if (defImpact > 80 && (parseFloat(s.spg) > 1.5 || parseFloat(s.bpg) > 1.5)) archetypeLabel = "Two-Way Force";
         else if (efficiency > 85 && parseFloat(s.threePct) > 38) archetypeLabel = "Sharpshooter";
+
+        const hotnessScore = this.calculatePlayerTrendScore(s, archetype);
+        const tone = this.classifyTone(hotnessScore);
+        const projection = this.buildPlayerProjection(s, playerOverall, archetype);
+        const aiOverview = this.buildPlayerNarrative(
+            athlete,
+            { ...s, hotnessScore },
+            teamStats,
+            tone,
+            projection,
+            playerOverall,
+            playerOffenseRating,
+            playerDefenseRating,
+        );
 
         return {
             rating: playerOverall.toFixed(1),
             ratingNum: playerOverall,
             offRating: playerOffenseRating.toFixed(1),
             defRating: playerDefenseRating.toFixed(1),
+            hasRealStats: true,
             posAbbrev: posAbbrev,
             pts: s.ppg.toFixed(1),
             reb: s.rpg.toFixed(1),
@@ -513,6 +660,12 @@ const models = {
             impactScore: Math.round(impactScoreRaw),
             availabilityScore: Math.round(availabilityScore),
             archetype: archetypeLabel,
+            hotnessScore: hotnessScore,
+            tone: tone,
+            projection: projection,
+            aiOverview: aiOverview,
+            career: s.career || null,
+            lastSeason: s.lastSeason || null,
         };
     },
 
@@ -551,6 +704,16 @@ const models = {
 
         const offRating = Math.max(60, Math.min(80, 62 + salaryFactor * 16));
         const defRating = Math.max(60, Math.min(78, 62 + salaryFactor * 14));
+        const hotnessScore = isActive ? (salaryFactor >= 0.55 ? 3 : 2) : 0;
+        const tone = this.classifyTone(hotnessScore);
+        const projection = {
+            points: Math.round(ppg * 10) / 10,
+            rebounds: Math.round(rpg * 10) / 10,
+            assists: Math.round(apg * 10) / 10,
+            floor: Math.round(Math.max(60, rating - 2.5) * 10) / 10,
+            ceiling: Math.round(Math.min(82, rating + 2.0) * 10) / 10,
+        };
+        const aiOverview = `${athlete.fullName || athlete.displayName} does not have enough live NBA sample yet, so this card is anchored to a conservative baseline blend using contract tier, role context, and team environment. The model currently holds him at ${tone.label.toLowerCase()} ${hotnessScore}/5 with a shadow projection around ${projection.points.toFixed(1)} PPG, ${projection.rebounds.toFixed(1)} RPG, and ${projection.assists.toFixed(1)} APG.`;
 
         return {
             rating: rating.toFixed(1),
@@ -566,6 +729,11 @@ const models = {
             mpg: mpg.toFixed(1),
             posAbbrev,
             hasRealStats: false,
+            archetype: rating >= 72 ? 'Rotation Piece' : 'Depth Piece',
+            hotnessScore,
+            tone,
+            projection,
+            aiOverview,
             scoringScore: 0, playmakingScore: 0, reboundingScore: 0,
             defenseScore: 0, impactScore: 0, availabilityScore: 0,
         };
@@ -603,6 +771,7 @@ const models = {
         const ppg = ptsFor / totalGames;
         const oppPpg = ptsAgainst / totalGames;
         const netRtg = ppg - oppPpg;
+        const detailed = window.store.state.teamDetailedStats?.[teamRaw.id] || {};
 
         // Determine streak
         let streak = '--';
@@ -625,7 +794,15 @@ const models = {
         return {
             wins, losses, winPct, ppg, oppPpg, netRtg,
             offRating: '50.00', defRating: '50.00', ovrRating: '50.00',
-            streak
+            streak,
+            pace: Number(detailed.pace || detailed.avgEstimatedPossessions || 98),
+            offensiveEfficiency: Number(detailed.offensiveEfficiency || ((ppg / Math.max(90, detailed.avgEstimatedPossessions || 98)) * 100)),
+            trueShootingPct: Number(detailed.trueShootingPct || 57),
+            shootingEfficiency: Number(detailed.shootingEfficiency || 53),
+            assistTurnoverRatio: Number(detailed.assistTurnoverRatio || 1.7),
+            turnoverRatio: Number(detailed.turnoverRatio || 13),
+            reboundRate: Number(detailed.reboundRate || 50),
+            pressureRate: Number(detailed.spg || 0) + Number(detailed.bpg || 0),
         };
     },
 
@@ -640,6 +817,7 @@ const models = {
         // First pass: gather base stats for ALL teams
         let rankings = [];
         let allPpg = [], allOppPpg = [], allNetRtg = [], allWinPct = [];
+        let allOffEff = [], allTrueShooting = [], allAstTo = [], allTurnoverRatio = [], allReboundRate = [], allPressure = [], allPace = [];
 
         teams.forEach(team => {
             const baseStats = this.generateAdvancedTeamStats(teamStatsMap[team.id]);
@@ -649,6 +827,13 @@ const models = {
                 allOppPpg.push(baseStats.oppPpg);
                 allNetRtg.push(baseStats.netRtg);
                 allWinPct.push(baseStats.winPct);
+                allOffEff.push(baseStats.offensiveEfficiency || 110);
+                allTrueShooting.push(baseStats.trueShootingPct || 57);
+                allAstTo.push(baseStats.assistTurnoverRatio || 1.7);
+                allTurnoverRatio.push(baseStats.turnoverRatio || 13);
+                allReboundRate.push(baseStats.reboundRate || 50);
+                allPressure.push(baseStats.pressureRate || 12);
+                allPace.push(baseStats.pace || 98);
             }
         });
 
@@ -660,6 +845,13 @@ const models = {
         const oppPpgBounds = tw(allOppPpg);
         const netRtgBounds = tw(allNetRtg);
         const winPctBounds = tw(allWinPct);
+        const offEffBounds = tw(allOffEff);
+        const tsBounds = tw(allTrueShooting);
+        const astToBounds = tw(allAstTo);
+        const turnoverBounds = tw(allTurnoverRatio);
+        const reboundBounds = tw(allReboundRate);
+        const pressureBounds = tw(allPressure);
+        const paceBounds = tw(allPace);
 
         // Collect roster strength data across all teams first
         const allRosterStrengthRaw = [];
@@ -758,16 +950,22 @@ const models = {
             // --- Team Offense Score (Section 4B-1) ---
             // Simplified: use PPG percentile + roster offense
             const teamOffenseScore = 100 * (
-                0.55 * this.norm(r.stats.ppg, ppgBounds.min, ppgBounds.max) +
-                0.25 * this.norm(r.stats.winPct, winPctBounds.min, winPctBounds.max) +
-                0.20 * this.normInverse(r.stats.oppPpg, oppPpgBounds.min, oppPpgBounds.max) * 0.3  // slight defensive adjustment
+                0.28 * this.norm(r.stats.ppg, ppgBounds.min, ppgBounds.max) +
+                0.20 * this.norm(r.stats.offensiveEfficiency || 110, offEffBounds.min, offEffBounds.max) +
+                0.16 * this.norm(r.stats.trueShootingPct || 57, tsBounds.min, tsBounds.max) +
+                0.14 * this.norm(r.stats.assistTurnoverRatio || 1.7, astToBounds.min, astToBounds.max) +
+                0.10 * this.normInverse(r.stats.turnoverRatio || 13, turnoverBounds.min, turnoverBounds.max) +
+                0.12 * this.norm(r.stats.pace || 98, paceBounds.min, paceBounds.max)
             );
 
             // --- Team Defense Score (Section 4B-2) ---
             const teamDefenseScore = 100 * (
-                0.55 * this.normInverse(r.stats.oppPpg, oppPpgBounds.min, oppPpgBounds.max) +
-                0.25 * this.norm(r.stats.winPct, winPctBounds.min, winPctBounds.max) +
-                0.20 * this.norm(r.stats.ppg, ppgBounds.min, ppgBounds.max) * 0.3
+                0.34 * this.normInverse(r.stats.oppPpg, oppPpgBounds.min, oppPpgBounds.max) +
+                0.16 * this.norm(r.stats.reboundRate || 50, reboundBounds.min, reboundBounds.max) +
+                0.16 * this.norm(r.stats.pressureRate || 12, pressureBounds.min, pressureBounds.max) +
+                0.14 * this.norm(r.stats.winPct, winPctBounds.min, winPctBounds.max) +
+                0.10 * this.norm(r.stats.netRtg, netRtgBounds.min, netRtgBounds.max) +
+                0.10 * this.normInverse(r.stats.turnoverRatio || 13, turnoverBounds.min, turnoverBounds.max)
             );
 
             // --- Team Results Score (Section 4B-3) ---
@@ -824,6 +1022,13 @@ const models = {
             r.stats.rosterStrength = rosterStrengthScore.toFixed(1);
             r.stats.starPower = starPowerScore.toFixed(1);
             r.stats.depth = depthScore.toFixed(1);
+            r.stats.trendScore =
+                (r.stats.winPct >= 0.55 ? 1 : 0) +
+                (r.stats.netRtg >= 3 ? 1 : 0) +
+                (this.parseStreakValue(r.stats.streak) >= 2 ? 1 : 0) +
+                ((r.stats.offensiveEfficiency || 110) >= 114 ? 1 : 0) +
+                ((r.stats.reboundRate || 50) >= 51 ? 1 : 0);
+            r.stats.tone = this.classifyTone(r.stats.trendScore);
         });
 
         // Sort by OVR descending

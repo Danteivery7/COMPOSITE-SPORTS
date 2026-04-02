@@ -187,8 +187,10 @@ const app = {
             window.models.updateTeamRankings();
             window.store.setLastUpdated('players');
             window.store.setLastUpdated('teams');
-            window.ui.renderTeamRankings();
-            if (window.ui.currentView === 'players') window.ui.renderPlayers();
+            window.ui.renderRankings(window.store.state.teamRankings);
+            if (document.getElementById('pane-players')?.classList.contains('active')) {
+                window.ui.renderPlayersList(window.store.state.players);
+            }
             console.log(`[CompositeNBA] Stats sync complete: ${allPlayerEntries.length} players tracked.`);
         };
 

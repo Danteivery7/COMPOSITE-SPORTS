@@ -144,16 +144,7 @@ const ui = {
                 } else if (sortBy === 'record') {
                     rankings.sort((a, b) => b.stats.winPct - a.stats.winPct);
                 } else if (sortBy === 'hot') {
-                    // Sort by win streak (hottest teams first)
-                    rankings.sort((a, b) => {
-                        const parseStreak = (s) => {
-                            if (!s || s === '--') return 0;
-                            const isWin = s.startsWith('W');
-                            const num = parseInt(s.replace(/[WL]/i, '')) || 0;
-                            return isWin ? num : -num;
-                        };
-                        return parseStreak(b.stats.streak) - parseStreak(a.stats.streak);
-                    });
+                    rankings.sort((a, b) => (b.stats.trendScore || 0) - (a.stats.trendScore || 0));
                 }
                 this.renderRankings(rankings);
             });
@@ -206,6 +197,28 @@ const ui = {
         if (r >= 67) return 'Role Player';
         if (r >= 55) return 'Bench';
         return 'Deep Bench';
+    },
+
+    formatSigned(value, digits = 1) {
+        if (!Number.isFinite(value)) return '--';
+        const fixed = Number(value).toFixed(digits);
+        return value > 0 ? `+${fixed}` : fixed;
+    },
+
+    formatMoneyline(odds) {
+        if (odds == null || odds === '') return 'No line';
+        const numeric = Number(odds);
+        if (!Number.isFinite(numeric)) return String(odds);
+        return `${numeric > 0 ? '+' : ''}${numeric}`;
+    },
+
+    getToneColor(tone) {
+        const label = tone?.label || tone;
+        if (label === 'Sizzling') return '#10b981';
+        if (label === 'Hot') return '#22c55e';
+        if (label === 'Steady') return '#60a5fa';
+        if (label === 'Chilly') return '#f59e0b';
+        return '#ef4444';
     },
 
     // ==================== LIVE GAMES ====================
@@ -349,32 +362,51 @@ const ui = {
             comparisons.push({ label: 'DEF', away: awayStats.defRating, home: homeStats.defRating });
         }
 
-        // Season series / key stats from summary
-        const keyFacts = summary.keyEvents || summary.article?.keywords || [];
+        const keyFacts = (summary.article?.keywords || []).slice(0, 3);
+        const prediction = away?.team?.id && home?.team?.id
+            ? window.predictor.predict(away.team.id, home.team.id, true)
+            : null;
 
-        // Prediction
         let predHtml = '';
-        if (summary.predictor) {
-            const awayChance = summary.predictor.awayTeam?.gameProjection || summary.predictor.awayTeam?.chance || '';
-            const homeChance = summary.predictor.homeTeam?.gameProjection || summary.predictor.homeTeam?.chance || '';
-            if (awayChance || homeChance) {
-                predHtml = `
-                    <div style="margin-top:12px; padding:10px; background:var(--bg-surface); border-radius:8px;">
-                        <div style="font-size:10px; color:var(--text-tertiary); text-transform:uppercase; font-weight:700; letter-spacing:0.5px; margin-bottom:8px;">ESPN Win Probability</div>
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div style="text-align:center; flex:1;">
-                                <div style="font-size:20px; font-weight:800; color:${parseFloat(awayChance) > 50 ? 'var(--success-color)' : 'var(--text-secondary)'};">${parseFloat(awayChance).toFixed(1)}%</div>
-                                <div style="font-size:10px; color:var(--text-tertiary);">${away?.team?.abbreviation}</div>
-                            </div>
-                            <div style="font-size:11px; color:var(--text-tertiary); font-weight:700;">VS</div>
-                            <div style="text-align:center; flex:1;">
-                                <div style="font-size:20px; font-weight:800; color:${parseFloat(homeChance) > 50 ? 'var(--success-color)' : 'var(--text-secondary)'};">${parseFloat(homeChance).toFixed(1)}%</div>
-                                <div style="font-size:10px; color:var(--text-tertiary);">${home?.team?.abbreviation}</div>
-                            </div>
+        if (prediction) {
+            const edgeLabel = prediction.marketEdge === null
+                ? 'Model-only projection'
+                : `${prediction.marketEdge > 0 ? home?.team?.abbreviation : away?.team?.abbreviation} ML edge ${this.formatSigned(Math.abs(prediction.marketEdge * 100), 1)} pts`;
+
+            predHtml = `
+                <div style="margin-top:12px; padding:14px; background:var(--bg-surface); border-radius:10px; border:1px solid var(--divider);">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:10px; flex-wrap:wrap;">
+                        <div>
+                            <div style="font-size:10px; color:var(--brand-accent); text-transform:uppercase; font-weight:800; letter-spacing:0.8px; margin-bottom:4px;">Composite Projection</div>
+                            <div style="font-size:18px; font-weight:800;">${prediction.modelScoreLabel}</div>
+                            <div style="font-size:11px; color:var(--text-secondary); margin-top:2px;">${prediction.teamB.team.abbreviation} ${prediction.teamB.prob}% win • ${prediction.teamA.team.abbreviation} ${prediction.teamA.prob}%</div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="font-size:10px; color:var(--text-tertiary); text-transform:uppercase; font-weight:700;">Betting Lean</div>
+                            <div style="font-size:12px; font-weight:700; color:var(--brand-accent); margin-top:4px;">${prediction.bettingLean}</div>
                         </div>
                     </div>
-                `;
-            }
+                    <div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; margin-bottom:10px;">
+                        <div class="card stat-card" style="padding:10px;">
+                            <div class="stat-label">Spread</div>
+                            <div class="stat-value" style="font-size:16px;">${prediction.projectedSpread}</div>
+                        </div>
+                        <div class="card stat-card" style="padding:10px;">
+                            <div class="stat-label">Projected Total</div>
+                            <div class="stat-value" style="font-size:16px;">${prediction.projectedTotal}</div>
+                        </div>
+                        <div class="card stat-card" style="padding:10px;">
+                            <div class="stat-label">Market Edge</div>
+                            <div class="stat-value" style="font-size:16px; color:${prediction.marketEdge === null ? 'var(--text-secondary)' : (prediction.marketEdge > 0 ? 'var(--success-color)' : 'var(--warning-color)')};">${edgeLabel}</div>
+                        </div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; font-size:11px; color:var(--text-secondary);">
+                        <span>${away?.team?.abbreviation} ML ${this.formatMoneyline(prediction.awayMoneyline)}</span>
+                        <span>${home?.team?.abbreviation} ML ${this.formatMoneyline(prediction.homeMoneyline)}</span>
+                        <span>${prediction.odds?.overUnder ? `O/U ${prediction.odds.overUnder}` : 'No total posted'}</span>
+                    </div>
+                </div>
+            `;
         }
 
         return `
@@ -395,6 +427,7 @@ const ui = {
                     </div>
                 ` : ''}
                 ${predHtml}
+                ${keyFacts.length ? `<div style="margin-top:10px; font-size:11px; color:var(--text-secondary); line-height:1.5;">${keyFacts.join(' • ')}</div>` : ''}
                 <div style="margin-top:10px; text-align:center; font-size:10px; color:var(--text-tertiary);">Tap to view more • Data via ESPN</div>
             </div>
         `;
@@ -701,6 +734,9 @@ const ui = {
         const period = game.status?.period || 0;
         const date = new Date(game.date);
         const gameId = game.id;
+        const projection = state === 'pre' && away?.team?.id && home?.team?.id
+            ? window.predictor.predict(away.team.id, home.team.id, true)
+            : null;
 
         let statusText = '';
         let isLive = false;
@@ -862,6 +898,23 @@ const ui = {
         // Expand hint
         const expandHint = `<div style="text-align:center; margin-top:8px; font-size:10px; color:var(--text-tertiary); opacity:0.6;">▼ Tap for ${state === 'pre' ? 'preview' : state === 'in' ? 'live stats' : 'box score'}</div>`;
 
+        const modelHtml = projection ? `
+            <div style="margin-top:10px; border-top:1px solid var(--divider); padding-top:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;">
+                    <div style="font-size:10px; color:var(--brand-accent); font-weight:800; text-transform:uppercase; letter-spacing:0.6px;">Composite Model</div>
+                    <div style="font-size:10px; color:${projection.marketEdge === null ? 'var(--text-tertiary)' : (projection.marketEdge > 0 ? 'var(--success-color)' : 'var(--warning-color)')}; font-weight:700;">
+                        ${projection.marketEdge === null ? 'No market line' : `ML ${projection.marketEdge > 0 ? home?.team?.abbreviation : away?.team?.abbreviation} ${this.formatSigned(Math.abs(projection.marketEdge * 100), 1)} pts`}
+                    </div>
+                </div>
+                <div style="font-size:12px; font-weight:700; margin-bottom:6px;">${projection.modelScoreLabel}</div>
+                <div style="display:flex; gap:6px; flex-wrap:wrap; font-size:10px; color:var(--text-secondary);">
+                    <span class="badge badge-roleplayer">${projection.projectedSpread}</span>
+                    <span class="badge badge-roleplayer">Total ${projection.projectedTotal}</span>
+                    <span class="badge badge-roleplayer">${projection.bettingLean}</span>
+                </div>
+            </div>
+        ` : '';
+
         return `
             <div class="card game-card" data-game-id="${gameId}" data-game-state="${state}" style="cursor:pointer; ${accentBar} transition: all 0.2s ease;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
@@ -895,6 +948,7 @@ const ui = {
 
                 ${quarterHtml}
                 ${leadersHtml}
+                ${modelHtml}
                 ${expandHint}
 
                 <div class="game-detail-panel" style="max-height:0; overflow:hidden; transition:max-height 0.35s ease;"></div>
@@ -1014,6 +1068,18 @@ const ui = {
 
         let roster = window.store.state.players.filter(p => String(p.teamId) === String(teamId));
         roster.sort((a, b) => (b.rating?.ratingNum || 0) - (a.rating?.ratingNum || 0));
+        const topPlayer = roster[0];
+
+        const nextGame = (window.store.state.games || []).find((game) => {
+            const competitors = game?.competitions?.[0]?.competitors || [];
+            return game?.status?.type?.state === 'pre' && competitors.some((competitor) => String(competitor?.team?.id) === String(teamId));
+        }) || null;
+        const nextCompetition = nextGame?.competitions?.[0] || null;
+        const nextAway = nextCompetition?.competitors?.find((competitor) => competitor.homeAway === 'away');
+        const nextHome = nextCompetition?.competitors?.find((competitor) => competitor.homeAway === 'home');
+        const nextProjection = nextAway?.team?.id && nextHome?.team?.id
+            ? window.predictor.predict(nextAway.team.id, nextHome.team.id, true)
+            : null;
 
         const container = document.getElementById('pane-team-detail');
 
@@ -1029,6 +1095,45 @@ const ui = {
                 <div class="card stat-card"><div class="stat-label">Streak</div><div class="stat-value">${displayStats.streak || '--'}</div></div>
             </div>
         ` : '<div class="card" style="padding:20px; text-align:center; color:var(--text-secondary);">Team stats loading...</div>';
+
+        const teamOverviewHtml = displayStats ? `
+            <div class="card" style="padding:20px; margin-bottom:24px; border:1px solid var(--divider);">
+                <div style="display:flex; justify-content:space-between; gap:16px; align-items:flex-start; flex-wrap:wrap;">
+                    <div style="max-width:720px;">
+                        <div style="font-size:10px; color:var(--brand-accent); text-transform:uppercase; font-weight:800; letter-spacing:0.8px; margin-bottom:6px;">Composite Team Read</div>
+                        <div style="font-size:16px; font-weight:800; margin-bottom:8px;">${displayStats.tone?.label || 'Steady'} form • ${displayStats.trendScore || 0}/5 pulse</div>
+                        <div style="font-size:14px; line-height:1.6; color:var(--text-secondary);">
+                            ${team.displayName} is carrying a ${displayStats.ovrRating} overall built on ${displayStats.offRating} offense, ${displayStats.defRating} defense, and a ${displayStats.rosterStrength || '--'} roster-strength score. ${topPlayer ? `${topPlayer.fullName || topPlayer.displayName} anchors the profile at ${topPlayer.rating?.rating || '--'} OVR.` : ''} ${nextProjection ? `The next slate projection leans ${nextProjection.bettingLean.toLowerCase()} with ${nextProjection.modelScoreLabel}.` : 'No next-game line is active on the current scoreboard.'}
+                        </div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:repeat(2, minmax(120px, 1fr)); gap:10px; min-width:min(100%, 280px);">
+                        <div class="card stat-card" style="padding:12px;">
+                            <div class="stat-label">Star Power</div>
+                            <div class="stat-value">${displayStats.starPower || '--'}</div>
+                        </div>
+                        <div class="card stat-card" style="padding:12px;">
+                            <div class="stat-label">Depth</div>
+                            <div class="stat-value">${displayStats.depth || '--'}</div>
+                        </div>
+                        <div class="card stat-card" style="padding:12px;">
+                            <div class="stat-label">Off Eff</div>
+                            <div class="stat-value">${displayStats.offensiveEfficiency ? Number(displayStats.offensiveEfficiency).toFixed(1) : '--'}</div>
+                        </div>
+                        <div class="card stat-card" style="padding:12px;">
+                            <div class="stat-label">Pace</div>
+                            <div class="stat-value">${displayStats.pace ? Number(displayStats.pace).toFixed(1) : '--'}</div>
+                        </div>
+                    </div>
+                </div>
+                ${nextProjection ? `
+                    <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap; font-size:11px; color:var(--text-secondary);">
+                        <span class="badge badge-roleplayer">${nextProjection.projectedSpread}</span>
+                        <span class="badge badge-roleplayer">Total ${nextProjection.projectedTotal}</span>
+                        <span class="badge badge-roleplayer">${String(teamId) === String(nextHome?.team?.id) ? `${team.displayName} ML ${this.formatMoneyline(nextProjection.homeMoneyline)}` : `${team.displayName} ML ${this.formatMoneyline(nextProjection.awayMoneyline)}`}</span>
+                    </div>
+                ` : ''}
+            </div>
+        ` : '';
 
         container.innerHTML = `
             <div class="pane-header" style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:24px;">
@@ -1047,6 +1152,7 @@ const ui = {
                 </button>
             </div>
             ${statsHtml}
+            ${teamOverviewHtml}
             <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:14px;">
                 <h3 style="font-size:16px; font-weight:700;">Roster <span style="color:var(--text-tertiary); font-weight:500; font-size:13px;">(${roster.length} players)</span></h3>
             </div>
@@ -1130,34 +1236,14 @@ const ui = {
         const s = p.rating || { ratingNum: 0, offRating: "0", defRating: "0", pts: "0", reb: "0", ast: "0", stl: "0", blk: "0", gp: 0, mpg: "0" };
         const container = document.getElementById('pane-player-detail');
 
-        // AI specific analysis generation based on live stats
-        let aiAnalysis = '';
-        if (s.gp === 0) {
-            aiAnalysis = `${p.fullName || p.displayName} has not played any games this season. His current rating is a conservative baseline proxy until he logs minimum minutes.`;
-        } else {
-            const strengths = [];
-            const weaknesses = [];
-
-            if (s.ratingNum >= 90) strengths.push('is performing at an MVP-caliber level');
-            else if (s.ratingNum >= 86) strengths.push('is an elite All-Star talent');
-            else if (s.ratingNum >= 80) strengths.push('is a highly impactful core rotation player');
-
-            if (parseFloat(s.offRating) >= 85) strengths.push('an offensive engine');
-            if (parseFloat(s.defRating) >= 85) strengths.push('a lockdown defensive anchor');
-
-            if (parseFloat(s.pts) >= 24) strengths.push(`an elite scorer (${s.pts} PPG)`);
-            if (parseFloat(s.ast) >= 7) strengths.push(`a premier playmaker (${s.ast} APG)`);
-            if (parseFloat(s.reb) >= 10) strengths.push(`dominant on the glass (${s.reb} RPG)`);
-
-            if (s.offRating < 70) weaknesses.push('offensive consistency');
-            if (s.defRating < 72) weaknesses.push('defensive impact');
-            if (s.tsPct < 52 && s.pts > 10) weaknesses.push('scoring efficiency');
-
-            let strText = strengths.length > 0 ? strengths.join(', ') : 'a solid contributor';
-            let wkText = weaknesses.length > 0 ? ` However, advanced metrics suggest room for improvement regarding ${weaknesses.join(' and ')}.` : '';
-
-            aiAnalysis = `Composite AI Analysis: Based on real-time data from the current season (${s.gp} games played), ${p.fullName || p.displayName} ${strText}.${wkText} His overall impact score reflects a dynamic ${s.posAbbrev} for the ${team ? team.displayName : 'team'}.`;
-        }
+        const tone = s.tone || { label: 'Steady' };
+        const toneColor = this.getToneColor(tone);
+        const projection = s.projection || null;
+        const aiAnalysis = s.aiOverview || (
+            s.gp === 0
+                ? `${p.fullName || p.displayName} has not logged enough live NBA data yet, so the current card is leaning on a conservative baseline proxy.`
+                : `${p.fullName || p.displayName} is grading ${tone.label.toLowerCase()} right now at ${s.hotnessScore || 0}/5 on the composite pulse meter, with the live season production driving the ${s.ratingNum || 0} overall.`
+        );
 
         const isFav = (window.store.state.favorites.players || []).includes(String(p.id));
 
@@ -1181,6 +1267,7 @@ const ui = {
                             <div style="font-size:48px; font-weight:900; line-height:1; color:${(s.ratingNum || 0) >= 90 ? '#f1c40f' : (s.ratingNum || 0) >= 80 ? '#3498db' : '#95a5a6'}; text-shadow: 0 4px 12px rgba(0,0,0,0.5);">${(s.ratingNum || 0).toFixed(1)}</div>
                             <div style="font-size:12px; font-weight:800; color:var(--text-secondary); letter-spacing:1px; text-transform:uppercase; margin-top:4px;">OVERALL</div>
                             <div style="display:inline-block; margin-top:12px; padding:4px 10px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:4px; font-size:10px; font-weight:800; color:#fff; text-transform:uppercase; letter-spacing:1px;">${s.archetype || 'Role Player'}</div>
+                            <div style="display:inline-block; margin-top:10px; padding:4px 10px; background:${toneColor}; border-radius:999px; font-size:10px; font-weight:800; color:#08111d; text-transform:uppercase; letter-spacing:0.8px;">${tone.label} ${s.hotnessScore || 0}/5</div>
                         </div>
                         <div style="text-align:right;">
                             <div style="font-size:24px; font-weight:800; color:var(--text-secondary);">${s.posAbbrev || p.position?.abbreviation || '--'}</div>
@@ -1217,6 +1304,15 @@ const ui = {
                             <span style="font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:1px; color:var(--brand-accent);">Composite AI Report</span>
                         </div>
                         <p style="font-size:15px; line-height:1.6; color:var(--text-secondary); margin:0;">${aiAnalysis}</p>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-bottom:24px;">
+                        <div class="card stat-card"><div class="stat-label">Pulse</div><div class="stat-value" style="color:${toneColor};">${tone.label}</div></div>
+                        <div class="card stat-card"><div class="stat-label">Hotness</div><div class="stat-value">${s.hotnessScore || 0}/5</div></div>
+                        <div class="card stat-card"><div class="stat-label">Proj PPG</div><div class="stat-value">${projection ? projection.points.toFixed(1) : '--'}</div></div>
+                        <div class="card stat-card"><div class="stat-label">Proj APG</div><div class="stat-value">${projection ? projection.assists.toFixed(1) : '--'}</div></div>
+                        <div class="card stat-card"><div class="stat-label">Proj RPG</div><div class="stat-value">${projection ? projection.rebounds.toFixed(1) : '--'}</div></div>
+                        <div class="card stat-card"><div class="stat-label">OVR Band</div><div class="stat-value">${projection ? `${projection.floor.toFixed(1)}-${projection.ceiling.toFixed(1)}` : '--'}</div></div>
                     </div>
 
                     <h3 style="font-size:16px; font-weight:700; margin-bottom:16px;">Current Season Stats</h3>
@@ -1466,13 +1562,14 @@ const ui = {
                     </div>
 
                     <div style="text-align:center; width:40%;">
-                        <div style="font-size:10px; font-weight:700; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">Spread</div>
+                        <div style="font-size:10px; font-weight:700; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">Projected Spread</div>
                         <div style="font-size:20px; font-weight:800; padding:8px 18px; background:var(--bg-elevated); border-radius:var(--radius-lg); display:inline-block; margin-bottom:10px;">
-                            ${res.spread}
+                            ${res.projectedSpread}
                         </div>
                         <div style="font-size:11px; color:${confColor}; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">
                             ${res.confidence} Confidence
                         </div>
+                        <div style="font-size:11px; color:var(--text-secondary); margin-top:8px;">Total ${res.projectedTotal} • ${res.bettingLean}</div>
                     </div>
 
                     <div style="text-align:center; width:30%;">
@@ -1480,6 +1577,39 @@ const ui = {
                         <h3 style="font-size:28px; font-weight:800;">${res.teamB.score}</h3>
                         <div style="font-size:13px; color:var(--text-secondary);">${res.teamB.prob}% Win</div>
                         <div style="font-size:11px; color:var(--text-tertiary); margin-top:2px;">${res.teamB.team.abbreviation}</div>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px; margin-bottom:20px;">
+                    <div class="card stat-card" style="padding:14px;">
+                        <div class="stat-label">Model Score</div>
+                        <div class="stat-value" style="font-size:16px;">${res.modelScoreLabel}</div>
+                    </div>
+                    <div class="card stat-card" style="padding:14px;">
+                        <div class="stat-label">Away ML</div>
+                        <div class="stat-value" style="font-size:16px;">${this.formatMoneyline(res.awayMoneyline)}</div>
+                    </div>
+                    <div class="card stat-card" style="padding:14px;">
+                        <div class="stat-label">Home ML</div>
+                        <div class="stat-value" style="font-size:16px;">${this.formatMoneyline(res.homeMoneyline)}</div>
+                    </div>
+                    <div class="card stat-card" style="padding:14px;">
+                        <div class="stat-label">Moneyline Edge</div>
+                        <div class="stat-value" style="font-size:16px; color:${res.marketEdge === null ? 'var(--text-secondary)' : (res.marketEdge > 0 ? 'var(--success-color)' : 'var(--warning-color)')};">
+                            ${res.marketEdge === null ? 'No line' : `${res.marketEdge > 0 ? res.teamB.team.abbreviation : res.teamA.team.abbreviation} ${this.formatSigned(Math.abs(res.marketEdge * 100), 1)} pts`}
+                        </div>
+                    </div>
+                    <div class="card stat-card" style="padding:14px;">
+                        <div class="stat-label">Spread Edge</div>
+                        <div class="stat-value" style="font-size:16px; color:${res.spreadEdge === null ? 'var(--text-secondary)' : (res.spreadEdge > 0 ? 'var(--success-color)' : 'var(--warning-color)')};">
+                            ${res.spreadEdge === null ? 'No spread' : `${res.spreadEdge > 0 ? res.teamB.team.abbreviation : res.teamA.team.abbreviation} ${this.formatSigned(Math.abs(res.spreadEdge), 1)}`}
+                        </div>
+                    </div>
+                    <div class="card stat-card" style="padding:14px;">
+                        <div class="stat-label">Total Edge</div>
+                        <div class="stat-value" style="font-size:16px; color:${res.totalEdge === null ? 'var(--text-secondary)' : (res.totalEdge > 0 ? 'var(--success-color)' : 'var(--warning-color)')};">
+                            ${res.totalEdge === null ? 'No total' : `${res.totalEdge > 0 ? 'Over' : 'Under'} ${Math.abs(res.totalEdge).toFixed(1)}`}
+                        </div>
                     </div>
                 </div>
 
