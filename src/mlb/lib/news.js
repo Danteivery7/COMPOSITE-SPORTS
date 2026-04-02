@@ -1,23 +1,15 @@
 import { cacheGet, cacheSet, CACHE_TTL } from '@/src/mlb/lib/cache';
+import { normalizeEspnNewsArticle } from '@/src/lib/espn-news';
 
 const MLB_NEWS_URL = 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/news';
 const MLB_NEWS_CACHE_KEY = 'mlb_news_v1';
 const MLB_NEWS_STALE_KEY = 'mlb_news_stale_v1';
 
 export function normalizeArticle(article, index) {
-    const image = article?.images?.[0] || article?.thumbnail;
-    const link = article?.links?.web?.href || article?.links?.mobile?.href || article?.link || null;
-
-    return {
-        id: article?.id || article?.guid || `mlb-news-${index}`,
-        headline: article?.headline || 'MLB Update',
-        description: article?.description || article?.story || '',
-        published: article?.published || article?.lastModified || null,
-        source: article?.source || 'ESPN',
-        byline: article?.byline || '',
-        image: image?.url || image?.href || null,
-        link,
-    };
+    return normalizeEspnNewsArticle(article, {
+        fallbackSource: 'ESPN',
+        fallbackId: `mlb-news-${index}`,
+    });
 }
 
 export async function fetchMLBNews() {

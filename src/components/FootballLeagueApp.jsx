@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import StoryDetailCard from '@/src/components/StoryDetailCard';
 import { getFootballLeagueConfig } from '@/src/lib/football';
 
 const NAV_ITEMS = [
@@ -54,7 +55,7 @@ function GameCard({ game, onOpen }) {
   );
 }
 
-function FootballOverview({ bootstrap, openGame, openTeam, openPlayer, setPage }) {
+function FootballOverview({ bootstrap, openGame, openTeam, openPlayer, openStory, setPage }) {
   const leadMatch = bootstrap.scoreboard?.[0];
   const topTeam = bootstrap.rankings?.[0];
   const topPlayer = bootstrap.featuredPlayers?.[0];
@@ -179,13 +180,13 @@ function FootballOverview({ bootstrap, openGame, openTeam, openPlayer, setPage }
             <button type="button" onClick={() => setPage('news')}>All news</button>
           </div>
           {leadNews ? (
-            <a className="football-news-feature" href={leadNews.link} target="_blank" rel="noreferrer">
+            <button className="football-news-feature" type="button" onClick={() => openStory(leadNews, 'overview')}>
               {leadNews.image ? <img src={leadNews.image} alt={leadNews.headline} className="football-news-image" /> : null}
               <div>
                 <strong>{leadNews.headline}</strong>
                 <p>{leadNews.description || 'Open story'}</p>
               </div>
-            </a>
+            </button>
           ) : (
             <p className="football-empty-copy">News is syncing.</p>
           )}
@@ -330,19 +331,30 @@ function PredictorView({ predictors }) {
   );
 }
 
-function NewsView({ news }) {
+function NewsView({ news, openStory }) {
   return (
     <div className="football-card-grid">
       {news.map((story) => (
-        <a className="football-panel football-news-card" key={story.id} href={story.link} target="_blank" rel="noreferrer">
+        <button className="football-panel football-news-card" key={story.id} type="button" onClick={() => openStory(story, 'news')}>
           {story.image ? <img src={story.image} alt={story.headline} className="football-news-image" /> : null}
           <div>
             <strong>{story.headline}</strong>
             <p>{story.description || 'Open story'}</p>
           </div>
-        </a>
+        </button>
       ))}
     </div>
+  );
+}
+
+function StoryDetailView({ story, onBack, onOpenRelated }) {
+  return (
+    <StoryDetailCard
+      story={story}
+      onBack={onBack}
+      backLabel="Back to news"
+      onOpenRelated={onOpenRelated}
+    />
   );
 }
 
@@ -529,6 +541,7 @@ export default function FootballLeagueApp({ leagueKey }) {
   const [teamDetail, setTeamDetail] = useState(null);
   const [playerDetail, setPlayerDetail] = useState(null);
   const [gameDetail, setGameDetail] = useState(null);
+  const [storyDetail, setStoryDetail] = useState(null);
   const [playersQuery, setPlayersQuery] = useState('');
   const [loadingBootstrap, setLoadingBootstrap] = useState(true);
   const [loadingPlayers, setLoadingPlayers] = useState(false);
@@ -592,6 +605,14 @@ export default function FootballLeagueApp({ leagueKey }) {
     setPage('game-detail');
   }
 
+  async function openStory(story, fromPage = 'overview') {
+    if (!story?.storyId) return;
+    const response = await fetch(`${apiBase}/news/${story.storyId}?apiHref=${encodeURIComponent(story.apiHref || '')}`);
+    const data = await response.json();
+    setStoryDetail({ ...data, previousPage: fromPage });
+    setPage('story-detail');
+  }
+
   const rankings = useMemo(() => bootstrap?.rankings || [], [bootstrap]);
   const teams = useMemo(() => bootstrap?.teams || [], [bootstrap]);
   const predictors = useMemo(() => bootstrap?.predictors || [], [bootstrap]);
@@ -619,7 +640,7 @@ export default function FootballLeagueApp({ leagueKey }) {
       case 'predictor':
         return <PredictorView predictors={predictors} />;
       case 'news':
-        return <NewsView news={news} />;
+        return <NewsView news={news} openStory={openStory} />;
       case 'settings':
         return (
           <div className="football-card-grid">
@@ -639,9 +660,17 @@ export default function FootballLeagueApp({ leagueKey }) {
         return playerDetail ? <PlayerDetailView detail={playerDetail} setPage={setPage} /> : null;
       case 'game-detail':
         return gameDetail ? <GameDetailView detail={gameDetail} predictors={predictors} setPage={setPage} /> : null;
+      case 'story-detail':
+        return storyDetail ? (
+          <StoryDetailView
+            story={storyDetail}
+            onBack={() => setPage(storyDetail.previousPage || 'overview')}
+            onOpenRelated={(story) => openStory(story, storyDetail.previousPage || 'overview')}
+          />
+        ) : null;
       case 'overview':
       default:
-        return <FootballOverview bootstrap={bootstrap} openGame={openGame} openTeam={openTeam} openPlayer={openPlayer} setPage={setPage} />;
+        return <FootballOverview bootstrap={bootstrap} openGame={openGame} openTeam={openTeam} openPlayer={openPlayer} openStory={openStory} setPage={setPage} />;
     }
   }
 

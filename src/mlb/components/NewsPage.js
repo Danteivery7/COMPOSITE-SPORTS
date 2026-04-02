@@ -2,7 +2,7 @@
 
 import { useMLBRouteData } from '@/src/mlb/lib/useMLBRouteData';
 
-export default function NewsPage() {
+export default function NewsPage({ onStoryClick }) {
     const { data = { articles: [], lastUpdated: null }, loading, error, refresh } = useMLBRouteData('/api/mlb/news');
 
     const formatTimestamp = (isoString) => {
@@ -71,11 +71,10 @@ export default function NewsPage() {
             ) : (
                 <div className="news-grid">
                     {data.articles.map((article) => (
-                        <a
+                        <button
                             key={article.id}
-                            href={article.link}
-                            target="_blank"
-                            rel="noreferrer"
+                            type="button"
+                            onClick={() => onStoryClick?.(article)}
                             className="card news-card"
                         >
                             {article.image ? (
@@ -92,7 +91,7 @@ export default function NewsPage() {
                                 {article.description ? <p>{article.description}</p> : null}
                                 <span className="news-card-link">Open Story</span>
                             </div>
-                        </a>
+                        </button>
                     ))}
                 </div>
             )}

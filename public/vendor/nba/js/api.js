@@ -3,8 +3,22 @@
    Handles all ESPN public API calls with error handling
    ============================================================ */
 const API_BASE = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba';
+const INTERNAL_API_BASE = '/api/nba';
 
 const api = {
+    async fetchBootstrap(force = false) {
+        try {
+            const response = await fetch(`${INTERNAL_API_BASE}/bootstrap${force ? '?force=1' : ''}`, {
+                cache: 'no-store'
+            });
+            if (!response.ok) throw new Error(`Bootstrap failed: ${response.status}`);
+            return await response.json();
+        } catch (error) {
+            console.error('Failed to fetch NBA bootstrap snapshot:', error);
+            return null;
+        }
+    },
+
     async fetchScoreboard() {
         try {
             const response = await fetch(`${API_BASE}/scoreboard`);
@@ -18,24 +32,25 @@ const api = {
 
     async fetchNews() {
         try {
-            const response = await fetch(`${API_BASE}/news`);
+            const response = await fetch(`${INTERNAL_API_BASE}/news`, { cache: 'no-store' });
             const data = await response.json();
-            return (data.articles || []).map((article, index) => {
-                const image = article?.images?.[0] || article?.thumbnail;
-                return {
-                    id: article?.id || article?.guid || `nba-news-${index}`,
-                    headline: article?.headline || 'NBA Update',
-                    description: article?.description || article?.story || '',
-                    published: article?.published || article?.lastModified || null,
-                    source: article?.source || 'ESPN',
-                    byline: article?.byline || '',
-                    image: image?.url || image?.href || '',
-                    link: article?.links?.web?.href || article?.links?.mobile?.href || article?.link || '',
-                };
-            }).filter((article) => article.link);
+            return data.articles || [];
         } catch (error) {
             console.error('Failed to fetch NBA news:', error);
             return [];
+        }
+    },
+
+    async fetchNewsStory(storyId, apiHref = '') {
+        try {
+            const response = await fetch(`${INTERNAL_API_BASE}/news/${storyId}${apiHref ? `?apiHref=${encodeURIComponent(apiHref)}` : ''}`, {
+                cache: 'no-store'
+            });
+            if (!response.ok) throw new Error(`Story failed: ${response.status}`);
+            return await response.json();
+        } catch (error) {
+            console.error(`Failed to fetch NBA story ${storyId}:`, error);
+            return null;
         }
     },
 

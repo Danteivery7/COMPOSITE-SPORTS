@@ -670,10 +670,20 @@ export async function fetchPostGameSummary(gameId, winningAbbr) {
         });
         if (!res.ok) return null;
         const data = await res.json();
+        const header = data.header?.competitions?.[0];
+        const competitors = header?.competitors || [];
+        const statusText = `${header?.status?.type?.state || ''} ${header?.status?.type?.detail || ''} ${header?.status?.type?.shortDetail || ''}`.toLowerCase();
+        const isInterruptedGame =
+            statusText.includes('postponed') ||
+            statusText.includes('ppd') ||
+            statusText.includes('delayed') ||
+            statusText.includes('suspended');
+        const isCompletedFinal = header?.status?.type?.completed === true || header?.status?.type?.state === 'post';
+        const hasWinner = competitors.some((competitor) => competitor.winner) && competitors.some((competitor) => competitor.winner === false);
         
         let winningPitcher = null, losingPitcher = null, savingPitcher = null;
-        if (data.header?.competitions?.[0]) {
-            const comp = data.header.competitions[0];
+        if (header) {
+            const comp = header;
             const mapPitcher = (pNode) => pNode?.athlete ? {
                 id: pNode.athlete.id,
                 name: pNode.athlete.shortName || pNode.athlete.displayName,
@@ -783,84 +793,83 @@ export async function fetchPostGameSummary(gameId, winningAbbr) {
 
         // ── Rare Event Detection ─────────────────────────────────────────
         let rareEvents = [];
-        
-        // Check for no-hitter / perfect game by examining team batting stats
-        for (const teamBlock of boxscore) {
-            const teamAbbr = teamBlock.team?.abbreviation;
-            const isWinnerTeam = teamAbbr === winningAbbr;
-            
-            // Check the LOSING team's batting to detect no-hitter
-            if (!isWinnerTeam || winningAbbr === null) {
-                const battingGroup = (teamBlock.statistics || []).find(s => s.type === 'batting');
-                if (battingGroup) {
-                    let teamHits = 0, teamBB = 0, teamHBP = 0, teamErrors = 0;
-                    for (const a of battingGroup.athletes || []) {
-                        const stats = a.stats || [];
-                        const keys = battingGroup.names || [];
+        const battingGroups = boxscore.map((teamBlock) => (teamBlock.statistics || []).find((group) => group.type === 'batting'));
+        const hasTrustworthyFinalBoxscore =
+            boxscore.length === 2 &&
+            battingGroups.length === 2 &&
+            battingGroups.every((group) => group && Array.isArray(group.athletes));
+        const canEvaluateRareEvents = Boolean(winningAbbr && isCompletedFinal && !isInterruptedGame && hasWinner && hasTrustworthyFinalBoxscore);
+
+        if (canEvaluateRareEvents) {
+            // Check for no-hitter / perfect game by examining team batting stats
+            for (const teamBlock of boxscore) {
+                const teamAbbr = teamBlock.team?.abbreviation;
+                const isWinnerTeam = teamAbbr === winningAbbr;
+
+                if (!isWinnerTeam) {
+                    const battingGroup = (teamBlock.statistics || []).find(s => s.type === 'batting');
+                    if (battingGroup) {
+                        let teamHits = 0, teamBB = 0, teamHBP = 0;
+                        for (const a of battingGroup.athletes || []) {
+                            const stats = a.stats || [];
+                            const keys = battingGroup.names || [];
+                            const raw = {};
+                            keys.forEach((k, i) => raw[k] = parseFloat(stats[i]) || 0);
+                            teamHits += raw.H || 0;
+                            teamBB += raw.BB || 0;
+                            teamHBP += raw.HBP || 0;
+                        }
+
+                        if (teamHits === 0) {
+                            if (teamBB === 0 && teamHBP === 0) {
+                                rareEvents.push({ type: 'perfect-game', team: winningAbbr });
+                            } else {
+                                rareEvents.push({ type: 'no-hitter', team: winningAbbr });
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Check for milestone individual performances
+            for (const teamBlock of boxscore) {
+                for (const statGroup of teamBlock.statistics || []) {
+                    const keys = statGroup.names || [];
+                    const isPitching = statGroup.type === 'pitching';
+
+                    for (const athleteObj of statGroup.athletes || []) {
+                        const p = athleteObj.athlete;
+                        const bStats = athleteObj.stats || [];
                         const raw = {};
-                        keys.forEach((k, i) => raw[k] = parseFloat(stats[i]) || 0);
-                        teamHits += raw.H || 0;
-                        teamBB += raw.BB || 0;
-                        teamHBP += raw.HBP || 0;
-                    }
-                    
-                    if (teamHits === 0) {
-                        if (teamBB === 0 && teamHBP === 0) {
-                            rareEvents.push({ type: 'perfect-game', team: winningAbbr });
+                        keys.forEach((k, i) => raw[k] = parseFloat(bStats[i]) || 0);
+                        const pName = p?.shortName || p?.displayName || 'Unknown';
+
+                        if (isPitching) {
+                            if ((raw.K || 0) >= 15) {
+                                rareEvents.push({ type: 'milestone', label: `🔥 ${pName}: ${raw.K} K`, kind: 'dominant-k' });
+                            }
+                            if ((raw.IP || 0) >= 9 && (raw.ER || 0) === 0) {
+                                rareEvents.push({ type: 'milestone', label: `⚡ ${pName}: CGSO`, kind: 'cgso' });
+                            }
                         } else {
-                            rareEvents.push({ type: 'no-hitter', team: winningAbbr });
+                            if ((raw.HR || 0) >= 3) {
+                                rareEvents.push({ type: 'milestone', label: `💣 ${pName}: ${raw.HR} HR`, kind: 'multi-hr' });
+                            }
+                            if ((raw.H || 0) >= 5) {
+                                rareEvents.push({ type: 'milestone', label: `🔥 ${pName}: ${raw.H}-for-${raw.AB}`, kind: 'hit-explosion' });
+                            }
+                            if ((raw.H || 0) >= 4 && (raw.HR || 0) >= 1 && (raw['2B'] || raw.DOUBLES || 0) >= 1 && (raw['3B'] || raw.TRIPLES || 0) >= 1) {
+                                rareEvents.push({ type: 'cycle', label: `🚴 ${pName}: Hit for the Cycle!`, kind: 'cycle' });
+                            }
                         }
                     }
                 }
             }
-        }
-        
-        // Check for milestone individual performances
-        for (const teamBlock of boxscore) {
-            for (const statGroup of teamBlock.statistics || []) {
-                const keys = statGroup.names || [];
-                const isPitching = statGroup.type === 'pitching';
-                
-                for (const athleteObj of statGroup.athletes || []) {
-                    const p = athleteObj.athlete;
-                    const bStats = athleteObj.stats || [];
-                    const raw = {};
-                    keys.forEach((k, i) => raw[k] = parseFloat(bStats[i]) || 0);
-                    const pName = p?.shortName || p?.displayName || 'Unknown';
-                    
-                    if (isPitching) {
-                        // 15+ K dominant pitching performance
-                        if ((raw.K || 0) >= 15) {
-                            rareEvents.push({ type: 'milestone', label: `🔥 ${pName}: ${raw.K} K`, kind: 'dominant-k' });
-                        }
-                        // Complete game shutout (9+ IP, 0 ER)
-                        if ((raw.IP || 0) >= 9 && (raw.ER || 0) === 0) {
-                            rareEvents.push({ type: 'milestone', label: `⚡ ${pName}: CGSO`, kind: 'cgso' });
-                        }
-                    } else {
-                        // 3+ HR game
-                        if ((raw.HR || 0) >= 3) {
-                            rareEvents.push({ type: 'milestone', label: `💣 ${pName}: ${raw.HR} HR`, kind: 'multi-hr' });
-                        }
-                        // 5+ hit game
-                        if ((raw.H || 0) >= 5) {
-                            rareEvents.push({ type: 'milestone', label: `🔥 ${pName}: ${raw.H}-for-${raw.AB}`, kind: 'hit-explosion' });
-                        }
-                        // Cycle detection (H >= 4 and HR >= 1 as proxy - true cycle needs 1B/2B/3B/HR)
-                        if ((raw.H || 0) >= 4 && (raw.HR || 0) >= 1 && (raw['2B'] || raw.DOUBLES || 0) >= 1 && (raw['3B'] || raw.TRIPLES || 0) >= 1) {
-                            rareEvents.push({ type: 'cycle', label: `🚴 ${pName}: Hit for the Cycle!`, kind: 'cycle' });
-                        }
-                    }
-                }
+
+            const loser = competitors.find(c => !c.winner);
+            if (loser && parseInt(loser.score) === 0 && !rareEvents.some(e => e.type === 'perfect-game' || e.type === 'no-hitter')) {
+                rareEvents.push({ type: 'shutout', team: winningAbbr });
             }
-        }
-        
-        // Shutout detection (losing team scored 0)
-        const header = data.header?.competitions?.[0];
-        const competitors = header?.competitors || [];
-        const loser = competitors.find(c => !c.winner);
-        if (loser && parseInt(loser.score) === 0 && !rareEvents.some(e => e.type === 'perfect-game' || e.type === 'no-hitter')) {
-            rareEvents.push({ type: 'shutout', team: winningAbbr });
         }
 
         return { winningPitcher, losingPitcher, savingPitcher, pog, rareEvents };

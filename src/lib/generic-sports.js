@@ -1,4 +1,5 @@
 import { getSportConfig } from '@/src/data/sports';
+import { normalizeEspnNewsArticle } from '@/src/lib/espn-news';
 
 const CACHE = new Map();
 
@@ -446,14 +447,15 @@ async function fetchNews(sport) {
   const cached = readCache(key);
   if (cached) return cached;
   const payload = await fetchJson(`${meta.site}/news`, 30 * 60 * 1000);
-  const articles = (payload.articles || []).slice(0, 8).map((article) => ({
-    id: article.id || article.headline,
-    headline: article.headline,
-    description: article.description || '',
-    link: article.links?.web?.href || article.link || '',
-    image: article.images?.[0]?.url || '',
-    published: article.published || article.lastModified || '',
-  }));
+  const articles = (payload.articles || [])
+    .slice(0, 8)
+    .map((article, index) =>
+      normalizeEspnNewsArticle(article, {
+        fallbackSource: meta.label,
+        fallbackId: `${sport}-news-${index}`,
+      }),
+    )
+    .filter((article) => article.storyId);
   return writeCache(key, articles, 30 * 60 * 1000);
 }
 

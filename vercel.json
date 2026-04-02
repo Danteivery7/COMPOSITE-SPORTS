@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/nba/warm",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

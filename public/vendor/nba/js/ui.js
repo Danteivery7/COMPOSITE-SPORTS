@@ -84,6 +84,7 @@ const ui = {
         if (tabId !== 'game-detail') window.store.state.activeGameId = null;
         if (tabId !== 'team-detail') window.store.state.activeTeamId = null;
         if (tabId !== 'player-detail') window.store.state.activePlayerId = null;
+        if (tabId !== 'story-detail') window.store.state.activeStoryId = null;
 
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll(`.nav-btn[data-tab="${tabId}"]`).forEach(b => b.classList.add('active'));
@@ -107,6 +108,8 @@ const ui = {
             this.renderPredictorSetup();
         } else if (tabId === 'news') {
             this.renderNews(window.store.state.news);
+        } else if (tabId === 'story-detail' && window.store.state.activeStoryId) {
+            this.renderStoryDetail(window.store.state.activeStoryId);
         } else if (tabId === 'teams') {
             this.renderTeamsList(window.store.state.teams);
         } else if (tabId === 'players') {
@@ -517,7 +520,7 @@ const ui = {
                 ${articles.length ? `
                     <div class="news-grid">
                         ${articles.map((article) => `
-                            <a class="card news-card" href="${article.link}" target="_blank" rel="noreferrer">
+                            <button class="card news-card" type="button" onclick="window.ui.showNewsStory('${article.storyId || article.id}', '${encodeURIComponent(article.apiHref || '')}')">
                                 ${article.image ? `<img src="${article.image}" alt="${article.headline}" class="news-card-image" onerror="this.remove()">` : ''}
                                 <div class="news-card-body ${article.image ? '' : 'news-card-body-no-image'}">
                                     <div class="news-card-meta">
@@ -528,7 +531,7 @@ const ui = {
                                     ${article.description ? `<p>${article.description}</p>` : ''}
                                     <span class="news-card-link">Open Story</span>
                                 </div>
-                            </a>
+                            </button>
                         `).join('')}
                     </div>
                 ` : '<div class="news-empty">No NBA news available.</div>'}
@@ -1506,7 +1509,7 @@ const ui = {
         };
 
         container.innerHTML = articles.map((article) => `
-            <a class="card news-card" href="${article.link}" target="_blank" rel="noreferrer">
+            <button class="card news-card" type="button" onclick="window.ui.showNewsStory('${article.storyId || article.id}', '${encodeURIComponent(article.apiHref || '')}')">
                 ${article.image
                     ? `<img src="${article.image}" alt="${article.headline}" class="news-card-image" onerror="this.remove()">`
                     : ''}
@@ -1519,8 +1522,101 @@ const ui = {
                     ${article.description ? `<p>${article.description}</p>` : ''}
                     <span class="news-card-link">Open Story</span>
                 </div>
-            </a>
+            </button>
         `).join('');
+    },
+
+    async showNewsStory(storyId, apiHref = '') {
+        const pane = document.getElementById('pane-story-detail');
+        if (!pane || !storyId) return;
+
+        const decodedApiHref = apiHref ? decodeURIComponent(apiHref) : '';
+        window.store.state.activeStoryId = String(storyId);
+        this.switchTab('story-detail');
+
+        pane.innerHTML = `
+            <div class="back-bar">
+                <button class="back-btn" onclick="window.ui.goBack()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                    Back to News
+                </button>
+            </div>
+            <div style="text-align:center; padding:96px 0;">
+                <div class="dot pulse" style="width:12px; height:12px; background:var(--brand-primary); border-radius:50%; margin:0 auto 16px;"></div>
+                <div style="font-weight:700; color:var(--text-secondary);">Loading story...</div>
+            </div>
+        `;
+
+        let story = window.store.state.newsStories[String(storyId)] || null;
+        if (!story) {
+            story = await window.api.fetchNewsStory(storyId, decodedApiHref);
+            if (story) {
+                window.store.setNewsStory(storyId, story);
+            }
+        }
+
+        this.renderStoryDetail(storyId);
+    },
+
+    renderStoryDetail(storyId) {
+        const pane = document.getElementById('pane-story-detail');
+        if (!pane) return;
+
+        const story = window.store.state.newsStories[String(storyId)];
+        if (!story) {
+            pane.innerHTML = '<div style="padding:48px; text-align:center; color:var(--text-secondary);">Story unavailable right now.</div>';
+            return;
+        }
+
+        const related = story.related || [];
+        const formatPublished = (isoString) => {
+            if (!isoString) return 'Latest';
+            return new Date(isoString).toLocaleString([], {
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+            });
+        };
+
+        pane.innerHTML = `
+            <div class="back-bar">
+                <button class="back-btn" onclick="window.ui.goBack()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                    Back to News
+                </button>
+            </div>
+            <section class="card news-story-shell">
+                <div class="news-story-head">
+                    <div class="news-story-kicker">${story.source || 'ESPN'}</div>
+                    <h2>${story.headline || 'NBA Story'}</h2>
+                    <div class="news-story-meta">
+                        <span>${story.byline || story.source || 'ESPN'}</span>
+                        <span>${formatPublished(story.published)}</span>
+                        <span>${story.contentType || 'Story'}</span>
+                    </div>
+                </div>
+                ${story.image ? `<img src="${story.image}" alt="${story.headline}" class="news-story-image" onerror="this.remove()">` : ''}
+                ${story.dek ? `<p class="news-story-dek">${story.dek}</p>` : ''}
+                <div class="news-story-body">${story.body || '<p>No story body is available yet.</p>'}</div>
+                ${related.length ? `
+                    <div class="news-story-related">
+                        <h3>More NBA Stories</h3>
+                        <div class="news-story-related-grid">
+                            ${related.slice(0, 4).map((item) => `
+                                <button class="card news-story-related-card" type="button" onclick="window.ui.showNewsStory('${item.storyId || item.id}', '${encodeURIComponent(item.apiHref || '')}')">
+                                    ${item.image ? `<img src="${item.image}" alt="${item.headline}" class="news-story-related-image" onerror="this.remove()">` : ''}
+                                    <div>
+                                        <strong>${item.headline}</strong>
+                                        <span>${item.source || 'ESPN'}</span>
+                                    </div>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+            </section>
+        `;
     },
 
     // ==================== RANKINGS ====================
@@ -2030,17 +2126,11 @@ const ui = {
         const label = document.getElementById('loading-label');
         if (!bar || !label) return;
 
-        const rp = window.store.state.loadingProgress.rosters;
-        const sp = window.store.state.loadingProgress.playerStats;
+        const bootstrap = window.store.state.loadingProgress.bootstrap;
 
-        if (rp.phase === 'loading') {
-            const pct = Math.round((rp.loaded / rp.total) * 100);
-            bar.style.width = pct + '%';
-            label.textContent = `Loading rosters: ${rp.loaded}/${rp.total} teams`;
-        } else if (sp.phase === 'loading') {
-            const pct = Math.round((sp.loaded / sp.total) * 100);
-            bar.style.width = pct + '%';
-            label.textContent = `Syncing player stats: ${sp.loaded}/${sp.total}`;
+        if (bootstrap?.phase === 'loading') {
+            bar.style.width = '54%';
+            label.textContent = 'Loading warm NBA snapshot...';
         } else {
             bar.style.width = '100%';
             label.textContent = window.store.state.players.length > 0

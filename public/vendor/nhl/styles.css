@@ -1845,3 +1845,48 @@ body[data-theme="dark"] .detail-card:hover,
 body[data-theme="dark"] .rank-row:hover {
   box-shadow: 0 20px 52px rgba(11, 31, 58, 0.34), 0 0 0 1px rgba(106, 191, 255, 0.08);
 }
+
+.story-detail-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.story-detail-image {
+  width: 100%;
+  max-height: 28rem;
+  object-fit: cover;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+}
+
+.story-detail-dek {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+
+.story-detail-body {
+  display: grid;
+  gap: 14px;
+  line-height: 1.8;
+  color: var(--text);
+}
+
+.story-detail-body p,
+.story-detail-body ul,
+.story-detail-body ol,
+.story-detail-body blockquote {
+  margin: 0;
+}
+
+.story-detail-body hr {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.story-related-list {
+  display: grid;
+  gap: 12px;
+}

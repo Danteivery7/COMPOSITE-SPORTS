@@ -122,9 +122,19 @@ export async function getNews(force = false) {
     "news",
     TTL.NEWS,
     async () => {
-      const payload = await fetchJson(`${API.site}/news`);
-      return payload?.articles || [];
+      return fetchJson(`/api/nhl/news`);
     },
+    { force },
+  );
+
+  return resource.data;
+}
+
+export async function getNewsStory(storyId, apiHref = "", force = false) {
+  const resource = await loadWithCache(
+    `news-story:${storyId}`,
+    TTL.NEWS,
+    () => fetchJson(`/api/nhl/news/${storyId}${apiHref ? `?apiHref=${encodeURIComponent(apiHref)}` : ""}`),
     { force },
   );
 

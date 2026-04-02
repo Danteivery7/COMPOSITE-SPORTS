@@ -7,6 +7,7 @@ import {
   getGameSummary,
   getLeagueStandings,
   getNews,
+  getNewsStory,
   getPlayerBundle,
   getScoreboardWindow,
   getSeasonLeaders,
@@ -71,6 +72,7 @@ const state = {
   featuredPlayers: [],
   predictorCards: [],
   news: [],
+  newsStories: {},
   teamBundles: {},
   playerCards: {},
   gameSummaries: {},
@@ -104,7 +106,11 @@ function applyTheme() {
 }
 
 function markActiveNav() {
-  const active = ["game", "team", "player"].includes(state.route.view) ? "overview" : state.route.view;
+  const active = ["game", "team", "player"].includes(state.route.view)
+    ? "overview"
+    : state.route.view === "story"
+      ? "news"
+      : state.route.view;
   document.querySelectorAll("[data-route]").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.route === active);
   });
@@ -306,6 +312,14 @@ async function ensurePlayerCard(playerId, force = false) {
   render();
 }
 
+async function ensureNewsStory(storyId, force = false) {
+  if (!storyId) return;
+  if (!force && state.newsStories[storyId]) return;
+  const storyMeta = (state.news || []).find((entry) => String(entry.storyId || entry.id) === String(storyId));
+  state.newsStories[storyId] = await getNewsStory(storyId, storyMeta?.apiHref || "", force);
+  render();
+}
+
 async function ensureRouteData(force = false) {
   if (state.route.view === "game" && state.route.id) {
     void ensureGameSummary(state.route.id, force);
@@ -317,6 +331,10 @@ async function ensureRouteData(force = false) {
 
   if (state.route.view === "player" && state.route.id) {
     void ensurePlayerCard(state.route.id, force);
+  }
+
+  if (state.route.view === "story" && state.route.id) {
+    void ensureNewsStory(state.route.id, force);
   }
 
   if (state.route.view === "players" || state.searchQuery.length >= 2) {
@@ -403,11 +421,6 @@ function handleAppClick(event) {
     event.preventDefault();
     handleSettingClick(settingTarget);
     return;
-  }
-
-  const external = event.target.closest("[data-external-url]");
-  if (external?.dataset.externalUrl) {
-    window.open(external.dataset.externalUrl, "_blank", "noopener");
   }
 }
 

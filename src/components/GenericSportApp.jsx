@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { getSportConfig } from '@/src/data/sports';
+import StoryDetailCard from '@/src/components/StoryDetailCard';
 
 const NAV_ITEMS = [
   { key: 'overview', label: 'Overview' },
@@ -291,6 +292,7 @@ function SportOverviewView({
   openTeam,
   openPlayer,
   openGame,
+  openStory,
   setPage,
 }) {
   const copy = SPORT_VIEW_COPY[sportKey];
@@ -377,11 +379,11 @@ function SportOverviewView({
             </button>
           ) : null}
           {leadStory ? (
-            <a className="sportview-spotlight thin" href={leadStory.link} target="_blank" rel="noreferrer">
+            <button className="sportview-spotlight thin" type="button" onClick={() => openStory(leadStory, 'overview')}>
               <span className="sportview-spotlight-label">Storyline</span>
               <strong>{leadStory.headline}</strong>
               <p>{leadStory.description || 'Open ESPN story'}</p>
-            </a>
+            </button>
           ) : null}
         </div>
       </article>
@@ -457,10 +459,10 @@ function SportOverviewView({
           <div className="sportview-note-list">
             {news.length ? (
               news.slice(0, 4).map((story) => (
-                <a className="sportview-note-link" href={story.link} target="_blank" rel="noreferrer" key={story.id}>
+                <button className="sportview-note-link" type="button" onClick={() => openStory(story, 'overview')} key={story.id}>
                   <strong>{story.headline}</strong>
                   <span>{story.description || 'Open story'}</span>
-                </a>
+                </button>
               ))
             ) : (
               <p className="generic-empty-copy">News feed is quiet right now.</p>
@@ -469,6 +471,17 @@ function SportOverviewView({
         </SportPanel>
       </div>
     </section>
+  );
+}
+
+function SportStoryDetailView({ story, onBack, onOpenRelated }) {
+  return (
+    <StoryDetailCard
+      story={story}
+      onBack={onBack}
+      backLabel="Back to news"
+      onOpenRelated={onOpenRelated}
+    />
   );
 }
 
@@ -721,6 +734,7 @@ export default function GenericSportApp({ sportKey }) {
   const [teamDetail, setTeamDetail] = useState(null);
   const [playerDetail, setPlayerDetail] = useState(null);
   const [gameDetail, setGameDetail] = useState(null);
+  const [storyDetail, setStoryDetail] = useState(null);
   const [playersQuery, setPlayersQuery] = useState('');
   const [loadingBootstrap, setLoadingBootstrap] = useState(true);
   const [loadingPlayers, setLoadingPlayers] = useState(false);
@@ -784,6 +798,14 @@ export default function GenericSportApp({ sportKey }) {
     setPage('game-detail');
   }
 
+  async function openStory(story, fromPage = 'overview') {
+    if (!story?.storyId) return;
+    const response = await fetch(`${apiBase}/news/${story.storyId}?apiHref=${encodeURIComponent(story.apiHref || '')}`);
+    const data = await response.json();
+    setStoryDetail({ ...data, previousPage: fromPage });
+    setPage('story-detail');
+  }
+
   const rankings = useMemo(() => bootstrap?.rankings || [], [bootstrap]);
   const teams = useMemo(() => bootstrap?.teams || [], [bootstrap]);
   const featuredPlayers = useMemo(() => bootstrap?.featuredPlayers || [], [bootstrap]);
@@ -845,6 +867,14 @@ export default function GenericSportApp({ sportKey }) {
         return gameDetail ? (
           <SportGameDetailView sportKey={sportKey} gameDetail={gameDetail} setPage={setPage} predictors={predictors} />
         ) : null;
+      case 'story-detail':
+        return storyDetail ? (
+          <SportStoryDetailView
+            story={storyDetail}
+            onBack={() => setPage(storyDetail.previousPage || 'overview')}
+            onOpenRelated={(story) => openStory(story, storyDetail.previousPage || 'overview')}
+          />
+        ) : null;
       case 'overview':
       default:
         return (
@@ -860,6 +890,7 @@ export default function GenericSportApp({ sportKey }) {
             openTeam={openTeam}
             openPlayer={openPlayer}
             openGame={openGame}
+            openStory={openStory}
             setPage={setPage}
           />
         );

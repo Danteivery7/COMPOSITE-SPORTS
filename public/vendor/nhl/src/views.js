@@ -175,19 +175,59 @@ function renderFeaturedPlayer(player) {
 }
 
 function renderArticle(article) {
-  const image = article.images?.find((item) => item.url)?.url || "";
+  const image = article.image || article.images?.find((item) => item.url)?.url || "";
+  const storyId = article.storyId || article.id;
   return `
-    <article class="article-card" data-external-url="${escapeHtml(article.links?.web?.href || article.link || "")}">
+    <article class="article-card" data-nav-hash="${toRouteHash("story", storyId)}">
       ${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(article.headline)}" />` : ""}
       <div class="article-head">
         <div>
-          <p class="eyebrow">ESPN Wire</p>
+          <p class="eyebrow">${escapeHtml(article.source || "ESPN Wire")}</p>
           <h3 class="article-title">${escapeHtml(article.headline)}</h3>
         </div>
       </div>
       <p class="article-desc">${escapeHtml(article.description || "No summary available.")}</p>
       <p class="article-meta">${escapeHtml(formatGameTime(article.published || article.lastModified))}</p>
     </article>
+  `;
+}
+
+function renderStoryDetail(state) {
+  const story = state.newsStories?.[state.route.id];
+
+  if (!story) {
+    return renderEmptyState("Story syncing", "The ESPN story body is still loading inside the NHL route.");
+  }
+
+  return `
+    <section class="list-panel story-detail-panel">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">${escapeHtml(story.source || "ESPN")}</p>
+          <h3 class="section-title">${escapeHtml(story.headline || "Story")}</h3>
+          <p class="section-subtitle">${escapeHtml([story.byline, formatGameTime(story.published)].filter(Boolean).join(" • "))}</p>
+        </div>
+        ${routeButton("Back to news", toRouteHash("news"))}
+      </div>
+      ${story.image ? `<img class="story-detail-image" src="${escapeHtml(story.image)}" alt="${escapeHtml(story.headline || "Story image")}" />` : ""}
+      ${story.dek ? `<p class="story-detail-dek">${escapeHtml(story.dek)}</p>` : ""}
+      <div class="story-detail-body">${story.body || "<p>No story body is available yet.</p>"}</div>
+      ${story.related?.length ? `
+        <div class="story-related-list">
+          ${story.related.slice(0, 4).map((item) => `
+            <button class="leader-card" data-nav-hash="${toRouteHash("story", item.storyId || item.id)}">
+              <div class="row-between">
+                <div>
+                  <h3 class="matchup-heading">${escapeHtml(item.headline)}</h3>
+                  <p class="small-note">${escapeHtml(item.source || "ESPN")}</p>
+                </div>
+                <span class="trend-chip flat">Open</span>
+              </div>
+            </button>
+          `).join("")}
+        </div>
+      ` : ""}
+    </section>
   `;
 }
 
@@ -956,6 +996,7 @@ export function renderApp(state) {
   if (route.view === "game") return renderGameDetail(state);
   if (route.view === "team") return renderTeamDetail(state);
   if (route.view === "player") return renderPlayerDetail(state);
+  if (route.view === "story") return renderStoryDetail(state);
   if (route.view === "scores") return renderScores(state);
   if (route.view === "rankings") return renderRankings(state);
   if (route.view === "players") return renderPlayers(state);
@@ -989,6 +1030,12 @@ export function syncRouteChrome(state) {
     const player = state.playerCards?.[state.route.id];
     title = player?.fullName || "Player Detail";
     eyebrow = "Consensus Player Card";
+  }
+
+  if (state.route.view === "story") {
+    const story = state.newsStories?.[state.route.id];
+    title = story?.headline || "Story Detail";
+    eyebrow = story?.source || "ESPN Wire";
   }
 
   return { title, eyebrow };

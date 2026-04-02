@@ -47,7 +47,7 @@ function TeamBadge({ team, size = 'md' }) {
     return <img src={logo} alt={team?.fullName || team?.name || team?.displayName || team?.abbr || 'Team'} className={className} />;
 }
 
-export default function OverviewPage({ onTeamClick, onPlayerClick, onGameClick }) {
+export default function OverviewPage({ onTeamClick, onPlayerClick, onGameClick, onStoryClick }) {
     const { data, loading, error, refresh } = useMLBRouteData('/api/mlb/overview');
 
     if (loading) {
@@ -192,16 +192,14 @@ export default function OverviewPage({ onTeamClick, onPlayerClick, onGameClick }
                         <h3>Trending News</h3>
                         <button
                             className="filter-btn active"
-                            onClick={() => {
-                                if (featuredStory?.link) window.open(featuredStory.link, '_blank', 'noopener,noreferrer');
-                            }}
+                            onClick={() => featuredStory && onStoryClick?.(featuredStory)}
                         >
                             Top story
                         </button>
                     </div>
                     {featuredStory ? (
                         <div className="overview-news-rail-body">
-                            <a href={featuredStory.link} target="_blank" rel="noreferrer" className="overview-news-feature">
+                            <button type="button" className="overview-news-feature" onClick={() => onStoryClick?.(featuredStory)}>
                                 {featuredStory.image ? (
                                     <img src={featuredStory.image} alt={featuredStory.headline} className="overview-news-feature-image" />
                                 ) : (
@@ -215,14 +213,14 @@ export default function OverviewPage({ onTeamClick, onPlayerClick, onGameClick }
                                     <h3>{featuredStory.headline}</h3>
                                     {featuredStory.description ? <p>{featuredStory.description}</p> : null}
                                 </div>
-                            </a>
+                            </button>
 
                             <div className="overview-news-mini-list">
                                 {moreStories.map((article) => (
-                                    <a key={article.id} href={article.link} target="_blank" rel="noreferrer" className="overview-news-mini">
+                                    <button key={article.id} type="button" onClick={() => onStoryClick?.(article)} className="overview-news-mini">
                                         <strong>{article.headline}</strong>
                                         <span>{article.source || 'ESPN'} • {formatTime(article.published)}</span>
-                                    </a>
+                                    </button>
                                 ))}
                             </div>
                         </div>

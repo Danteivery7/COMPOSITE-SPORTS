@@ -1,19 +1,16 @@
 /* ============================================================
    APP — Main Controller
-   Cache-first architecture: show cached data instantly,
-   then refresh from ESPN APIs in background
+   Snapshot-first architecture: hydrate from warm backend data,
+   then refresh lightweight feeds in the background
    ============================================================ */
 const app = {
 
     async init() {
         console.log('[CompositeNBA] Initializing...');
-        
-        // Fast-path: Load cache before anything else
-        window.store.loadCache();
 
+        await window.store.loadCache();
         window.ui.init();
 
-        // Subscribe to state changes
         window.store.subscribe((key) => {
             if (key === 'games') window.ui.renderLiveGames(window.store.state.games);
             if (key === 'news') window.ui.renderNews(window.store.state.news);
@@ -23,229 +20,71 @@ const app = {
             }
             if (key === 'teams') window.ui.renderTeamsList(window.store.state.teams);
             if (key === 'players') window.ui.renderPlayersList(window.store.state.players);
-            if (key === 'loading') {
-                // Only show loading progress if we don't have cached data yet
-                if (!window.store.state.cacheLoaded) window.ui.renderLoadingProgress();
+            if (key === 'loading' && !window.store.state.cacheLoaded) {
+                window.ui.renderLoadingProgress();
             }
             if (['games', 'news', 'rankings', 'teams', 'players'].includes(key)) {
                 window.ui.renderOverview();
             }
         });
 
-        // ---- INSTANT RENDER from cache ----
         if (window.store.state.cacheLoaded) {
-            console.log('[CompositeNBA] Rendering cached data instantly...');
-            // Re-run models to ensure derived state (ratings) are available from the raw cached stats
-            window.models.updateAllPlayers();
-            window.models.updateTeamRankings();
-
-            window.ui.renderLiveGames(window.store.state.games || []);
-            window.ui.renderNews(window.store.state.news || []);
-            window.ui.renderRankings(window.store.state.teamRankings);
-            window.ui.renderTeamsList(window.store.state.teams);
-            window.ui.renderPlayersList(window.store.state.players);
-            window.ui.renderPredictorSetup();
-            window.ui.renderOverview();
+            console.log('[CompositeNBA] Rendering cached snapshot instantly...');
+            this.recomputeFromHydratedState();
+            this.renderPrimarySurfaces();
         }
 
-        // ---- Background refresh (non-blocking) ----
-        // 1. Initial trigger — run immediately on boat
-        this.fetchBaseData();
-
-        // 2. Smart polling for live games (every 10s-60s)
+        await this.fetchBaseData();
         this.startLivePolling();
 
-        // 3. Periodic full refresh every 5 minutes (24/7 sync)
         setInterval(() => {
-            console.log('[App] 5-minute 24/7 sync triggered...');
-            this.refreshTeamsAndRosters();
-        }, 5 * 60000);
+            console.log('[CompositeNBA] 5-minute backend refresh triggered...');
+            this.fetchBaseData(true);
+        }, 5 * 60 * 1000);
 
-        console.log('[CompositeNBA] Boot complete & 24/7 sync armed.');
+        console.log('[CompositeNBA] Boot complete.');
     },
 
-    async fetchBaseData() {
-        window.ui.setSyncing(true);
-        try {
-            // Parallel fetch teams + scoreboard + news
-            const [games, news, teams] = await Promise.all([
-                window.api.fetchScoreboard(),
-                window.api.fetchNews(),
-                window.api.fetchTeams()
-            ]);
-
-            window.store.setGames(games);
-            window.store.setNews(news);
-            window.store.setTeams(teams);
-
-            // Fetch team profile stats + Core API detailed stats — all 30 in parallel
-            const [teamProfiles, teamDetailedStats, teamRecentForms] = await Promise.all([
-                Promise.all(teams.map(t => window.api.fetchTeamStats(t.id))),
-                Promise.all(teams.map(t => window.api.fetchTeamStatistics(t.id))),
-                Promise.all(teams.map(t => window.api.fetchTeamSchedule(t.id)))
-            ]);
-
-            teamProfiles.forEach((profile, idx) => {
-                if (profile) window.store.setTeamStats(teams[idx].id, profile);
-            });
-
-            teamDetailedStats.forEach((stats, idx) => {
-                if (stats) window.store.state.teamDetailedStats[teams[idx].id] = stats;
-            });
-
-            teamRecentForms.forEach((games, idx) => {
-                window.store.setTeamRecentForm(teams[idx].id, games || []);
-            });
-
-            // Generate initial rankings
-            window.models.updateTeamRankings();
-
-            // Fetch ALL rosters
-            await this.fetchAllRosters(teams);
-
-            // Final save to cache
-            window.store.saveCache();
-        } catch (e) {
-            console.error('[CompositeNBA] Critical boot failure:', e);
-        } finally {
-            window.ui.setSyncing(false);
-        }
-    },
-
-    /**
-     * Fetch all 30 rosters in batches of 10 (faster than 6).
-     */
-    async fetchAllRosters(teams) {
-        window.store.updateLoadingProgress('rosters', 0, teams.length, 'loading');
-        let loaded = 0;
-        const BATCH = 10;
-
-        for (let i = 0; i < teams.length; i += BATCH) {
-            const batch = teams.slice(i, i + BATCH);
-            const results = await Promise.all(batch.map(t => window.api.fetchTeamRoster(t.id)));
-
-            batch.forEach((t, j) => {
-                if (results[j]) {
-                    window.store.setRoster(t.id, results[j]);
-                }
-                loaded++;
-                window.store.updateLoadingProgress('rosters', loaded, teams.length, 'loading');
-            });
-
-            if (i + BATCH < teams.length) {
-                await new Promise(r => setTimeout(r, 50));
-            }
-        }
-
-        window.store.updateLoadingProgress('rosters', teams.length, teams.length, 'done');
-        console.log(`[CompositeNBA] All ${teams.length} rosters loaded.`);
-
-        // Build player list with estimated stats first
+    recomputeFromHydratedState() {
         window.models.updateAllPlayers();
         window.models.updateTeamRankings();
-        console.log(`[CompositeNBA] ${window.store.state.players.length} players aggregated.`);
-
-        // Fetch real player stats in parallel
-        this.fetchPlayerStatsInParallel();
+        this.runOfficialPlayerStatAudit();
     },
 
-    /**
-     * Fetch real stats for all players using parallel batches of 8.
-     */
-    async fetchPlayerStatsInParallel() {
-        const rosters = window.store.state.rosters;
-        let allPlayerEntries = [];
-        const ratingMap = Object.fromEntries(
-            (window.store.state.players || []).map((player) => [String(player.id), Number(player.rating?.ratingNum || 0)])
-        );
-
-        Object.keys(rosters).forEach(teamId => {
-            const rosterObj = rosters[teamId];
-            if (!rosterObj || !rosterObj.athletes) return;
-            rosterObj.athletes.forEach(p => {
-                if (p.id) allPlayerEntries.push({ id: p.id, teamId });
-            });
-        });
-
-        allPlayerEntries.sort((a, b) => (ratingMap[String(b.id)] || 0) - (ratingMap[String(a.id)] || 0));
-
-        console.log(`[CompositeNBA] Starting parallel stats fetch for ${allPlayerEntries.length} players...`);
-        window.store.updateLoadingProgress('playerStats', 0, allPlayerEntries.length, 'loading');
-        let previewRefreshQueued = false;
-
-        const queuePreviewRefresh = () => {
-            if (previewRefreshQueued) return;
-            previewRefreshQueued = true;
-            const run = () => {
-                previewRefreshQueued = false;
-                this.refreshPlayerSyncPreview();
-            };
-            if (window.requestAnimationFrame) {
-                window.requestAnimationFrame(run);
-            } else {
-                setTimeout(run, 0);
-            }
-        };
-
-        const results = await window.api.fetchPlayerStatsParallel(
-            allPlayerEntries,
-            (fetched, total) => {
-                window.store.updateLoadingProgress('playerStats', fetched, total, 'loading');
-                if (fetched <= 12 || fetched % 80 === 0) {
-                    queuePreviewRefresh();
-                }
-            },
-            (batchResults) => {
-                // Apply stats incrementally
-                Object.keys(batchResults).forEach(playerId => {
-                    const { stats, teamId } = batchResults[playerId];
-                    const rosterObj = window.store.state.rosters[teamId];
-                    if (rosterObj && rosterObj.athletes) {
-                        const athlete = rosterObj.athletes.find(a => String(a.id) === String(playerId));
-                        if (athlete && stats) {
-                            athlete.realStats = stats;
-                        }
-                    }
-                });
-            }
-        );
-
-        // 3. Final Model Update & UI Refresh
-        window.store.updateLoadingProgress('playerStats', allPlayerEntries.length, allPlayerEntries.length, 'done');
-        
-        const finalSync = () => {
-            console.log('[App] Performing final rating calculation...');
-            window.models.updateAllPlayers();
-            window.models.updateTeamRankings();
-            window.store.setLastUpdated('players');
-            window.store.setLastUpdated('teams');
-            this.runOfficialPlayerStatAudit();
-            window.ui.renderRankings(window.store.state.teamRankings);
-            if (document.getElementById('pane-players')?.classList.contains('active')) {
-                window.ui.renderPlayersList(window.store.state.players);
-            }
-            window.ui.renderOverview();
-            console.log(`[CompositeNBA] Stats sync complete: ${allPlayerEntries.length} players tracked.`);
-        };
-
-        if (window.requestIdleCallback) {
-            window.requestIdleCallback(finalSync);
-        } else {
-            setTimeout(finalSync, 500);
-        }
+    renderPrimarySurfaces() {
+        window.ui.renderLiveGames(window.store.state.games || []);
+        window.ui.renderNews(window.store.state.news || []);
+        window.ui.renderRankings(window.store.state.teamRankings || []);
+        window.ui.renderTeamsList(window.store.state.teams || []);
+        window.ui.renderPlayersList(window.store.state.players || []);
+        window.ui.renderPredictorSetup();
+        window.ui.renderOverview();
+        window.ui.renderLastUpdated();
     },
 
-    refreshPlayerSyncPreview() {
-        window.models.updateAllPlayers();
-        const activePane = document.querySelector('.pane.active')?.id || '';
-        if (activePane === 'pane-players') {
-            window.ui.renderPlayersList(window.store.state.players);
-        }
-        if (activePane === 'pane-overview') {
-            window.ui.renderOverview();
-        }
-        if (window.store.state.activePlayerId) {
-            window.ui.showPlayerDetail(window.store.state.activePlayerId);
+    applyBootstrapSnapshot(snapshot) {
+        if (!snapshot) return;
+
+        window.store.hydrateSnapshot(snapshot);
+        window.store.updateLoadingProgress('bootstrap', 1, 1, 'done');
+        this.recomputeFromHydratedState();
+        window.store.saveCache();
+        this.renderPrimarySurfaces();
+    },
+
+    async fetchBaseData(force = false) {
+        window.ui.setSyncing(true);
+        window.store.updateLoadingProgress('bootstrap', 0, 1, 'loading');
+
+        try {
+            const snapshot = await window.api.fetchBootstrap(force);
+            if (snapshot) {
+                this.applyBootstrapSnapshot(snapshot);
+            }
+        } catch (error) {
+            console.error('[CompositeNBA] Bootstrap failure:', error);
+        } finally {
+            window.ui.setSyncing(false);
         }
     },
 
@@ -283,7 +122,7 @@ const app = {
             return {
                 player: player.fullName || player.displayName,
                 season: official?.seasonLabel || '--',
-                source: official?.statSource || (player.rating?.hasRealStats ? 'official' : 'estimated'),
+                source: official?.statSource || (player.rating?.hasRealStats ? 'official' : 'syncing'),
                 ppg: official?.ppg ?? null,
                 rpg: official?.rpg ?? null,
                 apg: official?.apg ?? null,
@@ -295,67 +134,35 @@ const app = {
         console.table(auditRows);
     },
 
-    /**
-     * Adaptive live game polling.
-     */
     startLivePolling() {
-        let pollInterval = null;
+        let pollTimer = null;
 
         const poll = async () => {
-            const games = await window.api.fetchScoreboard();
-            if (games && games.length) window.store.setGames(games);
-
-            // If a specific game detail is open, refresh it too
-            if (window.store.state.activeGameId) {
-                const summary = await window.api.fetchGameSummary(window.store.state.activeGameId);
-                if (summary) {
-                    window.ui.updateGameDetailContent(summary);
+            try {
+                const games = await window.api.fetchScoreboard();
+                if (games?.length) {
+                    window.store.setGames(games);
                 }
+
+                if (window.store.state.activeGameId) {
+                    const summary = await window.api.fetchGameSummary(window.store.state.activeGameId);
+                    if (summary) {
+                        window.ui.updateGameDetailContent(summary);
+                    }
+                }
+
+                const hasLive = (games || []).some((game) => game.status?.type?.state === 'in');
+                const nextDelay = hasLive ? 10000 : 60000;
+                clearTimeout(pollTimer);
+                pollTimer = setTimeout(poll, nextDelay);
+            } catch (error) {
+                console.warn('[CompositeNBA] Live poll failed:', error);
+                clearTimeout(pollTimer);
+                pollTimer = setTimeout(poll, 60000);
             }
-
-            const hasLive = (games || []).some(g => g.status?.type?.state === 'in');
-            const nextDelay = hasLive ? 10000 : 60000;
-
-            clearTimeout(pollInterval);
-            pollInterval = setTimeout(poll, nextDelay);
         };
 
-        pollInterval = setTimeout(poll, 15000);
-    },
-
-    /**
-     * Full refresh — every 15 minutes.
-     */
-    async refreshTeamsAndRosters() {
-        console.log('[CompositeNBA] Periodic refresh...');
-        try {
-            const [teams, news] = await Promise.all([
-                window.api.fetchTeams(),
-                window.api.fetchNews()
-            ]);
-            window.store.setNews(news || []);
-            if (teams && teams.length) {
-                window.store.setTeams(teams);
-
-                const [profiles, detailedStats, recentForms] = await Promise.all([
-                    Promise.all(teams.map(t => window.api.fetchTeamStats(t.id))),
-                    Promise.all(teams.map(t => window.api.fetchTeamStatistics(t.id))),
-                    Promise.all(teams.map(t => window.api.fetchTeamSchedule(t.id)))
-                ]);
-                profiles.forEach((p, i) => { if (p) window.store.setTeamStats(teams[i].id, p); });
-                detailedStats.forEach((stats, i) => {
-                    if (stats) window.store.state.teamDetailedStats[teams[i].id] = stats;
-                });
-                recentForms.forEach((games, i) => {
-                    window.store.setTeamRecentForm(teams[i].id, games || []);
-                });
-
-                window.models.updateTeamRankings();
-                await this.fetchAllRosters(teams);
-            }
-        } catch (e) {
-            console.error('[CompositeNBA] Refresh error:', e);
-        }
+        pollTimer = setTimeout(poll, 15000);
     }
 };
 

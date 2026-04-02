@@ -13,6 +13,7 @@ import PlayersPage from '@/src/mlb/components/PlayersPage';
 import PlayerDetailPage from '@/src/mlb/components/PlayerDetailPage';
 import GameDetailPage from '@/src/mlb/components/GameDetailPage';
 import NewsPage from '@/src/mlb/components/NewsPage';
+import NewsStoryPage from '@/src/mlb/components/NewsStoryPage';
 import { fetchMLBRouteJson, prefetchMLBRoutes } from '@/src/mlb/lib/clientPrefetch';
 
 const MLB_BOOTSTRAP_ROUTES = [
@@ -35,6 +36,7 @@ export default function Home({ theme = 'dark', toggleTheme }) {
   const [selectedTeamId, setSelectedTeamId] = useState(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
   const [selectedGameId, setSelectedGameId] = useState(null);
+  const [selectedStory, setSelectedStory] = useState(null);
   const prevPageRef = useRef('players'); // Track where user came from
 
   useEffect(() => {
@@ -99,6 +101,17 @@ export default function Home({ theme = 'dark', toggleTheme }) {
     setCurrentPage('game-detail');
   }, []);
 
+  const navigateToStory = useCallback((story, fromPage = 'news') => {
+    if (!story?.storyId) return;
+    fetchMLBRouteJson(`/api/mlb/news/${story.storyId}?apiHref=${encodeURIComponent(story.apiHref || '')}`, {
+      force: true,
+      allowStaleOnError: true,
+    }).catch(() => { });
+    prevPageRef.current = fromPage;
+    setSelectedStory(story);
+    setCurrentPage('story-detail');
+  }, []);
+
   const goBack = useCallback(() => {
     setCurrentPage('teams');
     setSelectedTeamId(null);
@@ -120,10 +133,15 @@ export default function Home({ theme = 'dark', toggleTheme }) {
     setCurrentPage('live');
   }, []);
 
+  const goBackFromStory = useCallback(() => {
+    setSelectedStory(null);
+    setCurrentPage(prevPageRef.current === 'overview' ? 'overview' : 'news');
+  }, []);
+
   const renderPage = () => {
     switch (currentPage) {
       case 'overview':
-        return <OverviewPage onGameClick={navigateToGame} onTeamClick={navigateToTeam} onPlayerClick={(id) => navigateToPlayer(id, 'overview')} />;
+        return <OverviewPage onGameClick={navigateToGame} onTeamClick={navigateToTeam} onPlayerClick={(id) => navigateToPlayer(id, 'overview')} onStoryClick={(story) => navigateToStory(story, 'overview')} />;
       case 'live':
         return <LivePage onGameClick={navigateToGame} />;
       case 'rankings':
@@ -141,11 +159,13 @@ export default function Home({ theme = 'dark', toggleTheme }) {
       case 'predictor':
         return <PredictorPage />;
       case 'news':
-        return <NewsPage />;
+        return <NewsPage onStoryClick={(story) => navigateToStory(story, 'news')} />;
+      case 'story-detail':
+        return <NewsStoryPage story={selectedStory} onBack={goBackFromStory} onStoryClick={(story) => navigateToStory(story, 'news')} />;
       case 'settings':
         return <SettingsPage favorites={favorites} toggleFavorite={toggleFavorite} theme={theme} toggleTheme={toggleTheme} />;
       default:
-        return <OverviewPage onGameClick={navigateToGame} onTeamClick={navigateToTeam} onPlayerClick={(id) => navigateToPlayer(id, 'overview')} />;
+        return <OverviewPage onGameClick={navigateToGame} onTeamClick={navigateToTeam} onPlayerClick={(id) => navigateToPlayer(id, 'overview')} onStoryClick={(story) => navigateToStory(story, 'overview')} />;
     }
   };
 

@@ -1,20 +1,26 @@
 /* ============================================================
    STORE — Centralized State Management
-   Reactive pub/sub store with localStorage persistence
-   Includes FULL DATA CACHING for instant page loads
+   Snapshot-first architecture with IndexedDB persistence
    ============================================================ */
+const DB_NAME = 'composite-nba-cache';
+const DB_VERSION = 1;
+const SNAPSHOT_STORE = 'snapshots';
+const SNAPSHOT_KEY = 'bootstrap-v1';
+const MAX_CACHE_AGE = 4 * 60 * 60 * 1000;
+
 const store = {
     state: {
         games: [],
         news: [],
+        newsStories: {},
         teams: [],
         teamStats: {},
-        teamDetailedStats: {},     // Core API team statistics
+        teamDetailedStats: {},
         teamRecentForm: {},
         teamRankings: [],
         players: [],
         rosters: {},
-        leagueStats: {},           // min/max/avg for normalization
+        leagueStats: {},
         roleStats: {},
         favorites: {
             teams: [],
@@ -32,10 +38,14 @@ const store = {
             rosters: 0
         },
         loadingProgress: {
-            rosters: { loaded: 0, total: 30, phase: 'idle' },
+            bootstrap: { loaded: 0, total: 1, phase: 'idle' },
             playerStats: { loaded: 0, total: 0, phase: 'idle' }
         },
-        cacheLoaded: false  // true if we restored from cache
+        cacheLoaded: false,
+        activeGameId: null,
+        activeTeamId: null,
+        activePlayerId: null,
+        activeStoryId: null,
     },
 
     listeners: [],
@@ -43,18 +53,62 @@ const store = {
     init() {
         const savedFavs = localStorage.getItem('nbaCompFavs');
         if (savedFavs) {
-            try { this.state.favorites = JSON.parse(savedFavs); } catch(e) {}
+            try { this.state.favorites = JSON.parse(savedFavs); } catch (_error) {}
         }
 
         const savedSettings = localStorage.getItem('nbaCompSettings');
         if (savedSettings) {
-            try { this.state.settings = JSON.parse(savedSettings); } catch(e) {}
+            try { this.state.settings = JSON.parse(savedSettings); } catch (_error) {}
         }
 
         document.body.setAttribute('data-theme', this.state.settings.theme);
+    },
 
-        // Load cached data for INSTANT page load
-        this.loadCache();
+    openDb() {
+        return new Promise((resolve, reject) => {
+            if (!window.indexedDB) {
+                reject(new Error('IndexedDB unavailable'));
+                return;
+            }
+
+            const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+            request.onerror = () => reject(request.error);
+            request.onupgradeneeded = () => {
+                const db = request.result;
+                if (!db.objectStoreNames.contains(SNAPSHOT_STORE)) {
+                    db.createObjectStore(SNAPSHOT_STORE);
+                }
+            };
+            request.onsuccess = () => resolve(request.result);
+        });
+    },
+
+    async readSnapshotFromDb() {
+        try {
+            const db = await this.openDb();
+            return await new Promise((resolve, reject) => {
+                const tx = db.transaction(SNAPSHOT_STORE, 'readonly');
+                const request = tx.objectStore(SNAPSHOT_STORE).get(SNAPSHOT_KEY);
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve(request.result || null);
+            });
+        } catch (_error) {
+            return null;
+        }
+    },
+
+    async writeSnapshotToDb(snapshot) {
+        try {
+            const db = await this.openDb();
+            await new Promise((resolve, reject) => {
+                const tx = db.transaction(SNAPSHOT_STORE, 'readwrite');
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+                tx.objectStore(SNAPSHOT_STORE).put(snapshot, SNAPSHOT_KEY);
+            });
+        } catch (error) {
+            console.warn('[Cache] IndexedDB snapshot write failed:', error?.message || error);
+        }
     },
 
     subscribe(callback) {
@@ -62,9 +116,84 @@ const store = {
     },
 
     notify(key) {
-        this.listeners.forEach(cb => {
-            try { cb(key, this.state); } catch(e) { console.error('Store listener error:', e); }
+        this.listeners.forEach((callback) => {
+            try { callback(key, this.state); } catch (error) { console.error('Store listener error:', error); }
         });
+    },
+
+    hydrateSnapshot(snapshot, { notify = false } = {}) {
+        if (!snapshot) return;
+
+        this.state.games = snapshot.games || [];
+        this.state.news = snapshot.news || [];
+        this.state.teams = snapshot.teams || [];
+        this.state.teamStats = snapshot.teamStats || {};
+        this.state.teamDetailedStats = snapshot.teamDetailedStats || {};
+        this.state.teamRecentForm = snapshot.teamRecentForm || {};
+        this.state.rosters = snapshot.rosters || {};
+        this.state.lastUpdated = {
+            ...this.state.lastUpdated,
+            games: snapshot.bootstrapUpdated ? Date.parse(snapshot.bootstrapUpdated) : (snapshot.lastUpdated ? Date.parse(snapshot.lastUpdated) : this.state.lastUpdated.games),
+            news: snapshot.bootstrapUpdated ? Date.parse(snapshot.bootstrapUpdated) : (snapshot.lastUpdated ? Date.parse(snapshot.lastUpdated) : this.state.lastUpdated.news),
+            teams: snapshot.lastUpdated ? Date.parse(snapshot.lastUpdated) : this.state.lastUpdated.teams,
+            rosters: snapshot.lastUpdated ? Date.parse(snapshot.lastUpdated) : this.state.lastUpdated.rosters,
+            players: snapshot.lastUpdated ? Date.parse(snapshot.lastUpdated) : this.state.lastUpdated.players,
+        };
+        this.state.cacheLoaded = true;
+
+        if (notify) {
+            this.notify('games');
+            this.notify('news');
+            this.notify('teams');
+            this.notify('players');
+            this.notify('rankings');
+        }
+    },
+
+    async saveCache() {
+        try {
+            const snapshot = {
+                games: this.state.games,
+                news: this.state.news,
+                teams: this.state.teams,
+                teamStats: this.state.teamStats,
+                teamDetailedStats: this.state.teamDetailedStats,
+                teamRecentForm: this.state.teamRecentForm,
+                rosters: this.state.rosters,
+                lastUpdated: this.state.lastUpdated,
+                timestamp: Date.now()
+            };
+
+            localStorage.setItem('nbaCompCacheMeta', JSON.stringify({
+                timestamp: snapshot.timestamp,
+                teams: this.state.teams.length,
+                games: this.state.games.length,
+                lastUpdated: this.state.lastUpdated,
+            }));
+
+            await this.writeSnapshotToDb(snapshot);
+        } catch (error) {
+            console.warn('[Cache] Save failed:', error?.message || error);
+        }
+    },
+
+    async loadCache() {
+        try {
+            const snapshot = await this.readSnapshotFromDb();
+            const age = Date.now() - Number(snapshot?.timestamp || 0);
+            if (!snapshot || age > MAX_CACHE_AGE) {
+                if (snapshot && age > MAX_CACHE_AGE) {
+                    console.log('[Cache] IndexedDB snapshot expired, fetching fresh.');
+                }
+                return;
+            }
+
+            this.hydrateSnapshot(snapshot);
+            const ageMins = Math.round(age / 60000);
+            console.log(`[Cache] Restored NBA snapshot (${this.state.teams.length} teams, ${Object.keys(this.state.rosters || {}).length} rosters, ${ageMins}m old)`);
+        } catch (error) {
+            console.warn('[Cache] Load failed:', error?.message || error);
+        }
     },
 
     toggleFavorite(type, id) {
@@ -72,89 +201,12 @@ const store = {
         if (!this.state.favorites.players) this.state.favorites.players = [];
         const list = type === 'team' ? this.state.favorites.teams : this.state.favorites.players;
         const idx = list.indexOf(String(id));
-        if (idx === -1) {
-            list.push(String(id));
-        } else {
-            list.splice(idx, 1);
-        }
-        localStorage.setItem('nbaCompFavs', JSON.stringify(this.state.favorites));
+        if (idx === -1) list.push(String(id));
+        else list.splice(idx, 1);
+        this.saveState();
         this.notify('favorites');
     },
 
-    // ==================== DATA CACHE (localStorage) ====================
-    /**
-     * Save all critical state to localStorage for instant reload.
-     * Called after every major data update.
-     */
-    saveCache() {
-        try {
-            const cache = {
-                teams: this.state.teams,
-                teamRankings: this.state.teamRankings,
-                players: this.state.players.slice(0, 150), // Cache top 150 players
-                rosters: this.state.rosters,
-                teamStats: this.state.teamStats,
-                teamDetailedStats: this.state.teamDetailedStats,
-                teamRecentForm: this.state.teamRecentForm,
-                lastUpdated: this.state.lastUpdated,
-                timestamp: Date.now()
-            };
-            
-            // Try to save; if it exceeds quota, we'll catch and try a smaller version
-            try {
-                localStorage.setItem('nbaCompCache', JSON.stringify(cache));
-            } catch (quotaErr) {
-                console.warn('[Cache] Quota exceeded, saving minimal version');
-                const minimal = {
-                    teams: this.state.teams,
-                    teamRankings: this.state.teamRankings,
-                    players: this.state.players.slice(0, 50),
-                    lastUpdated: this.state.lastUpdated,
-                    timestamp: Date.now()
-                };
-                localStorage.setItem('nbaCompCache', JSON.stringify(minimal));
-            }
-        } catch (e) {
-            console.warn('[Cache] Save failed completely:', e.message);
-        }
-    },
-
-    /**
-     * Load cached data on page load for instant rendering.
-     * Data will be refreshed in background.
-     */
-    loadCache() {
-        try {
-            const raw = localStorage.getItem('nbaCompCache');
-            if (!raw) return;
-
-            const cache = JSON.parse(raw);
-            const age = Date.now() - (cache.timestamp || 0);
-            const MAX_AGE = 4 * 60 * 60 * 1000; // 4 hours cache age
-
-            if (age > MAX_AGE) {
-                console.log('[Cache] Expired, will fetch fresh.');
-                return;
-            }
-
-            if (cache.teams) this.state.teams = cache.teams;
-            if (cache.teamRankings) this.state.teamRankings = cache.teamRankings;
-            if (cache.players) this.state.players = cache.players;
-            if (cache.rosters) this.state.rosters = cache.rosters;
-            if (cache.teamStats) this.state.teamStats = cache.teamStats;
-            if (cache.teamDetailedStats) this.state.teamDetailedStats = cache.teamDetailedStats;
-            if (cache.teamRecentForm) this.state.teamRecentForm = cache.teamRecentForm;
-            if (cache.lastUpdated) this.state.lastUpdated = { ...this.state.lastUpdated, ...cache.lastUpdated };
-
-            this.state.cacheLoaded = true;
-            const ageMins = Math.round(age / 60000);
-            console.log(`[Cache] Restored ${cache.teams?.length || 0} teams, ${cache.players?.length || 0} players, ${Object.keys(cache.rosters || {}).length} rosters (${ageMins}m old)`);
-        } catch (e) {
-            console.warn('[Cache] Load failed:', e.message);
-        }
-    },
-
-    // ==================== SETTERS ====================
     setGames(games) {
         this.state.games = games;
         this.state.lastUpdated.games = Date.now();
@@ -167,6 +219,12 @@ const store = {
         this.notify('news');
     },
 
+    setNewsStory(storyId, story) {
+        this.state.newsStories[String(storyId)] = story;
+        this.state.activeStoryId = String(storyId);
+        this.notify('news-story');
+    },
+
     setTeams(teams) {
         this.state.teams = teams;
         this.state.lastUpdated.teams = Date.now();
@@ -174,52 +232,34 @@ const store = {
     },
 
     setTeamStats(teamId, stats) {
-        this.state.teamStats[teamId] = stats;
+        this.state.teamStats[String(teamId)] = stats;
     },
 
     setRoster(teamId, roster) {
-        this.state.rosters[teamId] = roster;
+        this.state.rosters[String(teamId)] = roster;
         this.state.lastUpdated.rosters = Date.now();
     },
 
     setTeamRecentForm(teamId, games) {
-        this.state.teamRecentForm[teamId] = games;
+        this.state.teamRecentForm[String(teamId)] = games;
     },
 
     setAllPlayers(players) {
         this.state.players = players;
         this.state.lastUpdated.players = Date.now();
         this.notify('players');
-        // Save to cache after every player update
         this.saveCache();
     },
 
     setRankings(rankings) {
         this.state.teamRankings = rankings;
         this.notify('rankings');
-        // Save to cache after rankings update
         this.saveCache();
     },
 
-    updateLoadingProgress(category, loaded, total, phase) {
-        this.state.loadingProgress[category] = { loaded, total, phase };
+    updateLoadingProgress(type, current, total, phase) {
+        this.state.loadingProgress[type] = { loaded: current, total, phase };
         this.notify('loading');
-    },
-
-    toggleFavoriteTeam(teamId) {
-        const idx = this.state.favorites.teams.indexOf(teamId);
-        if (idx > -1) this.state.favorites.teams.splice(idx, 1);
-        else this.state.favorites.teams.push(teamId);
-        this.saveState();
-        this.notify('favorites');
-    },
-
-    toggleFavoritePlayer(playerId) {
-        const idx = this.state.favorites.players.indexOf(playerId);
-        if (idx > -1) this.state.favorites.players.splice(idx, 1);
-        else this.state.favorites.players.push(playerId);
-        this.saveState();
-        this.notify('favorites');
     },
 
     toggleTheme() {
@@ -241,17 +281,10 @@ const store = {
     },
 
     setLastUpdated(key) {
-        if (this.state.lastUpdated && this.state.lastUpdated[key] !== undefined) {
+        if (this.state.lastUpdated[key] !== undefined) {
             this.state.lastUpdated[key] = Date.now();
             this.saveCache();
             this.notify('lastUpdated');
-        }
-    },
-
-    updateLoadingProgress(type, current, total, phase) {
-        if (this.state.loadingProgress[type]) {
-            this.state.loadingProgress[type] = { loaded: current, total, phase };
-            this.notify('loading');
         }
     }
 };

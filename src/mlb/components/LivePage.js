@@ -15,6 +15,19 @@ function getGameStatus(game) {
     const now = Date.now();
     const start = game.startTime ? new Date(game.startTime).getTime() : null;
     const minsUntil = start ? (start - now) / 60000 : null;
+    const statusText = `${game.state || ''} ${game.statusDetail || ''} ${game.shortDetail || ''}`.toLowerCase();
+
+    if (statusText.includes('postponed') || statusText.includes('ppd')) {
+        return { type: 'postponed', label: 'Postponed', cssClass: 'postponed' };
+    }
+
+    if (statusText.includes('suspended')) {
+        return { type: 'suspended', label: 'Suspended', cssClass: 'suspended' };
+    }
+
+    if (statusText.includes('delayed')) {
+        return { type: 'delayed', label: 'Delayed', cssClass: 'delayed' };
+    }
 
     if (game.state === 'post') {
         const nowDate = new Date();
@@ -126,7 +139,7 @@ export default function LivePage({ onGameClick }) {
     const visibleGames = allGames.filter(g => !getGameStatus(g).hide);
 
     // Sort: active → about to start → starting soon → pre → final
-    const sortOrder = { 'live': 0, 'about-to-start': 1, 'starting-soon': 2, 'scheduled': 3, 'final': 4 };
+    const sortOrder = { 'live': 0, 'delayed': 1, 'about-to-start': 2, 'starting-soon': 3, 'scheduled': 4, 'suspended': 5, 'postponed': 6, 'final': 7 };
     const games = [...visibleGames].sort((a, b) => {
         const sa = sortOrder[getGameStatus(a).type] ?? 3;
         const sb = sortOrder[getGameStatus(b).type] ?? 3;
@@ -187,7 +200,8 @@ function GameCard({ game, formatTime, index, onGameClick }) {
     const status = getGameStatus(game);
     const isLive = status.type === 'live';
     const isFinal = status.type === 'final';
-    const isPre = ['scheduled', 'starting-soon', 'about-to-start'].includes(status.type);
+    const isPre = ['scheduled', 'starting-soon', 'about-to-start', 'postponed'].includes(status.type);
+    const canShowRareEvents = !['postponed', 'delayed', 'suspended'].includes(status.type);
     const isExtraInnings = status.isExtraInnings || false;
     // Walkoff: ESPN statusDetail contains "walk-off" OR home wins in extras (always a walkoff)
     const detailLower = (game.statusDetail || game.shortDetail || '').toLowerCase();
@@ -199,16 +213,16 @@ function GameCard({ game, formatTime, index, onGameClick }) {
     
     // Rare event detection
     const rareEvents = game.postGameOptions?.rareEvents || [];
-    const isPerfectGame = rareEvents.some(e => e.type === 'perfect-game');
-    const isNoHitter = rareEvents.some(e => e.type === 'no-hitter') && !isPerfectGame;
-    const hasMilestone = rareEvents.some(e => e.type === 'milestone' || e.type === 'cycle');
-    const isShutout = rareEvents.some(e => e.type === 'shutout') && !isPerfectGame && !isNoHitter;
+    const isPerfectGame = canShowRareEvents && rareEvents.some(e => e.type === 'perfect-game');
+    const isNoHitter = canShowRareEvents && rareEvents.some(e => e.type === 'no-hitter') && !isPerfectGame;
+    const hasMilestone = canShowRareEvents && rareEvents.some(e => e.type === 'milestone' || e.type === 'cycle');
+    const isShutout = canShowRareEvents && rareEvents.some(e => e.type === 'shutout') && !isPerfectGame && !isNoHitter;
     
     // In-progress no-hitter detection (5+ innings, 0 hits for one team)
     const inning = game.period || 0;
     const awayHits = game.away?.hits ?? null;
     const homeHits = game.home?.hits ?? null;
-    const isActiveNoHitter = isLive && inning >= 5 && (
+    const isActiveNoHitter = canShowRareEvents && isLive && inning >= 5 && (
         (awayHits === 0) || (homeHits === 0)
     );
 
