@@ -1,19 +1,17 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { fetchMLBRouteJson } from '@/src/mlb/lib/clientPrefetch';
 
 export default function TeamDetailPage({ teamId, onBack, favorites, toggleFavorite, onPlayerClick }) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const timerRef = useRef(null);
 
-    const fetchTeam = async () => {
+    const fetchTeam = async (force = false) => {
         try {
-            const r = await fetch(`/api/mlb/teams/${teamId}`);
-            if (r.ok) {
-                const d = await r.json();
-                setData(d);
-            }
+            const d = await fetchMLBRouteJson(`/api/mlb/teams/${teamId}`, { force });
+            setData(d);
         } catch (e) {
             console.error(e);
         } finally {
@@ -24,7 +22,7 @@ export default function TeamDetailPage({ teamId, onBack, favorites, toggleFavori
     useEffect(() => {
         setLoading(true);
         fetchTeam();
-        timerRef.current = setInterval(fetchTeam, 10000);
+        timerRef.current = setInterval(() => fetchTeam(true), 10000);
         return () => clearInterval(timerRef.current);
     }, [teamId]);
 

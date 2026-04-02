@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { fetchMLBRouteJson } from '@/src/mlb/lib/clientPrefetch';
 
 export default function RankingsPage({ favorites, toggleFavorite, onTeamClick }) {
     const [data, setData] = useState(null);
@@ -11,12 +12,10 @@ export default function RankingsPage({ favorites, toggleFavorite, onTeamClick })
     const [sortBy, setSortBy] = useState('ovrRank');
     const [refreshing, setRefreshing] = useState(false);
 
-    const fetchRankings = async () => {
+    const fetchRankings = async (force = false) => {
         try {
             setRefreshing(true);
-            const res = await fetch('/api/mlb/rankings');
-            if (!res.ok) throw new Error('Failed to fetch');
-            const json = await res.json();
+            const json = await fetchMLBRouteJson('/api/mlb/rankings', { force });
             setData(json);
         } catch (err) {
             console.error('Rankings fetch error:', err);
@@ -28,7 +27,7 @@ export default function RankingsPage({ favorites, toggleFavorite, onTeamClick })
 
     useEffect(() => {
         fetchRankings();
-        const timer = setInterval(fetchRankings, 10000);
+        const timer = setInterval(() => fetchRankings(true), 10000);
         return () => clearInterval(timer);
     }, []);
 
@@ -112,7 +111,7 @@ export default function RankingsPage({ favorites, toggleFavorite, onTeamClick })
                     </p>
                     <div className="last-updated">
                         <span>Updated: {formatLastUpdated(data?.lastUpdated)}</span>
-                        <span className="refresh-icon" onClick={fetchRankings} style={{ opacity: refreshing ? 0.5 : 1 }}></span>
+                        <span className="refresh-icon" onClick={() => fetchRankings(true)} style={{ opacity: refreshing ? 0.5 : 1 }}></span>
                     </div>
                 </div>
             </div>

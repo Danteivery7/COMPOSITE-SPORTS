@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { fetchMLBRouteJson } from '@/src/mlb/lib/clientPrefetch';
 
 export default function PlayersPage({ onPlayerClick }) {
     const [data, setData] = useState(null);
@@ -13,11 +14,9 @@ export default function PlayersPage({ onPlayerClick }) {
     const timerRef = useRef(null);
     const searchTimeoutRef = useRef(null);
 
-    const fetchPlayers = async () => {
+    const fetchPlayers = async (force = false) => {
         try {
-            const res = await fetch('/api/mlb/players');
-            if (!res.ok) throw new Error('Failed to fetch players');
-            const json = await res.json();
+            const json = await fetchMLBRouteJson('/api/mlb/players', { force });
             setData(json);
             setError(null);
         } catch (err) {
@@ -29,7 +28,7 @@ export default function PlayersPage({ onPlayerClick }) {
 
     useEffect(() => {
         fetchPlayers();
-        timerRef.current = setInterval(fetchPlayers, 60000); // refresh every 60 sec to save limit
+        timerRef.current = setInterval(() => fetchPlayers(true), 60000); // refresh every 60 sec to save limit
         return () => clearInterval(timerRef.current);
     }, []);
 
@@ -109,7 +108,7 @@ export default function PlayersPage({ onPlayerClick }) {
                     </p>
                     <div className="last-updated">
                         <span>Updated: {formatLastUpdated(data?.lastUpdated)}</span>
-                        <span className="refresh-icon" onClick={fetchPlayers}></span>
+                        <span className="refresh-icon" onClick={() => fetchPlayers(true)}></span>
                     </div>
                 </div>
             </div>

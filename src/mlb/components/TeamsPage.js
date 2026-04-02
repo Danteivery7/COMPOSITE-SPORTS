@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { fetchMLBRouteJson } from '@/src/mlb/lib/clientPrefetch';
 
 export default function TeamsPage({ favorites, toggleFavorite, onTeamClick }) {
     const [data, setData] = useState(null);
@@ -10,13 +11,10 @@ export default function TeamsPage({ favorites, toggleFavorite, onTeamClick }) {
     const [search, setSearch] = useState('');
     const timerRef = useRef(null);
 
-    const fetchRankings = async () => {
+    const fetchRankings = async (force = false) => {
         try {
-            const res = await fetch('/api/mlb/rankings');
-            if (res.ok) {
-                const json = await res.json();
-                setData(json);
-            }
+            const json = await fetchMLBRouteJson('/api/mlb/rankings', { force });
+            setData(json);
         } catch (e) {
             console.error(e);
         } finally {
@@ -26,7 +24,7 @@ export default function TeamsPage({ favorites, toggleFavorite, onTeamClick }) {
 
     useEffect(() => {
         fetchRankings();
-        timerRef.current = setInterval(fetchRankings, 10000);
+        timerRef.current = setInterval(() => fetchRankings(true), 10000);
         return () => clearInterval(timerRef.current);
     }, []);
 

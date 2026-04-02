@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { fetchMLBRouteJson } from '@/src/mlb/lib/clientPrefetch';
 
 export default function PlayerDetailPage({ playerId, onBack }) {
     const [data, setData] = useState(null);
@@ -9,8 +10,7 @@ export default function PlayerDetailPage({ playerId, onBack }) {
     useEffect(() => {
         if (!playerId) return;
         setLoading(true);
-        fetch(`/api/mlb/players/${playerId}`)
-            .then(res => res.json())
+        fetchMLBRouteJson(`/api/mlb/players/${playerId}`)
             .then(json => { setData(json); setLoading(false); })
             .catch(() => setLoading(false));
     }, [playerId]);

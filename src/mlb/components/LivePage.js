@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { fetchMLBRouteJson } from '@/src/mlb/lib/clientPrefetch';
 
 /**
  * Returns a rich status object for a game based on its ESPN state and timing.
@@ -96,11 +97,9 @@ export default function LivePage({ onGameClick }) {
     const [error, setError] = useState(null);
     const timerRef = useRef(null);
 
-    const fetchScores = async () => {
+    const fetchScores = async (force = false) => {
         try {
-            const res = await fetch('/api/mlb/scores');
-            if (!res.ok) throw new Error('Failed to fetch scores');
-            const json = await res.json();
+            const json = await fetchMLBRouteJson('/api/mlb/scores', { force });
             setData(json);
             setError(null);
         } catch (err) {
@@ -113,7 +112,7 @@ export default function LivePage({ onGameClick }) {
     useEffect(() => {
         fetchScores();
         // Auto-refresh every 10 seconds
-        timerRef.current = setInterval(fetchScores, 10000);
+        timerRef.current = setInterval(() => fetchScores(true), 10000);
         return () => clearInterval(timerRef.current);
     }, []);
 
@@ -179,7 +178,7 @@ export default function LivePage({ onGameClick }) {
                     <div className="last-updated">
                         <span>Updated: {formatLastUpdated(data?.lastUpdated)}</span>
                         {data?.stale && <span style={{ color: 'var(--accent-yellow)' }}> (cached)</span>}
-                        <span className="refresh-icon" onClick={fetchScores}></span>
+                        <span className="refresh-icon" onClick={() => fetchScores(true)}></span>
                     </div>
                 </div>
             </div>

@@ -26,7 +26,7 @@ export default function Navbar({ currentPage, onNavigate, theme, toggleTheme }) 
         <nav className="navbar">
             <div className="navbar-inner">
                 <div className="navbar-brand-shell">
-                    <p className="navbar-kicker">Composite Tracking Suite</p>
+                    <p className="navbar-kicker">Ballpark Control Room</p>
                     <div className="navbar-brand" onClick={() => handleNav('overview')}>
                         <span className="brand-word">COMPOSITE</span>
                         <span className="brand-accent">MLB</span>

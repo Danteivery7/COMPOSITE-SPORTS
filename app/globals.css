@@ -457,10 +457,11 @@ button {
   bottom: -8rem;
   clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
   background:
-    radial-gradient(circle at center, rgba(255, 255, 255, 0.04), transparent 52%),
-    linear-gradient(135deg, rgba(44, 132, 87, 0.28), rgba(255, 255, 255, 0.03)),
-    linear-gradient(90deg, transparent 0 49%, rgba(247, 230, 198, 0.2) 49% 51%, transparent 51%),
-    linear-gradient(180deg, transparent 0 49%, rgba(247, 230, 198, 0.2) 49% 51%, transparent 51%);
+    radial-gradient(circle at 50% 50%, rgba(157, 102, 60, 0.26), transparent 27%),
+    radial-gradient(circle at 50% 50%, transparent 0 10%, rgba(245, 232, 205, 0.22) 10% 10.8%, transparent 10.8%),
+    repeating-linear-gradient(90deg, rgba(61, 101, 53, 0.3) 0 9%, rgba(53, 89, 46, 0.42) 9% 18%),
+    linear-gradient(135deg, transparent 0 49.45%, rgba(248, 239, 220, 0.34) 49.45% 50.55%, transparent 50.55%),
+    linear-gradient(225deg, transparent 0 49.45%, rgba(248, 239, 220, 0.34) 49.45% 50.55%, transparent 50.55%);
 }
 
 .sport-intro[data-motif='diamond'] .sport-intro-portal {
@@ -469,14 +470,20 @@ button {
   top: 11%;
   border-radius: 999px;
   background:
-    radial-gradient(circle at center, rgba(255, 229, 173, 0.18), transparent 62%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 80%),
-    linear-gradient(90deg, transparent 0 10%, rgba(255, 255, 255, 0.04) 10% 11%, transparent 11% 89%, rgba(255, 255, 255, 0.04) 89% 90%, transparent 90%);
+    radial-gradient(circle at center, rgba(248, 219, 158, 0.16), transparent 58%),
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.08), transparent 38%),
+    linear-gradient(180deg, rgba(35, 47, 34, 0.36), rgba(12, 12, 10, 0.08)),
+    linear-gradient(90deg, transparent 0 6%, rgba(255, 249, 236, 0.05) 6% 7%, transparent 7% 93%, rgba(255, 249, 236, 0.05) 93% 94%, transparent 94%);
+  border-color: rgba(241, 225, 192, 0.18);
 }
 
 .sport-intro[data-motif='diamond'] .sport-intro-object {
   background:
-    radial-gradient(circle at 34% 30%, #ffffff, #f2f5fa 60%, #d9e0ea 100%);
+    radial-gradient(circle at 32% 28%, #ffffff, #f5f0e6 56%, #d9d6d0 100%);
+  box-shadow:
+    0 1.4rem 3.6rem rgba(0, 0, 0, 0.42),
+    inset 0 -0.9rem 1.6rem rgba(0, 0, 0, 0.22),
+    inset 0 0.9rem 1.1rem rgba(255, 255, 255, 0.24);
 }
 
 .sport-intro[data-motif='diamond'] .detail-a,
@@ -504,8 +511,9 @@ button {
   inset: auto 18% 16% 18%;
   height: 12%;
   border-radius: 999px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
-  opacity: 0.55;
+  background:
+    linear-gradient(90deg, transparent, rgba(255, 246, 225, 0.82), transparent);
+  opacity: 0.72;
 }
 
 .sport-intro[data-motif='yardline'] .sport-intro-runway {
@@ -1598,15 +1606,17 @@ button {
   position: relative;
   min-height: 100vh;
   background:
-    radial-gradient(circle at top, rgba(246, 213, 156, 0.08), transparent 28%),
-    linear-gradient(180deg, rgba(12, 29, 20, 0.2), transparent 34%);
+    radial-gradient(circle at top, rgba(255, 225, 171, 0.08), transparent 24%),
+    radial-gradient(circle at 50% 88%, rgba(145, 94, 55, 0.14), transparent 18%),
+    repeating-linear-gradient(90deg, rgba(58, 92, 49, 0.08) 0 6%, rgba(50, 82, 43, 0.13) 6% 12%),
+    linear-gradient(180deg, rgba(12, 25, 18, 0.2), transparent 34%);
 }
 
 .mlb-route-topbar {
   position: relative;
   z-index: 11;
-  background: linear-gradient(180deg, rgba(7, 18, 13, 0.9), rgba(7, 18, 13, 0.4));
-  border-bottom: 1px solid rgba(246, 213, 156, 0.08);
+  background: linear-gradient(180deg, rgba(11, 13, 11, 0.94), rgba(11, 13, 11, 0.5));
+  border-bottom: 1px solid rgba(241, 225, 192, 0.08);
 }
 
 @media (min-width: 1024px) {

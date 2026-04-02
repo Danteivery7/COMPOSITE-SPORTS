@@ -46,6 +46,9 @@ function poisson(lambda, rng) {
  */
 export async function predict(teamAId, teamBId, options = {}) {
     const { formEmphasis = 0.5, neutralSite = false } = options;
+    const cacheKey = `mlb_prediction_${teamAId}_${teamBId}_${neutralSite ? 'neutral' : 'home'}_${Math.round(formEmphasis * 100)}`;
+    const cached = cacheGet(cacheKey);
+    if (cached) return cached;
 
     // Get rankings data (includes RPG, OVR scores, batting/pitching stats)
     const data = await computeRankings();
@@ -183,7 +186,7 @@ export async function predict(teamAId, teamBId, options = {}) {
         return Math.round(((100 - pct) / pct) * 100);
     };
 
-    return {
+    const result = {
         teamA: {
             teamId: teamA.id,
             name: teamA.fullName,
@@ -208,6 +211,9 @@ export async function predict(teamAId, teamBId, options = {}) {
         whyBullets,
         timestamp: new Date().toISOString(),
     };
+
+    cacheSet(cacheKey, result, CACHE_TTL.PREDICTION);
+    return result;
 }
 
 /* ── Build explanation bullets ────────────────────────────────────── */

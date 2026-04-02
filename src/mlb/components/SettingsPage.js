@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { MLB_TEAMS } from '@/src/mlb/lib/teams';
+import { fetchMLBRouteJson } from '@/src/mlb/lib/clientPrefetch';
 
 export default function SettingsPage({ favorites, toggleFavorite, theme, toggleTheme }) {
     const [dataStatus, setDataStatus] = useState(null);
@@ -9,8 +10,7 @@ export default function SettingsPage({ favorites, toggleFavorite, theme, toggleT
 
     useEffect(() => {
         // Check data source status by calling rankings API
-        fetch('/api/mlb/rankings')
-            .then(res => res.json())
+        fetchMLBRouteJson('/api/mlb/rankings')
             .then(data => {
                 setDataStatus({
                     sources: data.sources || [],

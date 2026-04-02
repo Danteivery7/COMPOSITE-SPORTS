@@ -17,6 +17,8 @@ export const CACHE_TTL = {
     SCHEDULE: 10,       // 10 seconds for schedules
     PLAYER_STATS: 10,   // 10 seconds for individual player stats
     PLAYERS_TOP: 604800, // 7 days (revalidated in background every 60s)
+    PREDICTION: 30,     // 30 seconds for matchup model output
+    NEWS: 300,          // 5 minutes for MLB news
 };
 
 // Load from disk on boot

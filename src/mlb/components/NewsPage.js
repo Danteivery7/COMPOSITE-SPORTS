@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { fetchMLBRouteJson } from '@/src/mlb/lib/clientPrefetch';
 
 export default function NewsPage() {
     const [data, setData] = useState({ articles: [], lastUpdated: null });
@@ -8,11 +9,9 @@ export default function NewsPage() {
     const [error, setError] = useState(null);
     const timerRef = useRef(null);
 
-    const fetchNews = async () => {
+    const fetchNews = async (force = false) => {
         try {
-            const res = await fetch('/api/mlb/news');
-            if (!res.ok) throw new Error('Failed to fetch MLB news');
-            const json = await res.json();
+            const json = await fetchMLBRouteJson('/api/mlb/news', { force });
             setData(json);
             setError(null);
         } catch (err) {
@@ -24,7 +23,7 @@ export default function NewsPage() {
 
     useEffect(() => {
         fetchNews();
-        timerRef.current = setInterval(fetchNews, 300000);
+        timerRef.current = setInterval(() => fetchNews(true), 300000);
         return () => clearInterval(timerRef.current);
     }, []);
 
@@ -74,7 +73,7 @@ export default function NewsPage() {
                     </p>
                     <div className="last-updated">
                         <span>Updated: {formatTimestamp(data?.lastUpdated)}</span>
-                        <span className="refresh-icon" onClick={fetchNews}></span>
+                        <span className="refresh-icon" onClick={() => fetchNews(true)}></span>
                     </div>
                 </div>
             </div>

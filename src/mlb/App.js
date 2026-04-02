@@ -13,6 +13,15 @@ import PlayersPage from '@/src/mlb/components/PlayersPage';
 import PlayerDetailPage from '@/src/mlb/components/PlayerDetailPage';
 import GameDetailPage from '@/src/mlb/components/GameDetailPage';
 import NewsPage from '@/src/mlb/components/NewsPage';
+import { fetchMLBRouteJson, prefetchMLBRoutes } from '@/src/mlb/lib/clientPrefetch';
+
+const MLB_BOOTSTRAP_ROUTES = [
+  '/api/mlb/overview',
+  '/api/mlb/scores',
+  '/api/mlb/rankings',
+  '/api/mlb/players',
+  '/api/mlb/news',
+];
 
 export default function Home() {
   const [currentPage, setCurrentPage] = useState('overview');
@@ -34,9 +43,9 @@ export default function Home() {
       document.documentElement.setAttribute('data-theme', 'dark');
     }
 
-    // Proactively pre-fetch and cache Top 50 players in the background on initial load
-    // This guarantees a 0ms load time when the user finally clicks the 'Players' tab
-    fetch('/api/mlb/players').catch(() => { });
+    // Warm the server cache first, then keep the main MLB tabs hot in the browser.
+    fetchMLBRouteJson('/api/mlb/warm', { force: true, allowStaleOnError: true }).catch(() => { });
+    prefetchMLBRoutes(MLB_BOOTSTRAP_ROUTES, { allowStaleOnError: true }).catch(() => { });
   }, []);
 
   const toggleFavorite = useCallback((teamId) => {
@@ -59,17 +68,26 @@ export default function Home() {
   }, []);
 
   const navigateToTeam = useCallback((teamId) => {
+    if (teamId) {
+      fetchMLBRouteJson(`/api/mlb/teams/${teamId}`, { force: true, allowStaleOnError: true }).catch(() => { });
+    }
     setSelectedTeamId(teamId);
     setCurrentPage('team-detail');
   }, []);
 
   const navigateToPlayer = useCallback((playerId, fromPage) => {
+    if (playerId) {
+      fetchMLBRouteJson(`/api/mlb/players/${playerId}`, { force: true, allowStaleOnError: true }).catch(() => { });
+    }
     prevPageRef.current = fromPage || currentPage;
     setSelectedPlayerId(playerId);
     setCurrentPage('player-detail');
   }, [currentPage]);
 
   const navigateToGame = useCallback((gameId) => {
+    if (gameId) {
+      fetchMLBRouteJson(`/api/mlb/games/${gameId}`, { force: true, allowStaleOnError: true }).catch(() => { });
+    }
     setSelectedGameId(gameId);
     setCurrentPage('game-detail');
   }, []);
