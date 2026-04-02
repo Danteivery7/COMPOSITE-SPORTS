@@ -16,6 +16,29 @@ const api = {
         }
     },
 
+    async fetchNews() {
+        try {
+            const response = await fetch(`${API_BASE}/news`);
+            const data = await response.json();
+            return (data.articles || []).map((article, index) => {
+                const image = article?.images?.[0] || article?.thumbnail;
+                return {
+                    id: article?.id || article?.guid || `nba-news-${index}`,
+                    headline: article?.headline || 'NBA Update',
+                    description: article?.description || article?.story || '',
+                    published: article?.published || article?.lastModified || null,
+                    source: article?.source || 'ESPN',
+                    byline: article?.byline || '',
+                    image: image?.url || image?.href || '',
+                    link: article?.links?.web?.href || article?.links?.mobile?.href || article?.link || '',
+                };
+            }).filter((article) => article.link);
+        } catch (error) {
+            console.error('Failed to fetch NBA news:', error);
+            return [];
+        }
+    },
+
     async fetchTeams() {
         try {
             const response = await fetch(`${API_BASE}/teams?limit=30`);

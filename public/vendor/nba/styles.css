@@ -455,15 +455,23 @@ select:focus { outline: none; border-color: var(--brand-primary); box-shadow: 0 
 .mobile-nav {
     display: flex;
     justify-content: space-around;
+    gap: 6px;
     position: fixed;
     bottom: 0;
     width: 100%;
     background: var(--bg-card);
-    padding: 10px 0 12px;
+    padding: 10px 8px 12px;
     border-top: 1px solid var(--divider);
     z-index: 100;
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
     backdrop-filter: blur(12px);
+}
+
+.mobile-nav .nav-btn {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 6px;
+    font-size: 11px;
 }
 
 @media (min-width: 768px) {
@@ -537,6 +545,73 @@ select:focus { outline: none; border-color: var(--brand-primary); box-shadow: 0 
 .game-card:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-md);
+}
+
+.news-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 18px;
+}
+
+.news-card {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+    text-decoration: none;
+}
+
+.news-card-image {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+    border-bottom: 1px solid var(--divider);
+}
+
+.news-card-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px;
+}
+
+.news-card-body-no-image {
+    padding-top: 22px;
+}
+
+.news-card-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.news-card h3 {
+    font-size: 18px;
+    line-height: 1.25;
+}
+
+.news-card p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.news-card-link {
+    margin-top: auto;
+    color: var(--brand-accent);
+    font-weight: 700;
+}
+
+.news-empty {
+    padding: 32px;
+    text-align: center;
 }
 
 /* ======================== TEAM CARD ======================== */
@@ -654,6 +729,7 @@ select:focus { outline: none; border-color: var(--brand-primary); box-shadow: 0 
     .pane-header h2 { font-size: 18px; }
     #main-content { padding: 16px; padding-bottom: 80px; }
     .games-grid { grid-template-columns: 1fr; }
+    .news-grid { grid-template-columns: 1fr; }
     .teams-grid { grid-template-columns: 1fr 1fr; }
     .stat-value { font-size: 22px; }
 }

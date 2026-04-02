@@ -8,6 +8,7 @@ export default function Navbar({ currentPage, onNavigate, theme, toggleTheme }) 
 
     const navItems = [
         { id: 'live', label: 'Live' },
+        { id: 'news', label: 'News' },
         { id: 'rankings', label: 'Rankings' },
         { id: 'teams', label: 'Teams' },
         { id: 'players', label: 'Players' },

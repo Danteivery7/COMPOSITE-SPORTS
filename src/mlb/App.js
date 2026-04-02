@@ -11,6 +11,7 @@ import TeamDetailPage from '@/src/mlb/components/TeamDetailPage';
 import PlayersPage from '@/src/mlb/components/PlayersPage';
 import PlayerDetailPage from '@/src/mlb/components/PlayerDetailPage';
 import GameDetailPage from '@/src/mlb/components/GameDetailPage';
+import NewsPage from '@/src/mlb/components/NewsPage';
 
 export default function Home() {
   const [currentPage, setCurrentPage] = useState('live');
@@ -111,6 +112,8 @@ export default function Home() {
         return <GameDetailPage gameId={selectedGameId} onBack={goBackFromGame} />;
       case 'predictor':
         return <PredictorPage />;
+      case 'news':
+        return <NewsPage />;
       case 'settings':
         return <SettingsPage favorites={favorites} toggleFavorite={toggleFavorite} theme={theme} toggleTheme={toggleTheme} />;
       default:

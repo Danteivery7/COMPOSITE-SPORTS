@@ -6,6 +6,7 @@
 const store = {
     state: {
         games: [],
+        news: [],
         teams: [],
         teamStats: {},
         teamDetailedStats: {},     // Core API team statistics
@@ -23,6 +24,7 @@ const store = {
         },
         lastUpdated: {
             games: 0,
+            news: 0,
             teams: 0,
             players: 0,
             rosters: 0
@@ -153,6 +155,12 @@ const store = {
         this.state.games = games;
         this.state.lastUpdated.games = Date.now();
         this.notify('games');
+    },
+
+    setNews(news) {
+        this.state.news = news;
+        this.state.lastUpdated.news = Date.now();
+        this.notify('news');
     },
 
     setTeams(teams) {

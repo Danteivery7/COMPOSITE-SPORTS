@@ -103,6 +103,8 @@ const ui = {
         if (tabId === 'rankings') {
             this.renderRankings(window.store.state.teamRankings);
             this.renderPredictorSetup();
+        } else if (tabId === 'news') {
+            this.renderNews(window.store.state.news);
         } else if (tabId === 'teams') {
             this.renderTeamsList(window.store.state.teams);
         } else if (tabId === 'players') {
@@ -898,6 +900,49 @@ const ui = {
                 <div class="game-detail-panel" style="max-height:0; overflow:hidden; transition:max-height 0.35s ease;"></div>
             </div>
         `;
+    },
+
+    renderNews(articles) {
+        const container = document.getElementById('news-grid-container');
+        if (!container) return;
+
+        if (!articles || articles.length === 0) {
+            container.innerHTML = `
+                <div class="card news-empty">
+                    <div style="font-size:40px; margin-bottom:12px;">📰</div>
+                    <h3 style="margin-bottom:8px;">No NBA news available</h3>
+                    <p style="color:var(--text-secondary);">ESPN has not returned any stories right now.</p>
+                </div>
+            `;
+            return;
+        }
+
+        const formatPublished = (isoString) => {
+            if (!isoString) return 'Latest';
+            return new Date(isoString).toLocaleString([], {
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+            });
+        };
+
+        container.innerHTML = articles.map((article) => `
+            <a class="card news-card" href="${article.link}" target="_blank" rel="noreferrer">
+                ${article.image
+                    ? `<img src="${article.image}" alt="${article.headline}" class="news-card-image" onerror="this.remove()">`
+                    : ''}
+                <div class="news-card-body ${article.image ? '' : 'news-card-body-no-image'}">
+                    <div class="news-card-meta">
+                        <span>${article.source || 'ESPN'}</span>
+                        <span>${formatPublished(article.published)}</span>
+                    </div>
+                    <h3>${article.headline}</h3>
+                    ${article.description ? `<p>${article.description}</p>` : ''}
+                    <span class="news-card-link">Open Story</span>
+                </div>
+            </a>
+        `).join('');
     },
 
     // ==================== RANKINGS ====================

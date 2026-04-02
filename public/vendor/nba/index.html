@@ -23,6 +23,7 @@
             </div>
             <nav class="desktop-nav">
                 <button class="nav-btn active" data-tab="live">Live</button>
+                <button class="nav-btn" data-tab="news">News</button>
                 <button class="nav-btn" data-tab="rankings">Rankings</button>
                 <button class="nav-btn" data-tab="teams">Teams</button>
                 <button class="nav-btn" data-tab="players">Players</button>
@@ -67,6 +68,19 @@
                     <div class="game-card skeleton-card"></div>
                     <div class="game-card skeleton-card"></div>
                     <div class="game-card skeleton-card"></div>
+                </div>
+            </section>
+
+            <!-- NEWS -->
+            <section id="pane-news" class="pane hidden">
+                <div class="pane-header">
+                    <h2>Latest News</h2>
+                    <p class="subtitle fade">ESPN NBA headlines and feature stories.</p>
+                </div>
+                <div class="news-grid" id="news-grid-container">
+                    <div class="card skeleton-card" style="height:260px;"></div>
+                    <div class="card skeleton-card" style="height:260px;"></div>
+                    <div class="card skeleton-card" style="height:260px;"></div>
                 </div>
             </section>
 
@@ -197,6 +211,7 @@
         <!-- Mobile Navigation -->
         <nav class="mobile-nav">
             <button class="nav-btn active" data-tab="live">Live</button>
+            <button class="nav-btn" data-tab="news">News</button>
             <button class="nav-btn" data-tab="rankings">Rank</button>
             <button class="nav-btn" data-tab="teams">Teams</button>
             <button class="nav-btn" data-tab="players">Players</button>

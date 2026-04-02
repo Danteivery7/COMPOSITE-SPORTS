@@ -16,6 +16,7 @@ const app = {
         // Subscribe to state changes
         window.store.subscribe((key) => {
             if (key === 'games') window.ui.renderLiveGames(window.store.state.games);
+            if (key === 'news') window.ui.renderNews(window.store.state.news);
             if (key === 'rankings') {
                 window.ui.renderRankings(window.store.state.teamRankings);
                 window.ui.renderPredictorSetup();
@@ -36,6 +37,7 @@ const app = {
             window.models.updateTeamRankings();
 
             window.ui.renderLiveGames(window.store.state.games || []);
+            window.ui.renderNews(window.store.state.news || []);
             window.ui.renderRankings(window.store.state.teamRankings);
             window.ui.renderTeamsList(window.store.state.teams);
             window.ui.renderPlayersList(window.store.state.players);
@@ -61,13 +63,15 @@ const app = {
     async fetchBaseData() {
         window.ui.setSyncing(true);
         try {
-            // Parallel fetch teams + scoreboard
-            const [games, teams] = await Promise.all([
+            // Parallel fetch teams + scoreboard + news
+            const [games, news, teams] = await Promise.all([
                 window.api.fetchScoreboard(),
+                window.api.fetchNews(),
                 window.api.fetchTeams()
             ]);
 
             window.store.setGames(games);
+            window.store.setNews(news);
             window.store.setTeams(teams);
 
             // Fetch team profile stats + Core API detailed stats — all 30 in parallel
@@ -229,7 +233,11 @@ const app = {
     async refreshTeamsAndRosters() {
         console.log('[CompositeNBA] Periodic refresh...');
         try {
-            const teams = await window.api.fetchTeams();
+            const [teams, news] = await Promise.all([
+                window.api.fetchTeams(),
+                window.api.fetchNews()
+            ]);
+            window.store.setNews(news || []);
             if (teams && teams.length) {
                 window.store.setTeams(teams);
 
