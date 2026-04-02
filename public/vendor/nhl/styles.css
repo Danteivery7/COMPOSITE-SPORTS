@@ -633,6 +633,22 @@ body.intro-active .ice-fx-layer {
   padding-top: 8px;
 }
 
+.sidebar-hub-link {
+  display: inline-flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(214, 59, 59, 0.9), rgba(26, 98, 186, 0.78));
+  color: #f8fbff;
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .sidebar-title {
   margin: 0 0 12px;
   font-size: 0.86rem;

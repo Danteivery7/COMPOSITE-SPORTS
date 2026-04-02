@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { getSportConfig } from '@/src/data/sports';
 
@@ -573,6 +574,11 @@ export default function GenericSportApp({ sportKey }) {
             </button>
           ))}
         </nav>
+        <div className="generic-sidebar-footer">
+          <Link href="/" className="generic-hub-link">
+            Back To Hub
+          </Link>
+        </div>
       </aside>
       <div className="generic-stage">
         <header className="generic-stage-header">

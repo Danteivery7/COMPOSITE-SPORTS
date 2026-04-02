@@ -352,6 +352,9 @@ button {
   align-self: start;
   position: sticky;
   top: 24px;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 48px);
   padding: 22px;
   border-radius: 28px;
 }
@@ -376,6 +379,11 @@ button {
   margin-top: 22px;
 }
 
+.generic-sidebar-footer {
+  margin-top: auto;
+  padding-top: 18px;
+}
+
 .generic-nav button {
   padding: 12px 14px;
   border-radius: 14px;
@@ -386,6 +394,18 @@ button {
 
 .generic-nav button.is-active {
   background: linear-gradient(135deg, color-mix(in srgb, var(--sport-accent) 32%, transparent), rgba(255, 255, 255, 0.06));
+}
+
+.generic-hub-link {
+  display: inline-flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--sport-accent), var(--sport-accent-alt));
+  color: #07101e;
+  font-weight: 700;
 }
 
 .generic-stage {
@@ -707,11 +727,14 @@ button {
 }
 
 @media (min-width: 1024px) {
+  .vendor-shell[data-sport='nhl'] .vendor-topbar,
   .vendor-shell[data-sport='nba'] .vendor-topbar,
+  .generic-route-topbar,
   .mlb-route-topbar {
     display: none;
   }
 
+  .vendor-shell[data-sport='nhl'] .vendor-frame,
   .vendor-shell[data-sport='nba'] .vendor-frame {
     height: 100vh;
   }
@@ -724,6 +747,7 @@ button {
 
   .generic-sidebar {
     position: static;
+    min-height: auto;
   }
 
   .generic-overview-columns {
