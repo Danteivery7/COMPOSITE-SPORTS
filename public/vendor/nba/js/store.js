@@ -250,7 +250,7 @@ const store = {
 
     updateLoadingProgress(type, current, total, phase) {
         if (this.state.loadingProgress[type]) {
-            this.state.loadingProgress[type] = { current, total, phase };
+            this.state.loadingProgress[type] = { loaded: current, total, phase };
             this.notify('loading');
         }
     }

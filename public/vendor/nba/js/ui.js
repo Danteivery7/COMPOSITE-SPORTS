@@ -214,6 +214,73 @@ const ui = {
         return `${numeric > 0 ? '+' : ''}${numeric}`;
     },
 
+    roundHalf(value) {
+        if (!Number.isFinite(value)) return null;
+        return Math.round(value * 2) / 2;
+    },
+
+    formatDecimal(value, digits = 1) {
+        if (!Number.isFinite(value)) return '--';
+        return Number(value).toFixed(digits);
+    },
+
+    getPlayerOfficialStats(player) {
+        const stats = player?.realStats || null;
+        if (!stats) return null;
+        if (Number(stats.gp || 0) <= 0 && Number(stats.ppg || 0) <= 0) return null;
+        return stats;
+    },
+
+    getPlayerStatSourceMeta(player) {
+        const officialStats = this.getPlayerOfficialStats(player);
+        if (officialStats) {
+            return {
+                isOfficial: true,
+                shortLabel: officialStats.seasonLabel || 'Official season',
+                longLabel: `Official ESPN ${officialStats.seasonLabel || 'season'} stats`,
+            };
+        }
+
+        return {
+            isOfficial: false,
+            shortLabel: 'Syncing official stats',
+            longLabel: 'Official ESPN season stats are still syncing for this player',
+        };
+    },
+
+    formatPlayerLine(player) {
+        const official = this.getPlayerOfficialStats(player);
+        if (!official) {
+            return '<span class="player-sync-pill">Syncing official stats</span>';
+        }
+
+        return `${this.formatDecimal(official.ppg)} pts • ${this.formatDecimal(official.rpg)} reb • ${this.formatDecimal(official.apg)} ast`;
+    },
+
+    buildPregamePropTargets(teamId, limit = 4) {
+        return [...(window.store.state.players || [])]
+            .filter((player) => String(player.teamId) === String(teamId))
+            .sort((a, b) => (b.rating?.ratingNum || 0) - (a.rating?.ratingNum || 0))
+            .slice(0, limit)
+            .map((player) => {
+                const projection = player.rating?.projection || null;
+                const official = this.getPlayerOfficialStats(player);
+                return {
+                    id: player.id,
+                    displayName: player.fullName || player.displayName || 'Player',
+                    archetype: player.rating?.primaryArchetype || player.rating?.archetype || 'Rotation Piece',
+                    headshot: player.headshot?.href || '',
+                    points: projection ? this.roundHalf(projection.points) : null,
+                    rebounds: projection ? this.roundHalf(projection.rebounds) : null,
+                    assists: projection ? this.roundHalf(projection.assists) : null,
+                    baseline:
+                        official
+                            ? `${this.formatDecimal(official.ppg)} / ${this.formatDecimal(official.rpg)} / ${this.formatDecimal(official.apg)} season line`
+                            : 'Official season stats still syncing',
+                };
+            });
+    },
+
     getToneColor(tone) {
         const label = tone?.label || tone;
         if (label === 'Sizzling') return '#10b981';
@@ -576,35 +643,7 @@ const ui = {
             card.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const gameId = card.dataset.gameId;
-                const state = card.dataset.gameState;
-
-                // PRE-GAME: Expansion Panel behavior
-                if (state === 'pre') {
-                    const detail = card.querySelector('.game-detail-panel');
-                    if (!detail) return;
-
-                    const isOpen = detail.classList.contains('open');
-                    // Close all others first
-                    container.querySelectorAll('.game-detail-panel.open').forEach(p => {
-                        p.classList.remove('open');
-                        p.style.maxHeight = '0';
-                    });
-
-                    if (!isOpen) {
-                        detail.classList.add('open');
-                        detail.style.maxHeight = detail.scrollHeight + 'px';
-                        if (!detail.dataset.loaded) {
-                            this.loadGameDetail(gameId, detail, state);
-                        }
-                    } else {
-                        detail.classList.remove('open');
-                        detail.style.maxHeight = '0';
-                    }
-                } 
-                // LIVE / POST: Dedicated Page behavior
-                else {
-                    this.renderGameDetail(gameId);
-                }
+                this.renderGameDetail(gameId);
             });
         });
     },
@@ -880,6 +919,189 @@ const ui = {
         this.updateGameDetailContent(summary);
     },
 
+    buildPregameGamePage(summary, competition, away, home, prediction) {
+        const rankings = window.store.state.teamRankings || [];
+        const awayTeam = rankings.find((entry) => String(entry.id) === String(away?.team?.id));
+        const homeTeam = rankings.find((entry) => String(entry.id) === String(home?.team?.id));
+        const awayStats = awayTeam?.stats || {};
+        const homeStats = homeTeam?.stats || {};
+
+        const venue = summary?.gameInfo?.venue?.fullName || competition?.venue?.fullName || 'Venue pending';
+        const venueAddress = summary?.gameInfo?.venue?.address || competition?.venue?.address || {};
+        const location = [venueAddress?.city, venueAddress?.state, venueAddress?.country].filter(Boolean).join(', ');
+        const broadcast = competition?.broadcasts?.[0]?.media?.shortName || competition?.broadcasts?.[0]?.names?.join(', ') || '';
+        const tipLabel = competition?.status?.type?.shortDetail || new Date(competition?.date || summary?.header?.competitions?.[0]?.date || Date.now()).toLocaleString([], {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+        });
+        const headline = summary?.predictor?.header || summary?.article?.headline || `${away?.team?.displayName || 'Away'} at ${home?.team?.displayName || 'Home'}`;
+        const contextPills = [
+            tipLabel,
+            venue,
+            location || null,
+            broadcast ? `TV ${broadcast}` : null,
+        ].filter(Boolean);
+
+        const comparisonRows = [
+            { label: 'OVR', away: awayStats.ovrRating || '--', home: homeStats.ovrRating || '--' },
+            { label: 'OFF', away: awayStats.offRating || '--', home: homeStats.offRating || '--' },
+            { label: 'DEF', away: awayStats.defRating || '--', home: homeStats.defRating || '--' },
+            { label: 'Results', away: awayStats.resultsScore || '--', home: homeStats.resultsScore || '--' },
+            { label: 'Recent 5', away: awayStats.recentRecord || '--', home: homeStats.recentRecord || '--' },
+        ];
+
+        const marketOdds = prediction?.odds || null;
+        const drivers = prediction?.drivers || [headline];
+        const awayTargets = away?.team?.id ? this.buildPregamePropTargets(away.team.id) : [];
+        const homeTargets = home?.team?.id ? this.buildPregamePropTargets(home.team.id) : [];
+
+        const buildTargetColumn = (team, targets) => `
+            <div class="pregame-prop-column">
+                <div class="pregame-prop-team">${team?.team?.displayName || 'Team'} · model targets</div>
+                ${targets.length ? targets.map((target) => `
+                    <button class="pregame-player-target" type="button" onclick="window.ui.showPlayerDetail('${target.id}')">
+                        <div>
+                            <strong>${target.displayName}</strong>
+                            <span>${target.archetype}</span>
+                        </div>
+                        <div class="pregame-player-lines">
+                            <span class="pregame-player-line">PTS ${target.points ?? '--'}</span>
+                            <span class="pregame-player-line">REB ${target.rebounds ?? '--'}</span>
+                            <span class="pregame-player-line">AST ${target.assists ?? '--'}</span>
+                        </div>
+                    </button>
+                `).join('') : '<div class="news-empty">Top rotation projections will appear once the roster sync is ready.</div>'}
+            </div>
+        `;
+
+        const favoriteAbbr = Number(prediction?.homeWinProbability || 0) >= Number(prediction?.awayWinProbability || 0)
+            ? home?.team?.abbreviation
+            : away?.team?.abbreviation;
+
+        return `
+            <div class="back-bar">
+                <button class="back-btn" onclick="window.ui.goBack()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                    Back to Scores
+                </button>
+            </div>
+
+            <section class="pregame-page-shell">
+                <article class="pregame-hero-card">
+                    <div class="pregame-matchup-head">
+                        <div class="pregame-team-spot">
+                            <img src="${away?.team?.logos?.[0]?.href || away?.team?.logo || ''}" class="pregame-team-logo" alt="${away?.team?.displayName || 'Away'}">
+                            <div>
+                                <div class="pregame-kicker">Away</div>
+                                <h2>${away?.team?.displayName || 'Away'}</h2>
+                                <p>${away?.records?.[0]?.summary || away?.record?.[0]?.summary || ''}</p>
+                            </div>
+                        </div>
+                        <div class="pregame-versus-block">
+                            <span>Pregame</span>
+                            <strong>${away?.team?.abbreviation || 'AWY'} @ ${home?.team?.abbreviation || 'HME'}</strong>
+                        </div>
+                        <div class="pregame-team-spot">
+                            <img src="${home?.team?.logos?.[0]?.href || home?.team?.logo || ''}" class="pregame-team-logo" alt="${home?.team?.displayName || 'Home'}">
+                            <div>
+                                <div class="pregame-kicker">Home</div>
+                                <h2>${home?.team?.displayName || 'Home'}</h2>
+                                <p>${home?.records?.[0]?.summary || home?.record?.[0]?.summary || ''}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="pregame-context-row">
+                        ${contextPills.map((pill, index) => `
+                            <span class="pregame-context-pill ${index === 0 ? 'highlight' : ''}">${pill}</span>
+                        `).join('')}
+                    </div>
+                    <div class="pregame-grid">
+                        <div class="pregame-hero-side">
+                            <span class="pregame-side-label">Composite projection</span>
+                            <div class="pregame-model-score">${prediction?.modelScoreLabel || 'Projection pending'}</div>
+                            <div class="pregame-model-prob">
+                                ${home?.team?.abbreviation || 'HOME'} ${prediction?.homeWinProbability ?? '--'}% win · ${away?.team?.abbreviation || 'AWY'} ${prediction?.awayWinProbability ?? '--'}%
+                            </div>
+                            <p class="pregame-edge-copy">
+                                ${prediction
+                                    ? `${prediction.bettingLean} is the current edge, with ${favoriteAbbr} carrying the stronger model win path.`
+                                    : 'The model preview will appear as soon as both team boards are ready.'}
+                            </p>
+                        </div>
+                        <div class="pregame-panel">
+                            <div class="section-headline">
+                                <h3>Market Board</h3>
+                                <span>${marketOdds?.provider || 'ESPN Odds'}</span>
+                            </div>
+                            <div class="pregame-market-grid">
+                                <div class="card stat-card">
+                                    <div class="stat-label">${away?.team?.abbreviation || 'AWY'} ML</div>
+                                    <div class="stat-value" style="font-size:18px;">${this.formatMoneyline(prediction?.awayMoneyline ?? marketOdds?.awayMoneyline)}</div>
+                                </div>
+                                <div class="card stat-card">
+                                    <div class="stat-label">${home?.team?.abbreviation || 'HME'} ML</div>
+                                    <div class="stat-value" style="font-size:18px;">${this.formatMoneyline(prediction?.homeMoneyline ?? marketOdds?.homeMoneyline)}</div>
+                                </div>
+                                <div class="card stat-card">
+                                    <div class="stat-label">Spread</div>
+                                    <div class="stat-value" style="font-size:18px;">${marketOdds?.homeSpread != null ? `${home?.team?.abbreviation} ${this.formatSigned(Number(marketOdds.homeSpread), 1)}` : (prediction?.projectedSpread || '--')}</div>
+                                </div>
+                                <div class="card stat-card">
+                                    <div class="stat-label">Total</div>
+                                    <div class="stat-value" style="font-size:18px;">${marketOdds?.overUnder != null ? marketOdds.overUnder : (prediction?.projectedTotal || '--')}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+
+                <div class="pregame-grid">
+                    <article class="pregame-panel pregame-panel-wide">
+                        <div class="section-headline">
+                            <h3>Team Comparison</h3>
+                            <span>${headline}</span>
+                        </div>
+                        <div class="pregame-comparison-grid">
+                            ${comparisonRows.map((row) => `
+                                <div class="pregame-compare-row">
+                                    <strong>${row.away}</strong>
+                                    <span>${row.label}</span>
+                                    <strong>${row.home}</strong>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </article>
+
+                    <article class="pregame-panel">
+                        <div class="section-headline">
+                            <h3>Model Drivers</h3>
+                            <span>Plain-language edge</span>
+                        </div>
+                        <div class="overview-stack">
+                            ${drivers.map((driver) => `
+                                <div class="pregame-driver-row">${driver}</div>
+                            `).join('')}
+                        </div>
+                    </article>
+                </div>
+
+                <article class="pregame-panel pregame-panel-wide">
+                    <div class="section-headline">
+                        <h3>Model-Only Player Targets</h3>
+                        <span>Internal projections, not sportsbook lines</span>
+                    </div>
+                    <div class="pregame-props-grid">
+                        ${buildTargetColumn(away, awayTargets)}
+                        ${buildTargetColumn(home, homeTargets)}
+                    </div>
+                </article>
+            </section>
+        `;
+    },
+
     updateGameDetailContent(summary) {
         const pane = document.getElementById('pane-game-detail');
         if (!pane || pane.classList.contains('hidden')) return;
@@ -896,6 +1118,14 @@ const ui = {
         const oldHomeScore = pane.querySelector('#detail-score-home')?.textContent;
         const awayScoreChanged = oldAwayScore !== undefined && oldAwayScore !== away?.score;
         const homeScoreChanged = oldHomeScore !== undefined && oldHomeScore !== home?.score;
+
+        if (state === 'pre') {
+            const prediction = away?.team?.id && home?.team?.id
+                ? window.predictor.predict(away.team.id, home.team.id, true)
+                : null;
+            pane.innerHTML = this.buildPregameGamePage(summary, competitions, away, home, prediction);
+            return;
+        }
 
         const html = `
             <div class="back-bar">
@@ -1192,8 +1422,7 @@ const ui = {
             accentBar = 'border-left:3px solid var(--brand-accent);';
         }
 
-        // Expand hint
-        const expandHint = `<div style="text-align:center; margin-top:8px; font-size:10px; color:var(--text-tertiary); opacity:0.6;">▼ Tap for ${state === 'pre' ? 'preview' : state === 'in' ? 'live stats' : 'box score'}</div>`;
+        const detailHint = `<div style="text-align:center; margin-top:8px; font-size:10px; color:var(--text-tertiary); opacity:0.72;">${state === 'pre' ? 'Tap for matchup preview' : state === 'in' ? 'Tap for live box score' : 'Tap for full box score'}</div>`;
 
         const modelHtml = projection ? `
             <div style="margin-top:10px; border-top:1px solid var(--divider); padding-top:8px;">
@@ -1246,9 +1475,7 @@ const ui = {
                 ${quarterHtml}
                 ${leadersHtml}
                 ${modelHtml}
-                ${expandHint}
-
-                <div class="game-detail-panel" style="max-height:0; overflow:hidden; transition:max-height 0.35s ease;"></div>
+                ${detailHint}
             </div>
         `;
     },
@@ -1351,6 +1578,7 @@ const ui = {
     // ==================== TEAM DETAIL ====================
     async showTeamDetail(teamId) {
         console.log('[UI] Showing team detail:', teamId);
+        window.store.state.activeTeamId = teamId;
         const team = window.store.state.teams.find(t => String(t.id) === String(teamId));
         const stats = window.store.state.teamStats[teamId];
         if (!team) return;
@@ -1377,6 +1605,7 @@ const ui = {
         const nextProjection = nextAway?.team?.id && nextHome?.team?.id
             ? window.predictor.predict(nextAway.team.id, nextHome.team.id, true)
             : null;
+        const syncedRosterCount = roster.filter((player) => this.getPlayerOfficialStats(player)).length;
 
         const container = document.getElementById('pane-team-detail');
 
@@ -1497,7 +1726,10 @@ const ui = {
                                 <td style="font-weight:700; color:var(--brand-accent);">${p.rating?.rating || '--'}</td>
                                 <td style="font-size:12px; color:var(--success-color);">${p.rating?.offRating || '--'}</td>
                                 <td style="font-size:12px; color:var(--info-color, #5bc0de);">${p.rating?.defRating || '--'}</td>
-                                <td>${p.rating?.pts || '--'}</td><td>${p.rating?.reb || '--'}</td><td>${p.rating?.ast || '--'}</td><td>${p.rating?.gp || '--'}</td>
+                                <td>${window.ui.getPlayerOfficialStats(p) ? window.ui.formatDecimal(window.ui.getPlayerOfficialStats(p).ppg) : '<span class="player-sync-pill">Syncing</span>'}</td>
+                                <td>${window.ui.getPlayerOfficialStats(p) ? window.ui.formatDecimal(window.ui.getPlayerOfficialStats(p).rpg) : '<span class="player-sync-pill">Syncing</span>'}</td>
+                                <td>${window.ui.getPlayerOfficialStats(p) ? window.ui.formatDecimal(window.ui.getPlayerOfficialStats(p).apg) : '<span class="player-sync-pill">Syncing</span>'}</td>
+                                <td>${window.ui.getPlayerOfficialStats(p)?.gp ?? '<span class="player-sync-pill">Syncing</span>'}</td>
                                 <td><span class="badge ${this.getBadgeClass(p.rating?.rating)}">${this.getBadgeLabel(p.rating?.rating)}</span></td>
                             </tr>
                         `).join('')}
@@ -1505,7 +1737,7 @@ const ui = {
                 </table>
             </div>
             <div style="margin-top:16px; font-size:11px; color:var(--text-tertiary); text-align:center;">
-                Player stats sync via ESPN APIs. ${roster.filter(p => p.rating?.hasRealStats).length}/${roster.length} players with real-time stats.
+                Player stats sync via ESPN APIs. ${syncedRosterCount}/${roster.length} players with official current-season stats attached.
             </div>
             <div id="team-schedule-container" style="margin-top:28px;"></div>
         `;
@@ -1544,6 +1776,7 @@ const ui = {
     async showPlayerDetail(playerId) {
         try {
             console.log('showPlayerDetail called for:', playerId);
+            window.store.state.activePlayerId = playerId;
             const p = window.store.state.players.find(x => String(x.id) === String(playerId));
             if (!p) {
                 console.error('Player not found in window.store.state.players!', playerId);
@@ -1560,6 +1793,8 @@ const ui = {
         const team = window.store.state.teams.find(t => String(t.id) === String(p.teamId));
         const s = p.rating || { ratingNum: 0, offRating: "0", defRating: "0", pts: "0", reb: "0", ast: "0", stl: "0", blk: "0", gp: 0, mpg: "0" };
         const container = document.getElementById('pane-player-detail');
+        const officialStats = this.getPlayerOfficialStats(p);
+        const statSource = this.getPlayerStatSourceMeta(p);
 
         const tone = s.tone || { label: 'Steady' };
         const toneColor = this.getToneColor(tone);
@@ -1575,9 +1810,9 @@ const ui = {
         const skillBuckets = Object.entries(s.skillBuckets || {})
             .sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0));
         const aiAnalysis = s.aiOverview || (
-            s.gp === 0
-                ? `${p.fullName || p.displayName} has not logged enough live NBA data yet, so the current card is leaning on a conservative baseline proxy.`
-                : `${p.fullName || p.displayName} is grading ${tone.label.toLowerCase()} right now at ${s.hotnessScore || 0}/5 on the composite pulse meter, with the live season production driving the ${s.ratingNum || 0} overall.`
+            !officialStats
+                ? `${p.fullName || p.displayName} is still syncing official ESPN season stats, so the rating card is temporarily leaning on the model baseline rather than a confirmed live stat line.`
+                : `${p.fullName || p.displayName} is grading ${tone.label.toLowerCase()} right now at ${s.hotnessScore || 0}/5 on the composite pulse meter, with the official ${statSource.shortLabel.toLowerCase()} production driving the ${s.ratingNum || 0} overall.`
         );
 
         const isFav = (window.store.state.favorites.players || []).includes(String(p.id));
@@ -1630,6 +1865,7 @@ const ui = {
                         </div>
                         <p>${aiAnalysis}</p>
                         <div class="player-intel-tags">
+                            <span class="player-intel-tag">${statSource.longLabel}</span>
                             <span class="player-intel-tag">Secondary Style: ${s.secondaryStyle || 'Balanced Support'}</span>
                             <span class="player-intel-tag">Takeover: ${s.takeoverStyle || 'Steady Force'}</span>
                             <span class="player-intel-tag">Tier: ${this.getBadgeLabel(s.rating)}</span>
@@ -1680,23 +1916,30 @@ const ui = {
 
                     <div class="card season-stats-panel">
                         <div class="section-headline">
-                            <h3>Current Season Stats</h3>
-                            <span>${team?.displayName || p.teamName || 'NBA'}</span>
+                            <h3>Official Season Stats</h3>
+                            <span>${statSource.shortLabel}</span>
                         </div>
-                        <div class="season-stats-grid">
-                        <div class="card stat-card"><div class="stat-label">PPG</div><div class="stat-value">${s.pts || '--'}</div></div>
-                        <div class="card stat-card"><div class="stat-label">RPG</div><div class="stat-value">${s.reb || '--'}</div></div>
-                        <div class="card stat-card"><div class="stat-label">APG</div><div class="stat-value">${s.ast || '--'}</div></div>
-                        <div class="card stat-card"><div class="stat-label">SPG</div><div class="stat-value">${s.stl || '--'}</div></div>
-                        <div class="card stat-card"><div class="stat-label">BPG</div><div class="stat-value">${s.blk || '--'}</div></div>
-                        <div class="card stat-card"><div class="stat-label">FG%</div><div class="stat-value">${s.fgPct || '--'}${s.fgPct ? '%' : ''}</div></div>
-                        <div class="card stat-card"><div class="stat-label">3P%</div><div class="stat-value">${s.threePct || '--'}${s.threePct ? '%' : ''}</div></div>
-                        <div class="card stat-card"><div class="stat-label">eFG%</div><div class="stat-value">${s.efgPct || '--'}${s.efgPct ? '%' : ''}</div></div>
-                        <div class="card stat-card"><div class="stat-label">TS%</div><div class="stat-value">${s.tsPct || '--'}${s.tsPct ? '%' : ''}</div></div>
-                        <div class="card stat-card"><div class="stat-label">PER</div><div class="stat-value">${s.per || '--'}</div></div>
-                        <div class="card stat-card"><div class="stat-label">MPG</div><div class="stat-value">${s.mpg || '--'}</div></div>
-                        <div class="card stat-card"><div class="stat-label">GP</div><div class="stat-value">${s.gp !== undefined ? s.gp : '--'}</div></div>
-                    </div>
+                        ${officialStats ? `
+                            <div class="season-stats-grid">
+                                <div class="card stat-card"><div class="stat-label">PPG</div><div class="stat-value">${this.formatDecimal(officialStats.ppg)}</div></div>
+                                <div class="card stat-card"><div class="stat-label">RPG</div><div class="stat-value">${this.formatDecimal(officialStats.rpg)}</div></div>
+                                <div class="card stat-card"><div class="stat-label">APG</div><div class="stat-value">${this.formatDecimal(officialStats.apg)}</div></div>
+                                <div class="card stat-card"><div class="stat-label">SPG</div><div class="stat-value">${this.formatDecimal(officialStats.spg)}</div></div>
+                                <div class="card stat-card"><div class="stat-label">BPG</div><div class="stat-value">${this.formatDecimal(officialStats.bpg)}</div></div>
+                                <div class="card stat-card"><div class="stat-label">FG%</div><div class="stat-value">${this.formatDecimal(officialStats.fgPct)}%</div></div>
+                                <div class="card stat-card"><div class="stat-label">3P%</div><div class="stat-value">${this.formatDecimal(officialStats.threePct)}%</div></div>
+                                <div class="card stat-card"><div class="stat-label">eFG%</div><div class="stat-value">${this.formatDecimal(officialStats.efgPct)}%</div></div>
+                                <div class="card stat-card"><div class="stat-label">TS%</div><div class="stat-value">${this.formatDecimal(officialStats.tsPct)}%</div></div>
+                                <div class="card stat-card"><div class="stat-label">PER</div><div class="stat-value">${this.formatDecimal(officialStats.per)}</div></div>
+                                <div class="card stat-card"><div class="stat-label">MPG</div><div class="stat-value">${this.formatDecimal(officialStats.mpg)}</div></div>
+                                <div class="card stat-card"><div class="stat-label">GP</div><div class="stat-value">${officialStats.gp}</div></div>
+                            </div>
+                        ` : `
+                            <div class="player-sync-panel">
+                                <strong>Syncing official ESPN season stats</strong>
+                                <p>The rating card is live, but the confirmed current-season stat row has not attached yet for ${p.fullName || p.displayName}.</p>
+                            </div>
+                        `}
                     </div>
                 </div>
             </div>
@@ -1761,14 +2004,8 @@ const ui = {
                     </div>
                 </td>
                 <td style="font-weight:700; color:var(--brand-accent); font-size:15px; font-variant-numeric:tabular-nums;">${p.rating?.rating || '--'}</td>
-                <td style="color:var(--text-secondary); font-size:12px;">
-                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                        <span>${p.rating?.pts || '--'} pts</span>
-                        <span>${p.rating?.reb || '--'} reb</span>
-                        <span>${p.rating?.ast || '--'} ast</span>
-                    </div>
-                </td>
-                <td style="font-variant-numeric:tabular-nums; font-size:12px;">${p.rating?.gp || '--'}</td>
+                <td style="color:var(--text-secondary); font-size:12px;">${this.formatPlayerLine(p)}</td>
+                <td style="font-variant-numeric:tabular-nums; font-size:12px;">${this.getPlayerOfficialStats(p)?.gp ?? '<span class="player-sync-pill">Syncing</span>'}</td>
                 <td><span class="badge ${this.getBadgeClass(p.rating?.rating)}">${this.getBadgeLabel(p.rating?.rating)}</span></td>
             </tr>
         `).join('');

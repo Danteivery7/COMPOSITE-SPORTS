@@ -14,6 +14,48 @@ const NAV_ITEMS = [
   { key: 'settings', label: 'Settings' },
 ];
 
+const SPORT_VIEW_COPY = {
+  cbb: {
+    heroEyebrow: 'Selection Room',
+    heroTitle: 'Bubble pressure, upset watch, and the full campus board in one place.',
+    heroSummary:
+      'The CBB route leans into bracket energy, hot mid-major storylines, and a top-down resume view so the board feels like March even on an ordinary slate.',
+    scoresTitle: 'Campus Pulse',
+    rankingsTitle: 'Resume Board',
+    playersTitle: 'Tournament Risers',
+    edgesTitle: 'Upset Watch',
+    teamStoryLabel: 'Resume Read',
+    playerStoryLabel: 'Prospect Pulse',
+    gameStoryLabel: 'Bracket Pressure',
+  },
+  nfl: {
+    heroEyebrow: 'Broadcast Window',
+    heroTitle: 'Field-level atmosphere, kickoff context, and the best edges on the slate.',
+    heroSummary:
+      'The NFL route now reads more like a broadcast board: field-green context, matchup framing, and clean Sunday-style power signals.',
+    scoresTitle: 'Kickoff Board',
+    rankingsTitle: 'Power Index',
+    playersTitle: 'Impact Board',
+    edgesTitle: 'Sunday Edges',
+    teamStoryLabel: 'Game Tape',
+    playerStoryLabel: 'Sunday Role',
+    gameStoryLabel: 'Game Script',
+  },
+  mls: {
+    heroEyebrow: 'Match Night',
+    heroTitle: 'Pitch-side boards, goal threats, and the floodlit match context that matters.',
+    heroSummary:
+      'The MLS route pushes into a more football-first feel with match-night presentation, club form, and attacking danger front and center.',
+    scoresTitle: 'Fixtures & Live Matches',
+    rankingsTitle: 'Supporters Shield Race',
+    playersTitle: 'Goal Threats',
+    edgesTitle: 'Match Edges',
+    teamStoryLabel: 'Club Identity',
+    playerStoryLabel: 'Match Influence',
+    gameStoryLabel: 'Match Rhythm',
+  },
+};
+
 function metricChip(label, value) {
   return (
     <div className="generic-metric-chip" key={label}>
@@ -29,6 +71,14 @@ function TeamLogo({ team }) {
   }
 
   return <img src={team.logo} alt={team.displayName} className="generic-team-logo" />;
+}
+
+function PlayerVisual({ player }) {
+  if (!player?.headshot) {
+    return <span className="generic-logo-fallback">{player?.displayName?.slice(0, 2)?.toUpperCase() || 'PL'}</span>;
+  }
+
+  return <img src={player.headshot} alt={player.displayName} className="generic-player-headshot" />;
 }
 
 function GameCard({ game, onOpen }) {
@@ -149,11 +199,7 @@ function PlayersTable({ players, onOpen, query, onQueryChange, loading }) {
                 <td>{player.rank}</td>
                 <td>
                   <div className="generic-player-cell">
-                    {player.headshot ? (
-                      <img src={player.headshot} alt={player.displayName} className="generic-player-headshot" />
-                    ) : (
-                      <span className="generic-logo-fallback">{player.displayName.slice(0, 2).toUpperCase()}</span>
-                    )}
+                    <PlayerVisual player={player} />
                     <div>
                       <strong>{player.displayName}</strong>
                       <span>{player.leaderSummary || player.shortName || 'Roster board'}</span>
@@ -199,6 +245,470 @@ function PredictorRail({ predictors }) {
         </article>
       ))}
     </div>
+  );
+}
+
+function SportRow({ title, subtitle, value, onClick, children }) {
+  return (
+    <button className="sportview-row" type="button" onClick={onClick}>
+      <div className="sportview-row-head">
+        <strong>{title}</strong>
+        {subtitle ? <span>{subtitle}</span> : null}
+      </div>
+      {children || (value ? <div className="sportview-row-value">{value}</div> : null)}
+    </button>
+  );
+}
+
+function SportPanel({ title, subtitle, actionLabel, onAction, children, className = '' }) {
+  return (
+    <article className={`generic-card sportview-panel ${className}`.trim()}>
+      <div className="sportview-panel-head">
+        <div>
+          <h3>{title}</h3>
+          {subtitle ? <p>{subtitle}</p> : null}
+        </div>
+        {actionLabel && onAction ? (
+          <button type="button" onClick={onAction}>
+            {actionLabel}
+          </button>
+        ) : null}
+      </div>
+      {children}
+    </article>
+  );
+}
+
+function SportOverviewView({
+  sportKey,
+  config,
+  bootstrap,
+  rankings,
+  scoreboard,
+  featuredPlayers,
+  predictors,
+  news,
+  openTeam,
+  openPlayer,
+  openGame,
+  setPage,
+}) {
+  const copy = SPORT_VIEW_COPY[sportKey];
+  const headlineGame = scoreboard[0] || null;
+  const leadPredictor = predictors[0] || null;
+  const leadStory = news[0] || null;
+
+  if (!copy) {
+    return (
+      <section className="generic-stack">
+        <article className="generic-card generic-overview-hero">
+          <div>
+            <p className="eyebrow">{config.label} Composite</p>
+            <h2>{bootstrap?.headline || config.cardBlurb}</h2>
+            <p>{config.introCopy}</p>
+          </div>
+          <div className="generic-metric-row">
+            {metricChip('Live', bootstrap?.meta?.liveGames ?? 0)}
+            {metricChip('Teams', bootstrap?.meta?.teamCount ?? rankings.length)}
+            {metricChip('Players', bootstrap?.meta?.playerCountLabel ?? 'Roster crawl ready')}
+          </div>
+        </article>
+        <div className="generic-overview-columns">
+          <SportPanel title="Live Board" actionLabel="Open all" onAction={() => setPage('scores')}>
+            <div className="generic-stack">
+              {scoreboard.length ? (
+                scoreboard.slice(0, 4).map((game) => (
+                  <GameCard key={game.id} game={game} onOpen={openGame} />
+                ))
+              ) : (
+                <p className="generic-empty-copy">No live or scheduled games are currently flowing through this board.</p>
+              )}
+            </div>
+          </SportPanel>
+          <SportPanel title="Top 10" actionLabel="Rankings" onAction={() => setPage('rankings')}>
+            <div className="generic-rank-list">
+              {rankings.length ? (
+                rankings.slice(0, 10).map((team) => (
+                  <button className="generic-rank-row" key={team.id} type="button" onClick={() => openTeam(team.id)}>
+                    <span>#{team.ovrRank}</span>
+                    <div className="generic-rank-team">
+                      <TeamLogo team={team} />
+                      <strong>{team.displayName}</strong>
+                    </div>
+                    <span>{team.ovrScore}</span>
+                  </button>
+                ))
+              ) : (
+                <p className="generic-empty-copy">Rankings are still syncing from the current standings and team metrics.</p>
+              )}
+            </div>
+          </SportPanel>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className={`sportview-shell sportview-shell-${sportKey}`}>
+      <article className={`generic-card sportview-hero sportview-hero-${sportKey}`}>
+        <div className="sportview-hero-copy">
+          <p className="eyebrow">{copy.heroEyebrow}</p>
+          <h2>{copy.heroTitle}</h2>
+          <p>{copy.heroSummary}</p>
+          <div className="sportview-chip-row">
+            {metricChip('Live', bootstrap?.meta?.liveGames ?? 0)}
+            {metricChip('Teams', bootstrap?.meta?.teamCount ?? rankings.length)}
+            {metricChip('Players', bootstrap?.meta?.playerCountLabel ?? 'Roster crawl ready')}
+          </div>
+        </div>
+        <div className="sportview-hero-side">
+          {leadPredictor ? (
+            <button className="sportview-spotlight" type="button" onClick={() => openGame(leadPredictor.gameId)}>
+              <span className="sportview-spotlight-label">{copy.edgesTitle}</span>
+              <strong>{leadPredictor.away.abbreviation} at {leadPredictor.home.abbreviation}</strong>
+              <p>{leadPredictor.projectedAwayScore} - {leadPredictor.projectedHomeScore} • {leadPredictor.confidence}</p>
+            </button>
+          ) : null}
+          {headlineGame ? (
+            <button className="sportview-spotlight muted" type="button" onClick={() => openGame(headlineGame.id)}>
+              <span className="sportview-spotlight-label">{copy.scoresTitle}</span>
+              <strong>{headlineGame.away.abbreviation} at {headlineGame.home.abbreviation}</strong>
+              <p>{headlineGame.statusLabel} • {headlineGame.broadcast || headlineGame.startLabel}</p>
+            </button>
+          ) : null}
+          {leadStory ? (
+            <a className="sportview-spotlight thin" href={leadStory.link} target="_blank" rel="noreferrer">
+              <span className="sportview-spotlight-label">Storyline</span>
+              <strong>{leadStory.headline}</strong>
+              <p>{leadStory.description || 'Open ESPN story'}</p>
+            </a>
+          ) : null}
+        </div>
+      </article>
+
+      <div className={`sportview-grid sportview-grid-${sportKey}`}>
+        <SportPanel title={copy.scoresTitle} subtitle="Live board and scheduled slate" actionLabel="Open scores" onAction={() => setPage('scores')}>
+          <div className="sportview-list">
+            {scoreboard.length ? (
+              scoreboard.slice(0, 5).map((game) => (
+                <SportRow
+                  key={game.id}
+                  title={`${game.away.abbreviation} @ ${game.home.abbreviation}`}
+                  subtitle={game.statusLabel}
+                  onClick={() => openGame(game.id)}
+                  value={<span className="sportview-scoreline">{game.away.score ?? '-'} : {game.home.score ?? '-'}</span>}
+                >
+                  <div className="sportview-scoreline">{game.away.score ?? '-'} : {game.home.score ?? '-'}</div>
+                </SportRow>
+              ))
+            ) : (
+              <p className="generic-empty-copy">The board is waiting on live or scheduled games.</p>
+            )}
+          </div>
+        </SportPanel>
+
+        <SportPanel title={copy.rankingsTitle} subtitle="Composite team order" actionLabel="Rankings" onAction={() => setPage('rankings')}>
+          <div className="sportview-list">
+            {rankings.length ? (
+              rankings.slice(0, 8).map((team) => (
+                <SportRow
+                  key={team.id}
+                  title={`#${team.ovrRank} ${team.displayName}`}
+                  subtitle={`${team.record} • ${team.streak || 'Even'}`}
+                  onClick={() => openTeam(team.id)}
+                >
+                  <div className="sportview-row-value">{team.ovrScore} OVR</div>
+                </SportRow>
+              ))
+            ) : (
+              <p className="generic-empty-copy">Rankings are still syncing.</p>
+            )}
+          </div>
+        </SportPanel>
+
+        <SportPanel title={copy.playersTitle} subtitle="Featured movers and leaders" actionLabel="Players" onAction={() => setPage('players')}>
+          <div className="sportview-feature-grid">
+            {featuredPlayers.length ? (
+              featuredPlayers.slice(0, 6).map((player) => (
+                <button className="sportview-feature-card" key={player.id} type="button" onClick={() => openPlayer(player.id)}>
+                  <div className="generic-player-cell">
+                    <PlayerVisual player={player} />
+                    <div>
+                      <strong>{player.displayName}</strong>
+                      <span>{player.team?.abbreviation || player.position || config.label}</span>
+                    </div>
+                  </div>
+                  <p>{player.leaderSummary || `${player.rating} OVR`}</p>
+                </button>
+              ))
+            ) : (
+              <p className="generic-empty-copy">Player features will populate after the roster crawl completes.</p>
+            )}
+          </div>
+        </SportPanel>
+      </div>
+
+      <div className={`sportview-lower sportview-lower-${sportKey}`}>
+        <SportPanel title={copy.edgesTitle} subtitle="Model leans" actionLabel="Predictor" onAction={() => setPage('predictor')} className="sportview-panel-wide">
+          <PredictorRail predictors={predictors.slice(0, 4)} />
+        </SportPanel>
+
+        <SportPanel title="Trending News" subtitle="Latest ESPN feed">
+          <div className="sportview-note-list">
+            {news.length ? (
+              news.slice(0, 4).map((story) => (
+                <a className="sportview-note-link" href={story.link} target="_blank" rel="noreferrer" key={story.id}>
+                  <strong>{story.headline}</strong>
+                  <span>{story.description || 'Open story'}</span>
+                </a>
+              ))
+            ) : (
+              <p className="generic-empty-copy">News feed is quiet right now.</p>
+            )}
+          </div>
+        </SportPanel>
+      </div>
+    </section>
+  );
+}
+
+function SportScoresView({ sportKey, scoreboard, predictors, openGame }) {
+  const predictorMap = Object.fromEntries((predictors || []).map((game) => [game.gameId, game]));
+
+  return (
+    <section className={`sportview-shell sportview-scores-shell sportview-scores-shell-${sportKey}`}>
+      <div className={`sportview-score-grid sportview-score-grid-${sportKey}`}>
+        {scoreboard.length ? (
+          scoreboard.map((game) => {
+            const prediction = predictorMap[game.id];
+            return (
+              <button className={`generic-card sportview-score-card sportview-score-card-${sportKey}`} key={game.id} type="button" onClick={() => openGame(game.id)}>
+                <div className="sportview-score-topline">
+                  <span className={`generic-status-pill is-${game.state}`}>{game.statusLabel}</span>
+                  <span>{game.broadcast || game.startLabel || 'ESPN'}</span>
+                </div>
+                <div className="sportview-score-teams">
+                  {[game.away, game.home].map((team) => (
+                    <div className="sportview-score-team" key={`${game.id}-${team.teamId}`}>
+                      <div className="generic-score-team">
+                        <TeamLogo team={team} />
+                        <div>
+                          <strong>{team.displayName}</strong>
+                          <span>{team.record || team.abbreviation}</span>
+                        </div>
+                      </div>
+                      <strong className="sportview-score-number">{team.score ?? '-'}</strong>
+                    </div>
+                  ))}
+                </div>
+                {prediction ? (
+                  <div className="sportview-chip-row">
+                    <span className="sportview-chip">Proj {prediction.projectedAwayScore}-{prediction.projectedHomeScore}</span>
+                    <span className="sportview-chip">{prediction.confidence}</span>
+                    <span className="sportview-chip">{prediction.home.abbreviation} {prediction.homeWinProbability}%</span>
+                  </div>
+                ) : null}
+              </button>
+            );
+          })
+        ) : (
+          <article className="generic-card sportview-panel">
+            <p className="generic-empty-copy">No live or scheduled games are currently available for this route.</p>
+          </article>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function SportTeamDetailView({ sportKey, config, teamDetail, openPlayer, setPage }) {
+  const copy = SPORT_VIEW_COPY[sportKey];
+  const recentLabel = sportKey === 'cbb' ? 'Recent Campus Run' : sportKey === 'nfl' ? 'Recent Sundays' : 'Recent Fixtures';
+  const rosterLabel = sportKey === 'cbb' ? 'Rotation Board' : sportKey === 'nfl' ? 'Impact Depth Chart' : 'Matchday Core';
+
+  return (
+    <section className={`sportview-shell sportview-detail-shell sportview-detail-shell-${sportKey}`}>
+      <button className="generic-back-button sportview-back" type="button" onClick={() => setPage('teams')}>
+        Back to teams
+      </button>
+      <article className={`generic-card sportview-hero sportview-detail-hero sportview-detail-hero-${sportKey}`}>
+        <div className="sportview-detail-brand">
+          <TeamLogo team={teamDetail.team} />
+          <div>
+            <p className="eyebrow">{copy.teamStoryLabel}</p>
+            <h2>{teamDetail.team.displayName}</h2>
+            <p>{teamDetail.team.record} • #{teamDetail.team.ovrRank} OVR</p>
+          </div>
+        </div>
+        <div className="sportview-chip-row">
+          <span className="sportview-chip">OFF {teamDetail.team.offScore}</span>
+          <span className="sportview-chip">DEF {teamDetail.team.defScore}</span>
+          <span className="sportview-chip">{teamDetail.team.streak || 'Even'}</span>
+        </div>
+      </article>
+
+      <div className="sportview-detail-grid">
+        <SportPanel title={rosterLabel} subtitle="Top composite names on this team" className="sportview-panel-tall">
+          <div className="sportview-list">
+            {teamDetail.roster.slice(0, 16).map((player) => (
+              <SportRow
+                key={player.id}
+                title={player.displayName}
+                subtitle={`${player.position || 'Player'} • ${player.tier}`}
+                onClick={() => openPlayer(player.id)}
+              >
+                <div className="sportview-row-value">{player.rating}</div>
+              </SportRow>
+            ))}
+          </div>
+        </SportPanel>
+
+        <SportPanel title={recentLabel} subtitle="What the last stretch looks like">
+          <div className="sportview-note-list">
+            {(teamDetail.recent || []).length ? (
+              teamDetail.recent.map((item, index) => (
+                <div className="sportview-note-link static" key={`${item}-${index}`}>
+                  <strong>{item}</strong>
+                  <span>{config.label} board context</span>
+                </div>
+              ))
+            ) : (
+              <p className="generic-empty-copy">Recent results will appear once ESPN returns the team schedule payload.</p>
+            )}
+          </div>
+        </SportPanel>
+
+        <SportPanel title={copy.teamStoryLabel} subtitle="Composite summary">
+          <p className="generic-empty-copy">
+            {teamDetail.team.displayName} is sitting at #{teamDetail.team.ovrRank} on the {config.label} board with a {teamDetail.team.record} line,
+            {` ${teamDetail.team.offScore} offense, ${teamDetail.team.defScore} defense, and ${teamDetail.team.streak || 'steady'} recent form.`}
+          </p>
+        </SportPanel>
+      </div>
+    </section>
+  );
+}
+
+function SportPlayerDetailView({ sportKey, config, playerDetail, setPage }) {
+  const copy = SPORT_VIEW_COPY[sportKey];
+
+  return (
+    <section className={`sportview-shell sportview-detail-shell sportview-detail-shell-${sportKey}`}>
+      <button className="generic-back-button sportview-back" type="button" onClick={() => setPage('players')}>
+        Back to players
+      </button>
+      <article className={`generic-card sportview-hero sportview-detail-hero sportview-detail-hero-${sportKey}`}>
+        <div className="generic-player-hero">
+          <PlayerVisual player={playerDetail.player} />
+          <div>
+            <p className="eyebrow">{copy.playerStoryLabel}</p>
+            <h2>{playerDetail.player.displayName}</h2>
+            <p>{playerDetail.player.team?.displayName} • {playerDetail.player.position || 'Player'}</p>
+          </div>
+          <div className="generic-player-rating-block">
+            <strong>{playerDetail.player.rating}</strong>
+            <span>{playerDetail.player.tier}</span>
+          </div>
+        </div>
+        <p className="sportview-body-copy">{playerDetail.analysis}</p>
+      </article>
+
+      <div className="sportview-detail-grid">
+        <SportPanel title="Signals" subtitle="Leaderboard context">
+          <div className="sportview-chip-row">
+            {(playerDetail.player.leaders || []).slice(0, 6).map((leader) => (
+              <span className="sportview-chip" key={`${leader.label}-${leader.rank}`}>{leader.label} #{leader.rank}</span>
+            ))}
+          </div>
+        </SportPanel>
+
+        <SportPanel title="Stat Lines" subtitle="Latest athlete stat feed" className="sportview-panel-tall">
+          <div className="sportview-note-list">
+            {(playerDetail.stats || []).length ? (
+              playerDetail.stats.map((stat) => (
+                <div className="sportview-note-link static" key={`${stat.group}-${stat.label}`}>
+                  <strong>{stat.label}</strong>
+                  <span>{stat.group} • {stat.value}</span>
+                </div>
+              ))
+            ) : (
+              <p className="generic-empty-copy">Detailed athlete stats are still syncing from the ESPN endpoint.</p>
+            )}
+          </div>
+        </SportPanel>
+      </div>
+    </section>
+  );
+}
+
+function SportGameDetailView({ sportKey, gameDetail, setPage, predictors }) {
+  const copy = SPORT_VIEW_COPY[sportKey];
+  const predictor = (predictors || []).find((entry) => entry.gameId === gameDetail.game.id);
+
+  return (
+    <section className={`sportview-shell sportview-detail-shell sportview-detail-shell-${sportKey}`}>
+      <button className="generic-back-button sportview-back" type="button" onClick={() => setPage('scores')}>
+        Back to scores
+      </button>
+      <article className={`generic-card sportview-hero sportview-detail-hero sportview-detail-hero-${sportKey}`}>
+        <div className="sportview-matchup">
+          <div className="sportview-match-side">
+            <TeamLogo team={gameDetail.game.away} />
+            <div>
+              <strong>{gameDetail.game.away.displayName}</strong>
+              <span>{gameDetail.game.away.record || gameDetail.game.away.abbreviation}</span>
+            </div>
+          </div>
+          <div className="sportview-match-center">
+            <span className={`generic-status-pill is-${gameDetail.game.state}`}>{gameDetail.game.statusLabel}</span>
+            <strong>{gameDetail.game.away.score ?? '-'} - {gameDetail.game.home.score ?? '-'}</strong>
+          </div>
+          <div className="sportview-match-side">
+            <TeamLogo team={gameDetail.game.home} />
+            <div>
+              <strong>{gameDetail.game.home.displayName}</strong>
+              <span>{gameDetail.game.home.record || gameDetail.game.home.abbreviation}</span>
+            </div>
+          </div>
+        </div>
+        <div className="sportview-chip-row">
+          {gameDetail.venue ? <span className="sportview-chip">{gameDetail.venue}</span> : null}
+          {gameDetail.location ? <span className="sportview-chip">{gameDetail.location}</span> : null}
+          {gameDetail.broadcast ? <span className="sportview-chip">{gameDetail.broadcast}</span> : null}
+          {predictor ? <span className="sportview-chip">Proj {predictor.projectedAwayScore}-{predictor.projectedHomeScore}</span> : null}
+        </div>
+        <p className="sportview-body-copy">{gameDetail.summary || `${copy.gameStoryLabel} is still syncing.`}</p>
+      </article>
+
+      <div className="sportview-detail-grid">
+        <SportPanel title={copy.gameStoryLabel} subtitle="Live context and notes" className="sportview-panel-tall">
+          <div className="sportview-note-list">
+            {(gameDetail.notes || []).length ? (
+              gameDetail.notes.map((note, index) => (
+                <div className="sportview-note-link static" key={`${note}-${index}`}>
+                  <strong>Board Note</strong>
+                  <span>{note}</span>
+                </div>
+              ))
+            ) : (
+              <p className="generic-empty-copy">No additional match notes are available yet for this event.</p>
+            )}
+          </div>
+        </SportPanel>
+
+        <SportPanel title="Prediction Context" subtitle="If the board has a model read">
+          {predictor ? (
+            <div className="sportview-chip-row">
+              <span className="sportview-chip">{predictor.home.abbreviation} {predictor.homeWinProbability}%</span>
+              <span className="sportview-chip">{predictor.confidence}</span>
+              <span className="sportview-chip">Projected {predictor.projectedAwayScore}-{predictor.projectedHomeScore}</span>
+            </div>
+          ) : (
+            <p className="generic-empty-copy">No current predictor card is attached to this matchup.</p>
+          )}
+        </SportPanel>
+      </div>
+    </section>
   );
 }
 
@@ -279,6 +789,7 @@ export default function GenericSportApp({ sportKey }) {
   const featuredPlayers = useMemo(() => bootstrap?.featuredPlayers || [], [bootstrap]);
   const scoreboard = useMemo(() => bootstrap?.scoreboard || [], [bootstrap]);
   const predictors = useMemo(() => bootstrap?.predictors || [], [bootstrap]);
+  const news = useMemo(() => bootstrap?.news || [], [bootstrap]);
 
   function renderPage() {
     if (loadingBootstrap) {
@@ -292,13 +803,7 @@ export default function GenericSportApp({ sportKey }) {
 
     switch (page) {
       case 'scores':
-        return (
-          <div className="generic-grid generic-score-grid">
-            {scoreboard.map((game) => (
-              <GameCard key={game.id} game={game} onOpen={openGame} />
-            ))}
-          </div>
-        );
+        return <SportScoresView sportKey={sportKey} scoreboard={scoreboard} predictors={predictors} openGame={openGame} />;
       case 'rankings':
         return <RankingsTable rankings={rankings} onOpenTeam={openTeam} />;
       case 'teams':
@@ -330,227 +835,40 @@ export default function GenericSportApp({ sportKey }) {
         );
       case 'team-detail':
         return teamDetail ? (
-          <section className="generic-detail">
-            <button className="generic-back-button" type="button" onClick={() => setPage('teams')}>
-              Back to teams
-            </button>
-            <article className="generic-card generic-detail-hero">
-              <div className="generic-detail-head">
-                <TeamLogo team={teamDetail.team} />
-                <div>
-                  <h2>{teamDetail.team.displayName}</h2>
-                  <p>{teamDetail.team.record} • #{teamDetail.team.ovrRank} OVR</p>
-                </div>
-              </div>
-              <div className="generic-inline-stats">
-                <span>OFF {teamDetail.team.offScore}</span>
-                <span>DEF {teamDetail.team.defScore}</span>
-                <span>{teamDetail.team.streak || 'Even'}</span>
-              </div>
-            </article>
-            <article className="generic-card">
-              <h3>Roster Board</h3>
-              <div className="generic-detail-list">
-                {teamDetail.roster.slice(0, 24).map((player) => (
-                  <button className="generic-detail-row" key={player.id} type="button" onClick={() => openPlayer(player.id)}>
-                    <span>{player.displayName}</span>
-                    <span>{player.position || '-'}</span>
-                    <strong>{player.rating}</strong>
-                  </button>
-                ))}
-              </div>
-            </article>
-          </section>
+          <SportTeamDetailView sportKey={sportKey} config={config} teamDetail={teamDetail} openPlayer={openPlayer} setPage={setPage} />
         ) : null;
       case 'player-detail':
         return playerDetail ? (
-          <section className="generic-detail">
-            <button className="generic-back-button" type="button" onClick={() => setPage('players')}>
-              Back to players
-            </button>
-            <article className="generic-card generic-detail-hero">
-              <div className="generic-player-hero">
-                {playerDetail.player.headshot ? (
-                  <img
-                    src={playerDetail.player.headshot}
-                    alt={playerDetail.player.displayName}
-                    className="generic-player-hero-img"
-                  />
-                ) : (
-                  <span className="generic-logo-fallback">{playerDetail.player.displayName.slice(0, 2).toUpperCase()}</span>
-                )}
-                <div>
-                  <h2>{playerDetail.player.displayName}</h2>
-                  <p>{playerDetail.player.team?.displayName} • {playerDetail.player.position || 'Player'}</p>
-                </div>
-                <div className="generic-player-rating-block">
-                  <strong>{playerDetail.player.rating}</strong>
-                  <span>{playerDetail.player.tier}</span>
-                </div>
-              </div>
-              <p>{playerDetail.analysis}</p>
-            </article>
-            <article className="generic-card">
-              <h3>Signals</h3>
-              <div className="generic-inline-stats">
-                {(playerDetail.player.leaders || []).slice(0, 6).map((leader) => (
-                  <span key={`${leader.label}-${leader.rank}`}>{leader.label} #{leader.rank}</span>
-                ))}
-              </div>
-            </article>
-            <article className="generic-card">
-              <h3>Stat Lines</h3>
-              <div className="generic-detail-list">
-                {(playerDetail.stats || []).map((stat) => (
-                  <div className="generic-detail-row static" key={`${stat.group}-${stat.label}`}>
-                    <span>{stat.group}</span>
-                    <span>{stat.label}</span>
-                    <strong>{stat.value}</strong>
-                  </div>
-                ))}
-              </div>
-            </article>
-          </section>
+          <SportPlayerDetailView sportKey={sportKey} config={config} playerDetail={playerDetail} setPage={setPage} />
         ) : null;
       case 'game-detail':
         return gameDetail ? (
-          <section className="generic-detail">
-            <button className="generic-back-button" type="button" onClick={() => setPage('scores')}>
-              Back to scores
-            </button>
-            <article className="generic-card generic-detail-hero">
-              <div className="generic-matchup-head">
-                <div>
-                  <strong>{gameDetail.game.away.displayName}</strong>
-                  <span>{gameDetail.game.away.score ?? '-'}</span>
-                </div>
-                <span className={`generic-status-pill is-${gameDetail.game.state}`}>{gameDetail.game.statusLabel}</span>
-                <div>
-                  <strong>{gameDetail.game.home.displayName}</strong>
-                  <span>{gameDetail.game.home.score ?? '-'}</span>
-                </div>
-              </div>
-              <p>{gameDetail.summary || 'Live matchup summary unavailable.'}</p>
-            </article>
-            <article className="generic-card">
-              <h3>Leaders & Notes</h3>
-              <div className="generic-detail-list">
-                {(gameDetail.notes || []).map((note, index) => (
-                  <div className="generic-detail-row static" key={`${note}-${index}`}>
-                    <span>Note</span>
-                    <span>{note}</span>
-                  </div>
-                ))}
-              </div>
-            </article>
-          </section>
+          <SportGameDetailView sportKey={sportKey} gameDetail={gameDetail} setPage={setPage} predictors={predictors} />
         ) : null;
       case 'overview':
       default:
         return (
-          <section className="generic-stack">
-            <article className="generic-card generic-overview-hero">
-              <div>
-                <p className="eyebrow">{config.label} Composite</p>
-                <h2>{bootstrap?.headline || config.cardBlurb}</h2>
-                <p>{config.introCopy}</p>
-              </div>
-              <div className="generic-metric-row">
-                {metricChip('Live', bootstrap?.meta?.liveGames ?? 0)}
-                {metricChip('Teams', bootstrap?.meta?.teamCount ?? teams.length)}
-                {metricChip('Players', bootstrap?.meta?.playerCountLabel ?? 'Roster crawl ready')}
-              </div>
-            </article>
-            <div className="generic-overview-columns">
-              <article className="generic-card">
-                <div className="generic-card-head">
-                  <h3>Live Board</h3>
-                  <button type="button" onClick={() => setPage('scores')}>
-                    Open all
-                  </button>
-                </div>
-                <div className="generic-stack">
-                  {scoreboard.length ? (
-                    scoreboard.slice(0, 4).map((game) => (
-                      <GameCard key={game.id} game={game} onOpen={openGame} />
-                    ))
-                  ) : (
-                    <p className="generic-empty-copy">No live or scheduled games are currently flowing through this board.</p>
-                  )}
-                </div>
-              </article>
-              <article className="generic-card">
-                <div className="generic-card-head">
-                  <h3>Top 10</h3>
-                  <button type="button" onClick={() => setPage('rankings')}>
-                    Rankings
-                  </button>
-                </div>
-                <div className="generic-rank-list">
-                  {rankings.length ? (
-                    rankings.slice(0, 10).map((team) => (
-                      <button className="generic-rank-row" key={team.id} type="button" onClick={() => openTeam(team.id)}>
-                        <span>#{team.ovrRank}</span>
-                        <div className="generic-rank-team">
-                          <TeamLogo team={team} />
-                          <strong>{team.displayName}</strong>
-                        </div>
-                        <span>{team.ovrScore}</span>
-                      </button>
-                    ))
-                  ) : (
-                    <p className="generic-empty-copy">Rankings are still syncing from the current standings and team metrics.</p>
-                  )}
-                </div>
-              </article>
-            </div>
-            <article className="generic-card">
-              <div className="generic-card-head">
-                <h3>Featured Players</h3>
-                <button type="button" onClick={() => setPage('players')}>
-                  Full board
-                </button>
-              </div>
-              <div className="generic-grid generic-feature-grid">
-                {featuredPlayers.length ? (
-                  featuredPlayers.map((player) => (
-                    <button className="generic-card generic-feature-card" key={player.id} type="button" onClick={() => openPlayer(player.id)}>
-                      <div className="generic-player-cell">
-                        {player.headshot ? (
-                          <img src={player.headshot} alt={player.displayName} className="generic-player-headshot" />
-                        ) : (
-                          <span className="generic-logo-fallback">{player.displayName.slice(0, 2).toUpperCase()}</span>
-                        )}
-                        <div>
-                          <strong>{player.displayName}</strong>
-                          <span>{player.team?.abbreviation || player.position || config.label}</span>
-                        </div>
-                      </div>
-                      <p>{player.leaderSummary || `${player.rating} OVR`}</p>
-                    </button>
-                  ))
-                ) : (
-                  <p className="generic-empty-copy">Open the full players board to kick off the roster-wide crawl for this sport.</p>
-                )}
-              </div>
-            </article>
-            <article className="generic-card">
-              <div className="generic-card-head">
-                <h3>Predictor Rail</h3>
-                <button type="button" onClick={() => setPage('predictor')}>
-                  Open predictor
-                </button>
-              </div>
-              <PredictorRail predictors={predictors.slice(0, 4)} />
-            </article>
-          </section>
+          <SportOverviewView
+            sportKey={sportKey}
+            config={config}
+            bootstrap={bootstrap}
+            rankings={rankings}
+            scoreboard={scoreboard}
+            featuredPlayers={featuredPlayers}
+            predictors={predictors}
+            news={news}
+            openTeam={openTeam}
+            openPlayer={openPlayer}
+            openGame={openGame}
+            setPage={setPage}
+          />
         );
     }
   }
 
   return (
     <section
-      className="generic-sport-shell"
+      className={`generic-sport-shell sport-shell-${sportKey}`}
       style={{
         '--sport-accent': config.accent,
         '--sport-accent-alt': config.accentAlt,

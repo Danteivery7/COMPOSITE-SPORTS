@@ -803,6 +803,39 @@ select:focus { outline: none; border-color: var(--brand-primary); box-shadow: 0 
     border: 1px solid var(--divider);
 }
 
+.player-sync-pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(245, 158, 11, 0.22);
+    background: rgba(245, 158, 11, 0.12);
+    color: var(--warning-color);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 4px 8px;
+}
+
+.player-sync-panel {
+    padding: 18px;
+    border-radius: 18px;
+    border: 1px solid rgba(245, 158, 11, 0.18);
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.14), rgba(17, 11, 9, 0.48));
+}
+
+.player-sync-panel strong {
+    display: block;
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.player-sync-panel p {
+    margin: 0;
+    color: var(--text-secondary);
+    line-height: 1.7;
+}
+
 /* ======================== PLAYER DETAIL ======================== */
 .player-detail-layout {
     display: grid;
@@ -1034,6 +1067,291 @@ select:focus { outline: none; border-color: var(--brand-primary); box-shadow: 0 
     font-size: 16px;
 }
 
+/* ======================== PREGAME DETAIL PAGE ======================== */
+.pregame-page-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.pregame-hero-card,
+.pregame-panel {
+    border-radius: 22px;
+    border: 1px solid var(--divider);
+    background:
+        radial-gradient(circle at top right, rgba(251, 191, 36, 0.12), transparent 30%),
+        linear-gradient(145deg, rgba(28, 18, 15, 0.96), rgba(18, 12, 10, 0.98));
+    box-shadow: var(--shadow-md);
+}
+
+.pregame-hero-card {
+    padding: 24px;
+}
+
+.pregame-kicker {
+    color: var(--brand-secondary);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+}
+
+.pregame-matchup-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 16px;
+    align-items: center;
+}
+
+.pregame-team-spot {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.pregame-team-spot:last-child {
+    justify-content: flex-end;
+    text-align: right;
+}
+
+.pregame-team-spot h2 {
+    font-size: 24px;
+    font-weight: 900;
+    letter-spacing: -0.03em;
+}
+
+.pregame-team-spot p {
+    margin-top: 4px;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.pregame-team-logo {
+    width: 74px;
+    height: 74px;
+    object-fit: contain;
+    filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.4));
+}
+
+.pregame-versus-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    text-align: center;
+}
+
+.pregame-versus-block span {
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.pregame-versus-block strong {
+    font-size: 18px;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.pregame-context-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 18px;
+}
+
+.pregame-context-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--divider);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.pregame-context-pill.highlight {
+    color: #fff7ee;
+    border-color: rgba(249, 115, 22, 0.3);
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(251, 191, 36, 0.14));
+}
+
+.pregame-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+    gap: 18px;
+    margin-top: 18px;
+}
+
+.pregame-hero-side {
+    padding: 18px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--divider);
+}
+
+.pregame-side-label {
+    display: inline-flex;
+    margin-bottom: 10px;
+    color: var(--brand-secondary);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+}
+
+.pregame-model-score {
+    font-size: 30px;
+    font-weight: 900;
+    line-height: 1.05;
+    letter-spacing: -0.05em;
+}
+
+.pregame-model-prob {
+    margin-top: 10px;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.pregame-edge-copy {
+    margin-top: 12px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+}
+
+.pregame-panel {
+    padding: 20px;
+}
+
+.pregame-panel-wide {
+    width: 100%;
+}
+
+.pregame-market-grid,
+.pregame-comparison-grid,
+.pregame-props-grid {
+    display: grid;
+    gap: 12px;
+}
+
+.pregame-market-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pregame-comparison-grid {
+    grid-template-columns: 1fr;
+}
+
+.pregame-compare-row,
+.pregame-driver-row {
+    display: grid;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    border: 1px solid var(--divider);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.pregame-compare-row {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+}
+
+.pregame-compare-row strong:last-child {
+    text-align: right;
+}
+
+.pregame-compare-row span {
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.pregame-driver-row {
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.65;
+}
+
+.pregame-props-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pregame-prop-column {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.pregame-prop-team {
+    color: var(--brand-secondary);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.pregame-player-target {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    padding: 14px 16px;
+    border-radius: 16px;
+    border: 1px solid var(--divider);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-primary);
+    text-align: left;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.pregame-player-target:hover {
+    transform: translateY(-1px);
+    border-color: rgba(249, 115, 22, 0.24);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.pregame-player-target strong {
+    display: block;
+    font-size: 14px;
+}
+
+.pregame-player-target span {
+    display: block;
+    margin-top: 3px;
+    color: var(--text-secondary);
+    font-size: 11px;
+}
+
+.pregame-player-lines {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.pregame-player-line {
+    display: inline-flex;
+    align-items: center;
+    border-radius: var(--radius-full);
+    padding: 6px 10px;
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
 /* ======================== TEAM CARD ======================== */
 .team-card {
     padding: 16px;
@@ -1251,11 +1569,23 @@ select:focus { outline: none; border-color: var(--brand-primary); box-shadow: 0 
 [data-theme="light"] .overview-row-btn,
 [data-theme="light"] .skill-dna-row,
 [data-theme="light"] .context-card,
+[data-theme="light"] .player-sync-panel,
 [data-theme="light"] .player-intel-tag,
 [data-theme="light"] .badge-pill,
-[data-theme="light"] .overview-chip {
+[data-theme="light"] .overview-chip,
+[data-theme="light"] .pregame-context-pill,
+[data-theme="light"] .pregame-compare-row,
+[data-theme="light"] .pregame-driver-row,
+[data-theme="light"] .pregame-player-target,
+[data-theme="light"] .pregame-hero-side {
     background: #EEF1F6;
     border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .player-sync-pill {
+    background: rgba(217, 119, 6, 0.12);
+    border-color: rgba(217, 119, 6, 0.18);
+    color: #b45309;
 }
 
 [data-theme="light"] .overview-hero-panel {
@@ -1283,6 +1613,25 @@ select:focus { outline: none; border-color: var(--brand-primary); box-shadow: 0 
     border-color: rgba(0, 0, 0, 0.08);
 }
 
+[data-theme="light"] .pregame-hero-card,
+[data-theme="light"] .pregame-panel {
+    background:
+        radial-gradient(circle at top right, rgba(245, 158, 11, 0.16), transparent 30%),
+        linear-gradient(145deg, #fff8f1, #f1dfcb);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .pregame-context-pill.highlight {
+    color: #9a3412;
+    border-color: rgba(194, 65, 12, 0.2);
+    background: linear-gradient(135deg, rgba(194, 65, 12, 0.12), rgba(245, 158, 11, 0.12));
+}
+
+[data-theme="light"] .pregame-player-line {
+    background: rgba(255, 255, 255, 0.8);
+    color: #111827;
+}
+
 /* Logo */
 [data-theme="light"] .logo-composite { color: #111827; }
 
@@ -1305,6 +1654,11 @@ select:focus { outline: none; border-color: var(--brand-primary); box-shadow: 0 
     .skill-dna-grid {
         grid-template-columns: 1fr;
     }
+
+    .pregame-grid,
+    .pregame-props-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (max-width: 780px) {
@@ -1320,6 +1674,26 @@ select:focus { outline: none; border-color: var(--brand-primary); box-shadow: 0 
 
     .overview-hero-metrics {
         grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .pregame-matchup-head {
+        grid-template-columns: 1fr;
+        text-align: center;
+    }
+
+    .pregame-team-spot,
+    .pregame-team-spot:last-child {
+        justify-content: center;
+        text-align: center;
+    }
+
+    .pregame-player-target {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .pregame-player-lines {
+        justify-content: flex-start;
     }
 }
 

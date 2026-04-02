@@ -155,6 +155,9 @@ const app = {
     async fetchPlayerStatsInParallel() {
         const rosters = window.store.state.rosters;
         let allPlayerEntries = [];
+        const ratingMap = Object.fromEntries(
+            (window.store.state.players || []).map((player) => [String(player.id), Number(player.rating?.ratingNum || 0)])
+        );
 
         Object.keys(rosters).forEach(teamId => {
             const rosterObj = rosters[teamId];
@@ -164,13 +167,33 @@ const app = {
             });
         });
 
+        allPlayerEntries.sort((a, b) => (ratingMap[String(b.id)] || 0) - (ratingMap[String(a.id)] || 0));
+
         console.log(`[CompositeNBA] Starting parallel stats fetch for ${allPlayerEntries.length} players...`);
         window.store.updateLoadingProgress('playerStats', 0, allPlayerEntries.length, 'loading');
+        let previewRefreshQueued = false;
+
+        const queuePreviewRefresh = () => {
+            if (previewRefreshQueued) return;
+            previewRefreshQueued = true;
+            const run = () => {
+                previewRefreshQueued = false;
+                this.refreshPlayerSyncPreview();
+            };
+            if (window.requestAnimationFrame) {
+                window.requestAnimationFrame(run);
+            } else {
+                setTimeout(run, 0);
+            }
+        };
 
         const results = await window.api.fetchPlayerStatsParallel(
             allPlayerEntries,
             (fetched, total) => {
                 window.store.updateLoadingProgress('playerStats', fetched, total, 'loading');
+                if (fetched <= 12 || fetched % 80 === 0) {
+                    queuePreviewRefresh();
+                }
             },
             (batchResults) => {
                 // Apply stats incrementally
@@ -196,6 +219,7 @@ const app = {
             window.models.updateTeamRankings();
             window.store.setLastUpdated('players');
             window.store.setLastUpdated('teams');
+            this.runOfficialPlayerStatAudit();
             window.ui.renderRankings(window.store.state.teamRankings);
             if (document.getElementById('pane-players')?.classList.contains('active')) {
                 window.ui.renderPlayersList(window.store.state.players);
@@ -209,6 +233,66 @@ const app = {
         } else {
             setTimeout(finalSync, 500);
         }
+    },
+
+    refreshPlayerSyncPreview() {
+        window.models.updateAllPlayers();
+        const activePane = document.querySelector('.pane.active')?.id || '';
+        if (activePane === 'pane-players') {
+            window.ui.renderPlayersList(window.store.state.players);
+        }
+        if (activePane === 'pane-overview') {
+            window.ui.renderOverview();
+        }
+        if (window.store.state.activePlayerId) {
+            window.ui.showPlayerDetail(window.store.state.activePlayerId);
+        }
+    },
+
+    getPlayerAuditSamples(limit = 8) {
+        const players = window.store.state.players || [];
+        const sorted = [...players]
+            .filter((player) => player?.realStats || player?.rating?.hasRealStats)
+            .sort((a, b) => (b.rating?.ratingNum || 0) - (a.rating?.ratingNum || 0));
+
+        const buckets = [
+            sorted[0],
+            sorted[Math.floor(sorted.length * 0.12)],
+            sorted[Math.floor(sorted.length * 0.25)],
+            sorted[Math.floor(sorted.length * 0.4)],
+            sorted[Math.floor(sorted.length * 0.55)],
+            sorted[Math.floor(sorted.length * 0.7)],
+            sorted[Math.floor(sorted.length * 0.85)],
+            sorted[sorted.length - 1],
+        ].filter(Boolean);
+
+        const seen = new Set();
+        return buckets.filter((player) => {
+            if (seen.has(player.id)) return false;
+            seen.add(player.id);
+            return true;
+        }).slice(0, limit);
+    },
+
+    runOfficialPlayerStatAudit() {
+        const samples = this.getPlayerAuditSamples();
+        if (!samples.length) return;
+
+        const auditRows = samples.map((player) => {
+            const official = player.realStats || null;
+            return {
+                player: player.fullName || player.displayName,
+                season: official?.seasonLabel || '--',
+                source: official?.statSource || (player.rating?.hasRealStats ? 'official' : 'estimated'),
+                ppg: official?.ppg ?? null,
+                rpg: official?.rpg ?? null,
+                apg: official?.apg ?? null,
+                gp: official?.gp ?? null,
+                rating: player.rating?.rating || '--',
+            };
+        });
+
+        console.table(auditRows);
     },
 
     /**

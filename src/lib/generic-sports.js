@@ -758,6 +758,14 @@ async function getGameDetail(sport, gameId) {
 
   try {
     const summary = await fetchJson(`${meta.site}/summary?event=${gameId}`, 20 * 1000);
+    const competition = summary.header?.competitions?.[0] || null;
+    const venue = summary.gameInfo?.venue?.fullName || competition?.venue?.fullName || '';
+    const venueAddress = summary.gameInfo?.venue?.address || competition?.venue?.address || {};
+    const location = [venueAddress.city, venueAddress.state, venueAddress.country].filter(Boolean).join(', ');
+    const broadcast =
+      competition?.broadcasts?.[0]?.media?.shortName ||
+      competition?.broadcasts?.[0]?.names?.join(', ') ||
+      '';
     const notes = [];
     walk(summary, (node) => {
       if (typeof node === 'string' && node.length > 18 && notes.length < 12) {
@@ -768,10 +776,18 @@ async function getGameDetail(sport, gameId) {
     return {
       sport,
       game,
+      headline:
+        summary.predictor?.header ||
+        summary.header?.competitions?.[0]?.note?.headline ||
+        summary.article?.headline ||
+        game.name,
       summary:
         summary.header?.competitions?.[0]?.note?.headline ||
         summary.predictor?.header ||
         game.statusLabel,
+      venue,
+      location,
+      broadcast,
       notes: uniqBy(notes, (note) => note).slice(0, 8),
       lastUpdated: new Date().toISOString(),
     };
@@ -779,7 +795,11 @@ async function getGameDetail(sport, gameId) {
     return {
       sport,
       game,
+      headline: game.name,
       summary: game.statusLabel,
+      venue: '',
+      location: '',
+      broadcast: game.broadcast || '',
       notes: [],
       lastUpdated: new Date().toISOString(),
     };

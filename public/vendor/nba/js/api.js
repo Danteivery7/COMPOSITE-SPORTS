@@ -110,19 +110,28 @@ const api = {
         return d.getMonth() >= 9 ? year + 1 : year;
     },
 
-    pickSeasonEntry(statistics = [], seasonYear = this.getSeasonYear()) {
-        if (!Array.isArray(statistics) || statistics.length === 0) return null;
-        return (
-            statistics.find((entry) => Number(entry?.season?.year) === Number(seasonYear)) ||
-            statistics[statistics.length - 1] ||
-            null
-        );
+    getEntryGamesPlayed(category, entry) {
+        if (!category || !entry) return 0;
+        const mapped = this.mapCategoryValues(category, entry?.stats);
+        return Number(mapped.gamesPlayed ?? mapped.gp ?? 0);
     },
 
-    pickPreviousSeasonEntry(statistics = [], seasonYear = this.getSeasonYear()) {
+    pickSeasonEntry(statistics = [], seasonYear = this.getSeasonYear(), category = null) {
+        if (!Array.isArray(statistics) || statistics.length === 0) return null;
+        const exactSeason = statistics.filter((entry) => Number(entry?.season?.year) === Number(seasonYear));
+        const exactWithGames = exactSeason.find((entry) => this.getEntryGamesPlayed(category, entry) > 0);
+        if (exactWithGames) return exactWithGames;
+        if (exactSeason.length) return exactSeason[0];
+
+        const sampled = statistics.filter((entry) => this.getEntryGamesPlayed(category, entry) > 0);
+        return sampled[sampled.length - 1] || statistics[statistics.length - 1] || null;
+    },
+
+    pickPreviousSeasonEntry(statistics = [], seasonYear = this.getSeasonYear(), category = null) {
         if (!Array.isArray(statistics) || statistics.length === 0) return null;
         const previous = statistics.filter((entry) => Number(entry?.season?.year) < Number(seasonYear));
-        return previous.length ? previous[previous.length - 1] : null;
+        const sampled = previous.filter((entry) => this.getEntryGamesPlayed(category, entry) > 0);
+        return sampled[sampled.length - 1] || (previous.length ? previous[previous.length - 1] : null);
     },
 
     assignMappedStat(target, name, rawValue) {
@@ -181,10 +190,15 @@ const api = {
             const nameMap = {};
             const careerMap = {};
             const lastSeasonMap = {};
+            let resolvedSeasonEntry = null;
 
             categories.forEach((cat) => {
-                const currentSeasonEntry = this.pickSeasonEntry(cat.statistics, seasonYear);
-                const previousSeasonEntry = this.pickPreviousSeasonEntry(cat.statistics, seasonYear);
+                const currentSeasonEntry = this.pickSeasonEntry(cat.statistics, seasonYear, cat);
+                const previousSeasonEntry = this.pickPreviousSeasonEntry(cat.statistics, seasonYear, cat);
+
+                if (!resolvedSeasonEntry && currentSeasonEntry?.season) {
+                    resolvedSeasonEntry = currentSeasonEntry;
+                }
 
                 Object.assign(nameMap, this.mapCategoryValues(cat, currentSeasonEntry?.stats));
                 Object.assign(careerMap, this.mapCategoryValues(cat, cat?.totals));
@@ -325,7 +339,9 @@ const api = {
                 shootingEfficiency: this.normalizePercent(nameMap['shootingEfficiency']) || efgPct || 50,
                 career,
                 lastSeason,
-                seasonLabel: this.pickSeasonEntry(categories.find((cat) => cat.name === 'averages')?.statistics, seasonYear)?.season?.displayName || `${seasonYear - 1}-${String(seasonYear).slice(-2)}`
+                seasonYear: Number(resolvedSeasonEntry?.season?.year || seasonYear),
+                seasonLabel: resolvedSeasonEntry?.season?.displayName || `${seasonYear - 1}-${String(seasonYear).slice(-2)}`,
+                statSource: 'official',
             };
         } catch (error) {
             console.warn(`[Stats] Full fetch failed for ${playerId}:`, error.message);

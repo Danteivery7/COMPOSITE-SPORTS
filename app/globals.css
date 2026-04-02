@@ -371,45 +371,84 @@ button {
   position: absolute;
 }
 
-.sport-intro[data-motif='court'] .sport-intro-runway,
-.sport-intro[data-motif='bracket'] .sport-intro-runway {
+.sport-intro[data-motif='court'] .sport-intro-runway {
   background:
-    radial-gradient(circle at center, rgba(255, 255, 255, 0.06), transparent 60%),
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.08), transparent 56%),
+    radial-gradient(circle at center, transparent 0 18%, rgba(255, 255, 255, 0.08) 18% 18.6%, transparent 18.6%),
     linear-gradient(90deg, transparent 0 18%, rgba(255, 255, 255, 0.08) 18% 19%, transparent 19% 81%, rgba(255, 255, 255, 0.08) 81% 82%, transparent 82%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent);
+    linear-gradient(180deg, rgba(126, 59, 17, 0.22), rgba(20, 9, 6, 0.02));
 }
 
-.sport-intro[data-motif='court'] .sport-intro-portal,
-.sport-intro[data-motif='bracket'] .sport-intro-portal {
+.sport-intro[data-motif='court'] .sport-intro-portal {
   border-color: rgba(255, 196, 112, 0.22);
 }
 
-.sport-intro[data-motif='court'] .sport-intro-object,
-.sport-intro[data-motif='bracket'] .sport-intro-object {
+.sport-intro[data-motif='court'] .sport-intro-object {
   background:
     radial-gradient(circle at 35% 30%, #ffb55f, #e9771d 55%, #9d430f 100%);
 }
 
-.sport-intro[data-motif='court'] .detail-a,
-.sport-intro[data-motif='bracket'] .detail-a {
+.sport-intro[data-motif='court'] .detail-a {
   inset: 10% 47% 10% 47%;
   background: rgba(66, 28, 6, 0.72);
   border-radius: 999px;
 }
 
-.sport-intro[data-motif='court'] .detail-b,
-.sport-intro[data-motif='bracket'] .detail-b {
+.sport-intro[data-motif='court'] .detail-b {
   inset: 47% 10% 47% 10%;
   background: rgba(66, 28, 6, 0.72);
   border-radius: 999px;
 }
 
-.sport-intro[data-motif='court'] .detail-c,
-.sport-intro[data-motif='bracket'] .detail-c {
+.sport-intro[data-motif='court'] .detail-c {
   inset: 12% 18%;
   border-top: 4px solid rgba(66, 28, 6, 0.72);
   border-bottom: 4px solid rgba(66, 28, 6, 0.72);
   border-radius: 50%;
+}
+
+.sport-intro[data-motif='bracket'] .sport-intro-runway {
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0 1.8%, transparent 1.8% 14%, rgba(255, 255, 255, 0.08) 14% 15.2%, transparent 15.2% 84.8%, rgba(255, 255, 255, 0.08) 84.8% 86%, transparent 86% 98.2%, rgba(255, 255, 255, 0.08) 98.2% 100%),
+    linear-gradient(180deg, transparent 0 17%, rgba(255, 255, 255, 0.08) 17% 18.2%, transparent 18.2% 38%, rgba(255, 255, 255, 0.08) 38% 39.2%, transparent 39.2% 59%, rgba(255, 255, 255, 0.08) 59% 60.2%, transparent 60.2% 80%, rgba(255, 255, 255, 0.08) 80% 81.2%, transparent 81.2%),
+    linear-gradient(180deg, rgba(146, 84, 18, 0.16), transparent);
+}
+
+.sport-intro[data-motif='bracket'] .sport-intro-portal {
+  border-color: rgba(255, 214, 138, 0.26);
+  background:
+    radial-gradient(circle at center, rgba(255, 229, 173, 0.12), transparent 62%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0 10%, transparent 10% 90%, rgba(255, 255, 255, 0.04) 90% 100%);
+}
+
+.sport-intro[data-motif='bracket'] .sport-intro-object {
+  width: 9rem;
+  height: 9rem;
+  border-radius: 28%;
+  background:
+    linear-gradient(135deg, #f9c15a, #da7c1d);
+  transform: translateX(-50%) rotate(8deg);
+}
+
+.sport-intro[data-motif='bracket'] .detail-a,
+.sport-intro[data-motif='bracket'] .detail-b,
+.sport-intro[data-motif='bracket'] .detail-c {
+  background: rgba(73, 34, 9, 0.76);
+}
+
+.sport-intro[data-motif='bracket'] .detail-a {
+  inset: 18% 18% auto 18%;
+  height: 10%;
+}
+
+.sport-intro[data-motif='bracket'] .detail-b {
+  inset: 44% 18% auto 18%;
+  height: 10%;
+}
+
+.sport-intro[data-motif='bracket'] .detail-c {
+  inset: auto 18% 18% 18%;
+  height: 10%;
 }
 
 .sport-intro[data-motif='diamond'] .sport-intro-runway {
@@ -418,9 +457,10 @@ button {
   bottom: -8rem;
   clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
   background:
-    linear-gradient(135deg, rgba(255, 222, 164, 0.16), rgba(255, 255, 255, 0.04)),
-    linear-gradient(90deg, transparent 0 49%, rgba(255, 255, 255, 0.12) 49% 51%, transparent 51%),
-    linear-gradient(180deg, transparent 0 49%, rgba(255, 255, 255, 0.12) 49% 51%, transparent 51%);
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.04), transparent 52%),
+    linear-gradient(135deg, rgba(44, 132, 87, 0.28), rgba(255, 255, 255, 0.03)),
+    linear-gradient(90deg, transparent 0 49%, rgba(247, 230, 198, 0.2) 49% 51%, transparent 51%),
+    linear-gradient(180deg, transparent 0 49%, rgba(247, 230, 198, 0.2) 49% 51%, transparent 51%);
 }
 
 .sport-intro[data-motif='diamond'] .sport-intro-portal {
@@ -429,8 +469,9 @@ button {
   top: 11%;
   border-radius: 999px;
   background:
-    radial-gradient(circle at center, rgba(255, 229, 173, 0.16), transparent 62%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 80%);
+    radial-gradient(circle at center, rgba(255, 229, 173, 0.18), transparent 62%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 80%),
+    linear-gradient(90deg, transparent 0 10%, rgba(255, 255, 255, 0.04) 10% 11%, transparent 11% 89%, rgba(255, 255, 255, 0.04) 89% 90%, transparent 90%);
 }
 
 .sport-intro[data-motif='diamond'] .sport-intro-object {
@@ -1200,14 +1241,372 @@ button {
   font-size: 2rem;
 }
 
+.sport-shell-cbb .generic-stage,
+.sport-shell-cbb .generic-sidebar {
+  background:
+    radial-gradient(circle at top, rgba(255, 207, 108, 0.12), transparent 30%),
+    linear-gradient(180deg, rgba(20, 14, 13, 0.95), rgba(10, 10, 13, 0.98));
+}
+
+.sport-shell-nfl .generic-stage,
+.sport-shell-nfl .generic-sidebar {
+  background:
+    radial-gradient(circle at top, rgba(124, 255, 145, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(6, 18, 10, 0.96), rgba(4, 10, 7, 0.99));
+}
+
+.sport-shell-mls .generic-stage,
+.sport-shell-mls .generic-sidebar {
+  background:
+    radial-gradient(circle at top, rgba(255, 130, 165, 0.12), transparent 30%),
+    linear-gradient(180deg, rgba(8, 17, 13, 0.95), rgba(6, 9, 8, 0.99));
+}
+
+.sport-shell-cbb .generic-stage::before,
+.sport-shell-nfl .generic-stage::before,
+.sport-shell-mls .generic-stage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.18;
+}
+
+.sport-shell-cbb .generic-stage,
+.sport-shell-nfl .generic-stage,
+.sport-shell-mls .generic-stage {
+  position: relative;
+  overflow: hidden;
+}
+
+.sport-shell-cbb .generic-stage::before {
+  background:
+    linear-gradient(90deg, transparent 0 10%, rgba(255, 255, 255, 0.03) 10% 10.4%, transparent 10.4% 89.6%, rgba(255, 255, 255, 0.03) 89.6% 90%, transparent 90%),
+    linear-gradient(180deg, transparent 0 24%, rgba(255, 255, 255, 0.02) 24% 24.4%, transparent 24.4% 49.6%, rgba(255, 255, 255, 0.02) 49.6% 50%, transparent 50%);
+}
+
+.sport-shell-nfl .generic-stage::before {
+  background:
+    linear-gradient(90deg, transparent 0 8%, rgba(255, 255, 255, 0.04) 8% 8.3%, transparent 8.3% 91.7%, rgba(255, 255, 255, 0.04) 91.7% 92%, transparent 92%),
+    repeating-linear-gradient(90deg, transparent 0 9.8%, rgba(255, 255, 255, 0.025) 9.8% 10%, transparent 10% 20%);
+}
+
+.sport-shell-mls .generic-stage::before {
+  background:
+    linear-gradient(90deg, transparent 0 21%, rgba(255, 255, 255, 0.04) 21% 21.3%, transparent 21.3% 78.7%, rgba(255, 255, 255, 0.04) 78.7% 79%, transparent 79%),
+    linear-gradient(180deg, transparent 0 49.2%, rgba(255, 255, 255, 0.03) 49.2% 50.2%, transparent 50.2%);
+}
+
+.sportview-shell {
+  display: grid;
+  gap: 18px;
+}
+
+.sportview-hero {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.sportview-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.24;
+}
+
+.sportview-hero-cbb {
+  grid-template-columns: 1.15fr 0.85fr;
+}
+
+.sportview-hero-cbb::before {
+  background:
+    linear-gradient(135deg, rgba(255, 207, 108, 0.16), transparent 55%),
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0 14px, transparent 14px 28px);
+}
+
+.sportview-hero-nfl {
+  grid-template-columns: 1.2fr 0.8fr;
+}
+
+.sportview-hero-nfl::before {
+  background:
+    linear-gradient(180deg, rgba(124, 255, 145, 0.14), transparent 56%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 12%);
+}
+
+.sportview-hero-mls {
+  grid-template-columns: 1.1fr 0.9fr;
+}
+
+.sportview-hero-mls::before {
+  background:
+    radial-gradient(circle at top right, rgba(255, 130, 165, 0.16), transparent 34%),
+    linear-gradient(180deg, rgba(124, 255, 145, 0.08), transparent 64%);
+}
+
+.sportview-hero-copy,
+.sportview-hero-side,
+.sportview-spotlight,
+.sportview-detail-brand,
+.sportview-matchup {
+  position: relative;
+  z-index: 1;
+}
+
+.sportview-hero-copy h2,
+.sportview-detail-brand h2 {
+  margin: 10px 0 10px;
+  font-size: 2rem;
+}
+
+.sportview-hero-copy p:last-child,
+.sportview-body-copy {
+  color: #dce5fa;
+  line-height: 1.75;
+}
+
+.sportview-hero-side,
+.sportview-list,
+.sportview-note-list,
+.sportview-feature-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.sportview-spotlight,
+.sportview-note-link,
+.sportview-feature-card {
+  width: 100%;
+  text-align: left;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+
+.sportview-spotlight-label,
+.sportview-row-head span,
+.sportview-panel-head p,
+.sportview-note-link span,
+.sportview-feature-card p {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.sportview-spotlight strong,
+.sportview-panel-head h3,
+.sportview-row-head strong,
+.sportview-note-link strong,
+.sportview-feature-card strong {
+  display: block;
+}
+
+.sportview-spotlight.muted,
+.sportview-spotlight.thin {
+  min-height: auto;
+}
+
+.sportview-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sportview-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.9rem;
+  color: #f4f7ff;
+}
+
+.sportview-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.sportview-grid-cbb {
+  grid-template-columns: 1.1fr 0.95fr 0.95fr;
+}
+
+.sportview-grid-nfl {
+  grid-template-columns: 1.05fr 1fr 0.95fr;
+}
+
+.sportview-grid-mls {
+  grid-template-columns: 1fr 0.95fr 1.05fr;
+}
+
+.sportview-lower {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 18px;
+}
+
+.sportview-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.sportview-panel-wide {
+  min-width: 0;
+}
+
+.sportview-panel-tall {
+  min-height: 100%;
+}
+
+.sportview-panel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.sportview-panel-head button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+}
+
+.sportview-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  text-align: left;
+}
+
+.sportview-row-head strong {
+  font-size: 1rem;
+}
+
+.sportview-row-value,
+.sportview-scoreline {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1rem;
+  color: var(--sport-accent-alt);
+  font-weight: 700;
+}
+
+.sportview-feature-grid {
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+
+.sportview-feature-card {
+  display: grid;
+  gap: 10px;
+}
+
+.sportview-note-link.static {
+  cursor: default;
+}
+
+.sportview-score-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.sportview-score-grid-cbb,
+.sportview-score-grid-mls {
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+}
+
+.sportview-score-grid-nfl {
+  grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+}
+
+.sportview-score-card {
+  text-align: left;
+  display: grid;
+  gap: 14px;
+}
+
+.sportview-score-topline,
+.sportview-score-team {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+}
+
+.sportview-score-teams {
+  display: grid;
+  gap: 12px;
+}
+
+.sportview-score-number {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.2rem;
+}
+
+.sportview-detail-shell {
+  display: grid;
+  gap: 18px;
+}
+
+.sportview-back {
+  justify-self: start;
+}
+
+.sportview-detail-hero {
+  gap: 16px;
+}
+
+.sportview-detail-brand,
+.sportview-match-side {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.sportview-detail-grid {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 18px;
+}
+
+.sportview-matchup {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 16px;
+  align-items: center;
+}
+
+.sportview-match-center {
+  text-align: center;
+  display: grid;
+  gap: 8px;
+}
+
+.sportview-match-center strong {
+  font-size: 1.7rem;
+}
+
 .mlb-route-shell {
   position: relative;
   min-height: 100vh;
+  background:
+    radial-gradient(circle at top, rgba(246, 213, 156, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(12, 29, 20, 0.2), transparent 34%);
 }
 
 .mlb-route-topbar {
   position: relative;
   z-index: 11;
+  background: linear-gradient(180deg, rgba(7, 18, 13, 0.9), rgba(7, 18, 13, 0.4));
+  border-bottom: 1px solid rgba(246, 213, 156, 0.08);
 }
 
 @media (min-width: 1024px) {
@@ -1235,6 +1634,17 @@ button {
   }
 
   .generic-overview-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .sportview-hero-cbb,
+  .sportview-hero-nfl,
+  .sportview-hero-mls,
+  .sportview-grid-cbb,
+  .sportview-grid-nfl,
+  .sportview-grid-mls,
+  .sportview-lower,
+  .sportview-detail-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -1300,18 +1710,32 @@ button {
   .mlb-route-topbar,
   .generic-stage-header,
   .generic-card-head,
+  .sportview-panel-head,
   .generic-controls,
   .generic-detail-head,
   .generic-matchup-head,
-  .generic-player-hero {
+  .generic-player-hero,
+  .sportview-matchup,
+  .sportview-score-topline,
+  .sportview-score-team {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .sportview-matchup {
+    display: grid;
+    grid-template-columns: 1fr;
+    text-align: left;
   }
 
   .generic-score-grid,
   .generic-team-grid,
   .generic-feature-grid,
-  .generic-predictor-grid {
+  .generic-predictor-grid,
+  .sportview-score-grid-cbb,
+  .sportview-score-grid-nfl,
+  .sportview-score-grid-mls,
+  .sportview-feature-grid {
     grid-template-columns: 1fr;
   }
 }
