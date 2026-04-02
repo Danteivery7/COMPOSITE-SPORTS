@@ -1,4 +1,14 @@
 const clientRouteCache = new Map();
+const clientRouteListeners = new Map();
+
+function emitUpdate(url) {
+    const listeners = clientRouteListeners.get(url);
+    if (!listeners?.size) return;
+    const payload = clientRouteCache.get(url)?.data ?? null;
+    for (const listener of listeners) {
+        listener(payload);
+    }
+}
 
 function storeData(url, data) {
     clientRouteCache.set(url, {
@@ -6,11 +16,26 @@ function storeData(url, data) {
         promise: null,
         fetchedAt: Date.now(),
     });
+    emitUpdate(url);
     return data;
 }
 
 export function getMLBPrefetchedData(url) {
     return clientRouteCache.get(url)?.data ?? null;
+}
+
+export function subscribeMLBRoute(url, listener) {
+    if (!clientRouteListeners.has(url)) {
+        clientRouteListeners.set(url, new Set());
+    }
+    const listeners = clientRouteListeners.get(url);
+    listeners.add(listener);
+    return () => {
+        listeners.delete(listener);
+        if (!listeners.size) {
+            clientRouteListeners.delete(url);
+        }
+    };
 }
 
 export async function fetchMLBRouteJson(url, options = {}) {

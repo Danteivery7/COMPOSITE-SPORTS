@@ -1,35 +1,14 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { fetchMLBRouteJson } from '@/src/mlb/lib/clientPrefetch';
+import { useMemo, useState } from 'react';
+import { useMLBRouteData } from '@/src/mlb/lib/useMLBRouteData';
 
 export default function RankingsPage({ favorites, toggleFavorite, onTeamClick }) {
-    const [data, setData] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const { data, loading, refresh } = useMLBRouteData('/api/mlb/rankings');
     const [search, setSearch] = useState('');
     const [league, setLeague] = useState('All');
     const [division, setDivision] = useState('All');
     const [sortBy, setSortBy] = useState('ovrRank');
-    const [refreshing, setRefreshing] = useState(false);
-
-    const fetchRankings = async (force = false) => {
-        try {
-            setRefreshing(true);
-            const json = await fetchMLBRouteJson('/api/mlb/rankings', { force });
-            setData(json);
-        } catch (err) {
-            console.error('Rankings fetch error:', err);
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchRankings();
-        const timer = setInterval(() => fetchRankings(true), 10000);
-        return () => clearInterval(timer);
-    }, []);
 
     const filteredRankings = useMemo(() => {
         if (!data?.rankings) return [];
@@ -111,7 +90,7 @@ export default function RankingsPage({ favorites, toggleFavorite, onTeamClick })
                     </p>
                     <div className="last-updated">
                         <span>Updated: {formatLastUpdated(data?.lastUpdated)}</span>
-                        <span className="refresh-icon" onClick={() => fetchRankings(true)} style={{ opacity: refreshing ? 0.5 : 1 }}></span>
+                        <span className="refresh-icon" onClick={refresh}></span>
                     </div>
                 </div>
             </div>

@@ -1,27 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import { MLB_TEAMS } from '@/src/mlb/lib/teams';
-import { fetchMLBRouteJson } from '@/src/mlb/lib/clientPrefetch';
+import { useMLBRouteData } from '@/src/mlb/lib/useMLBRouteData';
 
 export default function SettingsPage({ favorites, toggleFavorite, theme, toggleTheme }) {
-    const [dataStatus, setDataStatus] = useState(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        // Check data source status by calling rankings API
-        fetchMLBRouteJson('/api/mlb/rankings')
-            .then(data => {
-                setDataStatus({
-                    sources: data.sources || [],
-                    failedSources: data.failedSources || [],
-                    lastUpdated: data.lastUpdated,
-                    teamCount: data.rankings?.length || 0,
-                });
-                setLoading(false);
-            })
-            .catch(() => setLoading(false));
-    }, []);
+    const { data, loading } = useMLBRouteData('/api/mlb/rankings');
+    const dataStatus = useMemo(() => {
+        if (!data) return null;
+        return {
+            sources: data.sources || [],
+            failedSources: data.failedSources || [],
+            lastUpdated: data.lastUpdated,
+            teamCount: data.rankings?.length || 0,
+        };
+    }, [data]);
 
     const favoriteTeams = MLB_TEAMS.filter(t => favorites.includes(t.id));
 

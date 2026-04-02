@@ -1,19 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { fetchMLBRouteJson } from '@/src/mlb/lib/clientPrefetch';
+import { useMLBRouteData } from '@/src/mlb/lib/useMLBRouteData';
 
 export default function PlayerDetailPage({ playerId, onBack }) {
-    const [data, setData] = useState(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        if (!playerId) return;
-        setLoading(true);
-        fetchMLBRouteJson(`/api/mlb/players/${playerId}`)
-            .then(json => { setData(json); setLoading(false); })
-            .catch(() => setLoading(false));
-    }, [playerId]);
+    const { data, loading } = useMLBRouteData(`/api/mlb/players/${playerId}`, {
+        enabled: Boolean(playerId),
+        refreshInterval: 60000,
+    });
 
     if (loading) {
         return (

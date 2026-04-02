@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { fetchMLBRouteJson } from '@/src/mlb/lib/clientPrefetch';
+import { useMLBRouteData } from '@/src/mlb/lib/useMLBRouteData';
 
 function formatTime(isoString) {
     if (!isoString) return '';
@@ -31,28 +30,7 @@ function getGameStatusLabel(game) {
 }
 
 export default function OverviewPage({ onTeamClick, onPlayerClick, onGameClick }) {
-    const [data, setData] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const timerRef = useRef(null);
-
-    const fetchOverview = async (force = false) => {
-        try {
-            const json = await fetchMLBRouteJson('/api/mlb/overview', { force });
-            setData(json);
-            setError(null);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchOverview();
-        timerRef.current = setInterval(() => fetchOverview(true), 60000);
-        return () => clearInterval(timerRef.current);
-    }, []);
+    const { data, loading, error, refresh } = useMLBRouteData('/api/mlb/overview');
 
     if (loading) {
         return (
@@ -87,7 +65,7 @@ export default function OverviewPage({ onTeamClick, onPlayerClick, onGameClick }
                     </p>
                     <div className="last-updated">
                         <span>Updated: {formatTimestamp(data?.lastUpdated)}</span>
-                        <span className="refresh-icon" onClick={() => fetchOverview(true)}></span>
+                        <span className="refresh-icon" onClick={refresh}></span>
                     </div>
                 </div>
             </div>

@@ -1,31 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { fetchMLBRouteJson } from '@/src/mlb/lib/clientPrefetch';
+import { useMLBRouteData } from '@/src/mlb/lib/useMLBRouteData';
 
 export default function NewsPage() {
-    const [data, setData] = useState({ articles: [], lastUpdated: null });
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const timerRef = useRef(null);
-
-    const fetchNews = async (force = false) => {
-        try {
-            const json = await fetchMLBRouteJson('/api/mlb/news', { force });
-            setData(json);
-            setError(null);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchNews();
-        timerRef.current = setInterval(() => fetchNews(true), 300000);
-        return () => clearInterval(timerRef.current);
-    }, []);
+    const { data = { articles: [], lastUpdated: null }, loading, error, refresh } = useMLBRouteData('/api/mlb/news');
 
     const formatTimestamp = (isoString) => {
         if (!isoString) return 'Never';
@@ -73,7 +51,7 @@ export default function NewsPage() {
                     </p>
                     <div className="last-updated">
                         <span>Updated: {formatTimestamp(data?.lastUpdated)}</span>
-                        <span className="refresh-icon" onClick={() => fetchNews(true)}></span>
+                        <span className="refresh-icon" onClick={refresh}></span>
                     </div>
                 </div>
             </div>

@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { fetchMLBRouteJson } from '@/src/mlb/lib/clientPrefetch';
+import { useMLBRouteData } from '@/src/mlb/lib/useMLBRouteData';
 
 /**
  * Returns a rich status object for a game based on its ESPN state and timing.
@@ -92,29 +91,7 @@ function getOrdinal(n) {
 }
 
 export default function LivePage({ onGameClick }) {
-    const [data, setData] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const timerRef = useRef(null);
-
-    const fetchScores = async (force = false) => {
-        try {
-            const json = await fetchMLBRouteJson('/api/mlb/scores', { force });
-            setData(json);
-            setError(null);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchScores();
-        // Auto-refresh every 10 seconds
-        timerRef.current = setInterval(() => fetchScores(true), 10000);
-        return () => clearInterval(timerRef.current);
-    }, []);
+    const { data, loading, error, refresh } = useMLBRouteData('/api/mlb/scores');
 
     const formatTime = (isoString) => {
         if (!isoString) return '';
@@ -178,7 +155,7 @@ export default function LivePage({ onGameClick }) {
                     <div className="last-updated">
                         <span>Updated: {formatLastUpdated(data?.lastUpdated)}</span>
                         {data?.stale && <span style={{ color: 'var(--accent-yellow)' }}> (cached)</span>}
-                        <span className="refresh-icon" onClick={() => fetchScores(true)}></span>
+                        <span className="refresh-icon" onClick={refresh}></span>
                     </div>
                 </div>
             </div>

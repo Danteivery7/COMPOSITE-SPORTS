@@ -22,6 +22,12 @@ const MLB_BOOTSTRAP_ROUTES = [
   '/api/mlb/players',
   '/api/mlb/news',
 ];
+const MLB_PRIMARY_REFRESH_ROUTES = [
+  '/api/mlb/warm',
+  '/api/mlb/overview',
+  '/api/mlb/scores',
+  '/api/mlb/rankings',
+];
 
 export default function Home() {
   const [currentPage, setCurrentPage] = useState('overview');
@@ -46,6 +52,24 @@ export default function Home() {
     // Warm the server cache first, then keep the main MLB tabs hot in the browser.
     fetchMLBRouteJson('/api/mlb/warm', { force: true, allowStaleOnError: true }).catch(() => { });
     prefetchMLBRoutes(MLB_BOOTSTRAP_ROUTES, { allowStaleOnError: true }).catch(() => { });
+
+    const primaryRefresh = setInterval(() => {
+      prefetchMLBRoutes(MLB_PRIMARY_REFRESH_ROUTES, { force: true, allowStaleOnError: true }).catch(() => { });
+    }, 15000);
+
+    const playersRefresh = setInterval(() => {
+      fetchMLBRouteJson('/api/mlb/players', { force: true, allowStaleOnError: true }).catch(() => { });
+    }, 60000);
+
+    const newsRefresh = setInterval(() => {
+      fetchMLBRouteJson('/api/mlb/news', { force: true, allowStaleOnError: true }).catch(() => { });
+    }, 300000);
+
+    return () => {
+      clearInterval(primaryRefresh);
+      clearInterval(playersRefresh);
+      clearInterval(newsRefresh);
+    };
   }, []);
 
   const toggleFavorite = useCallback((teamId) => {

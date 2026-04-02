@@ -1,36 +1,15 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { fetchMLBRouteJson } from '@/src/mlb/lib/clientPrefetch';
+import { useMLBRouteData } from '@/src/mlb/lib/useMLBRouteData';
 
 export default function PlayersPage({ onPlayerClick }) {
-    const [data, setData] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const { data, loading, error, refresh } = useMLBRouteData('/api/mlb/players');
     const [search, setSearch] = useState('');
     const [globalResults, setGlobalResults] = useState([]);
     const [isSearchingGlobal, setIsSearchingGlobal] = useState(false);
     const [posFilter, setPosFilter] = useState('All');
-    const timerRef = useRef(null);
     const searchTimeoutRef = useRef(null);
-
-    const fetchPlayers = async (force = false) => {
-        try {
-            const json = await fetchMLBRouteJson('/api/mlb/players', { force });
-            setData(json);
-            setError(null);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchPlayers();
-        timerRef.current = setInterval(() => fetchPlayers(true), 60000); // refresh every 60 sec to save limit
-        return () => clearInterval(timerRef.current);
-    }, []);
 
     // Global Search Effect
     useEffect(() => {
@@ -108,7 +87,7 @@ export default function PlayersPage({ onPlayerClick }) {
                     </p>
                     <div className="last-updated">
                         <span>Updated: {formatLastUpdated(data?.lastUpdated)}</span>
-                        <span className="refresh-icon" onClick={() => fetchPlayers(true)}></span>
+                        <span className="refresh-icon" onClick={refresh}></span>
                     </div>
                 </div>
             </div>

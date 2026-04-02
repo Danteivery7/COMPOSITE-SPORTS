@@ -1,36 +1,17 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { fetchMLBRouteJson } from '@/src/mlb/lib/clientPrefetch';
+import { useState } from 'react';
+import { useMLBRouteData } from '@/src/mlb/lib/useMLBRouteData';
 
 export default function GameDetailPage({ gameId, onBack }) {
-    const [game, setGame] = useState(null);
-    const [plays, setPlays] = useState([]);
-    const [keyPlays, setKeyPlays] = useState([]);
-    const [boxscore, setBoxscore] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const timerRef = useRef(null);
-
-    const fetchGame = async (force = false) => {
-        try {
-            const json = await fetchMLBRouteJson(`/api/mlb/games/${gameId}`, { force });
-            setGame(json.game);
-            setPlays(json.plays || []);
-            setKeyPlays(json.keyPlays || []);
-            setBoxscore(json.boxscore || null);
-        } catch (err) {
-            console.error('Game fetch error:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        if (!gameId) return;
-        fetchGame();
-        timerRef.current = setInterval(() => fetchGame(true), 10000);
-        return () => clearInterval(timerRef.current);
-    }, [gameId]);
+    const { data, loading } = useMLBRouteData(`/api/mlb/games/${gameId}`, {
+        enabled: Boolean(gameId),
+        refreshInterval: 10000,
+    });
+    const game = data?.game || null;
+    const plays = data?.plays || [];
+    const keyPlays = data?.keyPlays || [];
+    const boxscore = data?.boxscore || null;
 
     if (loading) {
         return (
