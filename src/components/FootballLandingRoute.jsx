@@ -51,8 +51,20 @@ export default function FootballLandingRoute() {
 
     async function load() {
       try {
-        const response = await fetch('/api/football/landing', { cache: 'no-store' });
-        const json = await response.json();
+        let response = await fetch('/api/football/landing', { cache: 'no-store' });
+        let json = await response.json();
+        const invalidLanding =
+          !response.ok ||
+          !Array.isArray(json?.leagues) ||
+          !json.leagues.length ||
+          !Array.isArray(json?.topPlayers) ||
+          !json.topPlayers.length;
+
+        if (invalidLanding) {
+          response = await fetch('/api/football/landing?force=1', { cache: 'no-store' });
+          json = await response.json();
+        }
+
         setData(json);
       } finally {
         setLoading(false);

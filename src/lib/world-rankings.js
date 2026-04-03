@@ -22,6 +22,7 @@ import {
 } from '@/public/vendor/nhl/src/analytics.js';
 
 const CACHE = new Map();
+const WORLD_CACHE_VERSION = 'v3';
 
 const SOURCE_WEIGHTS = {
   mlb: 1.18,
@@ -43,7 +44,7 @@ function clamp(value, min, max) {
 }
 
 function cacheKey(scope) {
-  return `world:${scope}`;
+  return `world:${WORLD_CACHE_VERSION}:${scope}`;
 }
 
 function readCache(key) {
@@ -250,10 +251,9 @@ function includeDiversityPicks(sorted) {
     selectedIds.add(candidate.id);
   }
 
-  const topScore = sorted[0]?.normalizedDominance || 0;
   DIVERSITY_SPORTS.forEach((sportKey) => {
     const candidate = sorted.find((entry) => entry.sportKey === sportKey);
-    if (candidate && candidate.normalizedDominance >= Math.max(84, topScore - 12)) {
+    if (candidate && candidate.normalizedDominance >= 78) {
       pushCandidate(candidate);
     }
   });

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { isFootballLeague } from '@/src/lib/football';
+import { getFootballBootstrap, isFootballLeague } from '@/src/lib/football';
 import { getFootballLeagueSnapshot } from '@/src/lib/live-sports-backend';
 
 export const dynamic = 'force-dynamic';
@@ -17,19 +17,28 @@ export async function GET(_request, { params }) {
     });
     return NextResponse.json(data);
   } catch (error) {
-    return NextResponse.json(
-      {
-        league,
-        error: error.message,
-        scoreboard: [],
-        rankings: [],
-        teams: [],
-        news: [],
-        featuredPlayers: [],
-        predictors: [],
-        lastUpdated: null,
-      },
-      { status: 500 },
-    );
+    try {
+      const rebuilt = await getFootballBootstrap(league);
+      return NextResponse.json({
+        ...rebuilt,
+        warning: error.message,
+      });
+    } catch (fallbackError) {
+      return NextResponse.json(
+        {
+          league,
+          error: fallbackError.message || error.message,
+          scoreboard: [],
+          rankings: [],
+          teams: [],
+          news: [],
+          featuredPlayers: [],
+          playersCatalog: { players: [], totalPlayers: 0, lastUpdated: null },
+          predictors: [],
+          lastUpdated: null,
+        },
+        { status: 500 },
+      );
+    }
   }
 }

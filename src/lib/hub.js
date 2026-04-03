@@ -18,6 +18,7 @@ import { formatEasternDisplay, getEasternNowLabel, getEasternWeeklyCycleId, isSa
 const STORY_TTL_MS = 5 * 60 * 1000;
 const BETS_TTL_MS = 90 * 1000;
 const HERO_TTL_MS = 60 * 1000;
+const HUB_CACHE_VERSION = 'v3';
 
 const EXTERNAL_NEWS_SOURCES = [
   {
@@ -1028,7 +1029,7 @@ async function buildHubHeroSnapshot() {
 }
 
 export async function getHubTrendingStories({ force = false } = {}) {
-  return getHotSnapshot('hub-trending-stories', () => buildTrendingStoriesSnapshot(), {
+  return getHotSnapshot(`hub-trending-stories-${HUB_CACHE_VERSION}`, () => buildTrendingStoriesSnapshot(), {
     ttlMs: STORY_TTL_MS,
     force,
   });
@@ -1071,14 +1072,14 @@ export async function getHubStoryDetail(storyId, apiHref = '') {
 }
 
 export async function getHubTopBets({ force = false } = {}) {
-  return getHotSnapshot('hub-top-bets', () => buildTopBetsSnapshot(), {
+  return getHotSnapshot(`hub-top-bets-${HUB_CACHE_VERSION}`, () => buildTopBetsSnapshot(), {
     ttlMs: BETS_TTL_MS,
     force,
   });
 }
 
 export async function getHubHero({ force = false } = {}) {
-  return getHotSnapshot('hub-hero', () => buildHubHeroSnapshot(), {
+  return getHotSnapshot(`hub-hero-${HUB_CACHE_VERSION}`, () => buildHubHeroSnapshot(), {
     ttlMs: HERO_TTL_MS,
     force,
   });
@@ -1099,9 +1100,9 @@ export async function warmHubSnapshots() {
       },
       { force: true, ttlMs: 15 * 60 * 1000 },
     ),
-    warmSnapshot('hub-trending-stories', () => buildTrendingStoriesSnapshot(), { force: true, ttlMs: STORY_TTL_MS }),
-    warmSnapshot('hub-top-bets', () => buildTopBetsSnapshot(), { force: true, ttlMs: BETS_TTL_MS }),
-    warmSnapshot('hub-hero', () => buildHubHeroSnapshot(), { force: true, ttlMs: HERO_TTL_MS }),
+    warmSnapshot(`hub-trending-stories-${HUB_CACHE_VERSION}`, () => buildTrendingStoriesSnapshot(), { force: true, ttlMs: STORY_TTL_MS }),
+    warmSnapshot(`hub-top-bets-${HUB_CACHE_VERSION}`, () => buildTopBetsSnapshot(), { force: true, ttlMs: BETS_TTL_MS }),
+    warmSnapshot(`hub-hero-${HUB_CACHE_VERSION}`, () => buildHubHeroSnapshot(), { force: true, ttlMs: HERO_TTL_MS }),
     getGenericSportSnapshot('nfl', { force: true }),
     getGenericSportSnapshot('cbb', { force: true }),
     getFootballLandingSnapshot({ force: true }),

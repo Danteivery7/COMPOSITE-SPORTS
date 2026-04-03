@@ -2,6 +2,7 @@ import { getHotSnapshot, warmSnapshot } from '@/src/lib/snapshot-store';
 import { getSportBootstrap, getPlayerCatalog, isGenericSport } from '@/src/lib/generic-sports';
 import {
   getFootballBootstrap,
+  getFootballFeaturedPlayers,
   getFootballLanding,
   getFootballPlayerCatalog,
   isFootballLeague,
@@ -10,7 +11,8 @@ import {
 const SPORT_BOOTSTRAP_TTL = 2 * 60 * 1000;
 const SPORT_PLAYER_TTL = 10 * 60 * 1000;
 const FOOTBALL_LANDING_TTL = 2 * 60 * 1000;
-const FOOTBALL_SNAPSHOT_VERSION = 'v3';
+const FOOTBALL_SNAPSHOT_VERSION = 'v4';
+const FOOTBALL_LANDING_VERSION = 'v2';
 
 function footballRecordHasGames(record) {
   const match = String(record || '').match(/(\d+)\s*-\s*(\d+)\s*-\s*(\d+)/);
@@ -27,6 +29,12 @@ function isHealthyFootballSnapshot(snapshot) {
     (team) => footballRecordHasGames(team?.record) || Number(team?.gamesPlayed || 0) > 0 || Number(team?.standingPoints || 0) > 0,
   );
   return rankedTeams >= 6 && playerCount >= 15 && hasRealRecords;
+}
+
+function isMeaningfulFootballSnapshot(snapshot) {
+  const rankings = snapshot?.rankings || [];
+  const players = snapshot?.playersCatalog?.players || [];
+  return rankings.length >= 6 || players.length >= 15;
 }
 
 function makeSportSnapshotKey(sport) {
@@ -56,9 +64,11 @@ async function buildGenericSportSnapshot(sport) {
 
 async function buildFootballLeagueSnapshot(leagueKey) {
   const bootstrap = await getFootballBootstrap(leagueKey);
-  const playersCatalog = bootstrap?.playersCatalog || (await getFootballPlayerCatalog(leagueKey));
+  const playersCatalog = bootstrap?.playersCatalog?.players?.length ? bootstrap.playersCatalog : (await getFootballPlayerCatalog(leagueKey));
+  const featuredPlayers = bootstrap?.featuredPlayers?.length ? bootstrap.featuredPlayers : await getFootballFeaturedPlayers(leagueKey, bootstrap?.rankings || []);
   const snapshot = {
     ...bootstrap,
+    featuredPlayers,
     playersCatalog,
     playerMeta: {
       totalPlayers: playersCatalog?.players?.length || 0,
@@ -123,7 +133,28 @@ export async function getFootballLeagueSnapshot(leagueKey, { force = false } = {
   }
 
   if (!isHealthyFootballSnapshot(snapshot)) {
-    throw new Error(`Football snapshot for ${leagueKey} is still incomplete after forced rebuild`);
+    const directBootstrap = await getFootballBootstrap(leagueKey);
+    const directPlayers = directBootstrap?.playersCatalog?.players?.length
+      ? directBootstrap.playersCatalog
+      : await getFootballPlayerCatalog(leagueKey);
+    const repaired = {
+      ...directBootstrap,
+      featuredPlayers: directBootstrap?.featuredPlayers?.length
+        ? directBootstrap.featuredPlayers
+        : (directPlayers?.players || []).slice(0, 12),
+      playersCatalog: directPlayers,
+      playerMeta: {
+        totalPlayers: directPlayers?.players?.length || 0,
+        lastUpdated: directPlayers?.lastUpdated || directBootstrap?.lastUpdated || null,
+      },
+      lastUpdated: new Date().toISOString(),
+    };
+
+    if (isMeaningfulFootballSnapshot(repaired)) {
+      return repaired;
+    }
+
+    throw new Error(`Football snapshot for ${leagueKey} is still incomplete after rebuild`);
   }
 
   return snapshot;
@@ -143,7 +174,7 @@ export async function warmFootballLeagueSnapshot(leagueKey, force = false) {
 
 export async function getFootballLandingSnapshot({ force = false } = {}) {
   return getHotSnapshot(
-    `football-landing-${FOOTBALL_SNAPSHOT_VERSION}`,
+    `football-landing-${FOOTBALL_LANDING_VERSION}`,
     async () => ({
       ...(await getFootballLanding()),
       lastUpdated: new Date().toISOString(),
@@ -154,7 +185,7 @@ export async function getFootballLandingSnapshot({ force = false } = {}) {
 
 export async function warmFootballLandingSnapshot(force = false) {
   return warmSnapshot(
-    `football-landing-${FOOTBALL_SNAPSHOT_VERSION}`,
+    `football-landing-${FOOTBALL_LANDING_VERSION}`,
     async () => ({
       ...(await getFootballLanding()),
       lastUpdated: new Date().toISOString(),

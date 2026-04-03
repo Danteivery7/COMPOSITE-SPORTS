@@ -12,7 +12,7 @@
   --radius-lg: 26px;
   --radius-md: 18px;
   --radius-sm: 12px;
-  --hub-marquee-duration: 44s;
+  --hub-marquee-duration: 52s;
 }
 
 *,
@@ -4367,7 +4367,7 @@ body[data-composite-route='football'] {
 }
 
 .hub-live-ticker-track {
-  animation-duration: calc(var(--hub-marquee-duration) * 1.65);
+  animation-duration: calc(var(--hub-marquee-duration) * 1.1);
 }
 
 .hub-story-marquee-pill {

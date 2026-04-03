@@ -610,9 +610,22 @@ export default function FootballLeagueApp({ leagueKey, initialEntry = null, them
   const initialEntryHandledRef = useRef(false);
 
   async function fetchBootstrap() {
+    let response = null;
     try {
-      const response = await fetch(`${apiBase}/bootstrap`, { cache: 'no-store' });
-      const data = await response.json();
+      response = await fetch(`${apiBase}/bootstrap`, { cache: 'no-store' });
+      let data = await response.json();
+      const invalidBoard =
+        !response.ok ||
+        !Array.isArray(data?.rankings) ||
+        !data.rankings.length ||
+        !Array.isArray(data?.playersCatalog?.players) ||
+        !data.playersCatalog.players.length;
+
+      if (invalidBoard) {
+        response = await fetch(`${apiBase}/bootstrap?force=1`, { cache: 'no-store' });
+        data = await response.json();
+      }
+
       setBootstrap(data);
     } finally {
       setLoadingBootstrap(false);

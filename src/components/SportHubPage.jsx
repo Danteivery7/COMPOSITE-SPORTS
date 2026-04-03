@@ -38,8 +38,20 @@ export default function SportHubPage() {
 
     async function loadHero() {
       try {
-        const response = await fetch('/api/hub/hero');
-        const json = await response.json();
+        let response = await fetch('/api/hub/hero', { cache: 'no-store' });
+        let json = await response.json();
+        const invalidHero =
+          !response.ok ||
+          !Array.isArray(json?.worldBoard?.players) ||
+          !json.worldBoard.players.length ||
+          !Array.isArray(json?.heroStories) ||
+          !json.heroStories.length;
+
+        if (invalidHero) {
+          response = await fetch('/api/hub/hero?force=1', { cache: 'no-store' });
+          json = await response.json();
+        }
+
         setHero(json);
       } finally {
         setLoading(false);
