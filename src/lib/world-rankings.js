@@ -22,7 +22,7 @@ import {
 } from '@/public/vendor/nhl/src/analytics.js';
 
 const CACHE = new Map();
-const WORLD_CACHE_VERSION = 'v4';
+const WORLD_CACHE_VERSION = 'v5';
 const DEFAULT_HEADSHOT = 'https://a.espncdn.com/i/headshots/nophoto.png';
 
 const SOURCE_WEIGHTS = {
@@ -78,6 +78,22 @@ function resolveHeadshot(...sources) {
   return DEFAULT_HEADSHOT;
 }
 
+function getSportHeadshotUrl(sportKey, playerId) {
+  const id = String(playerId || '').trim();
+  if (!id) return '';
+  if (sportKey === 'mlb') return `https://a.espncdn.com/i/headshots/mlb/players/full/${id}.png`;
+  if (sportKey === 'nba') return `https://a.espncdn.com/i/headshots/nba/players/full/${id}.png`;
+  if (sportKey === 'nhl') return `https://a.espncdn.com/i/headshots/nhl/players/full/${id}.png`;
+  if (sportKey === 'nfl') return `https://a.espncdn.com/i/headshots/nfl/players/full/${id}.png`;
+  if (sportKey === 'football') return `https://a.espncdn.com/i/headshots/soccer/players/full/${id}.png`;
+  if (sportKey === 'cbb') return `https://a.espncdn.com/i/headshots/mens-college-basketball/players/full/${id}.png`;
+  return '';
+}
+
+function resolveSportHeadshot(sportKey, playerId, ...sources) {
+  return resolveHeadshot(...sources, getSportHeadshotUrl(sportKey, playerId));
+}
+
 function positionDifficulty(position = '') {
   const pos = String(position).toUpperCase();
   if (['QB', 'PG', 'C', 'GK', 'SP', 'G'].includes(pos)) return 1;
@@ -124,12 +140,12 @@ async function getNBACandidates() {
         playerId &&
         officialPlayer &&
         player?.displayName &&
-        player?.headshot &&
         player?.rating?.hasRealStats &&
         Number.isFinite(overall),
       );
     })
     .map((player) => {
+      const officialPlayer = officialCatalog.get(String(player.id));
       const overall = Number(player.rating?.ratingNum);
       if (!Number.isFinite(overall)) return null;
       const hotness = Number(player.rating?.hotnessScore || 0);
@@ -137,7 +153,13 @@ async function getNBACandidates() {
         id: `nba-${player.id}`,
         playerId: String(player.id),
         displayName: player.fullName || player.displayName,
-        headshot: resolveHeadshot(player.headshot),
+        headshot: resolveSportHeadshot(
+          'nba',
+          player.id,
+          officialPlayer?.headshot,
+          player.headshot?.href,
+          player.headshot,
+        ),
         position: player.rating?.posAbbrev || player.position?.abbreviation || player.position || 'NBA',
         leagueLabel: 'NBA',
         sportKey: 'nba',
@@ -185,7 +207,7 @@ async function getNHLCandidates() {
           id: `nhl-${card.playerId}`,
           playerId: String(card.playerId),
           displayName: card.fullName || card.shortName || 'NHL Player',
-          headshot: resolveHeadshot(card.headshot),
+          headshot: resolveSportHeadshot('nhl', card.playerId, card.headshot),
           position: card.position || 'NHL',
           leagueLabel: 'NHL',
           sportKey: 'nhl',
@@ -269,7 +291,13 @@ function includeDiversityPicks(sorted) {
   });
 
   sorted.forEach((candidate) => pushCandidate(candidate));
-  return selected.slice(0, 5);
+  return selected
+    .sort(
+      (left, right) =>
+        right.normalizedDominance - left.normalizedDominance ||
+        Number(right.overall || 0) - Number(left.overall || 0),
+    )
+    .slice(0, 5);
 }
 
 async function getHubCandidates() {
@@ -303,7 +331,7 @@ async function getHubCandidates() {
     id: `mlb-${player.id}`,
     playerId: String(player.id),
     displayName: player.name || player.displayName,
-    headshot: resolveHeadshot(player.headshot),
+    headshot: resolveSportHeadshot('mlb', player.id, player.headshot),
     position: player.position || 'MLB',
     leagueLabel: 'MLB',
     sportKey: 'mlb',
@@ -322,7 +350,7 @@ async function getHubCandidates() {
       id: `${sportKey}-${player.id}`,
       playerId: String(player.id),
       displayName: player.displayName,
-      headshot: resolveHeadshot(player.headshot),
+      headshot: resolveSportHeadshot(sportKey, player.id, player.headshot),
       position: player.position || leagueLabel,
       leagueLabel,
       sportKey,
@@ -342,7 +370,7 @@ async function getHubCandidates() {
       id: `${leagueKey}-${player.id}`,
       playerId: String(player.id),
       displayName: player.displayName,
-      headshot: resolveHeadshot(player.headshot),
+      headshot: resolveSportHeadshot('football', player.id, player.headshot),
       position: player.position || 'Football',
       leagueLabel: league.label,
       sportKey: 'football',
@@ -379,13 +407,8 @@ export async function getWorldTopPlayers() {
   if (cached) return cached;
 
   const sourcePools = await getHubCandidates();
-  const footballByLeague = Array.from(
-    sourcePools.football.reduce((map, candidate) => {
-      const groupKey = candidate.leagueKey;
-      if (!map.has(groupKey)) map.set(groupKey, []);
-      map.get(groupKey).push(candidate);
-      return map;
-    }, new Map()).values(),
+  const footballPool = [...sourcePools.football].sort((left, right) =>
+    Number(right.overall || 0) - Number(left.overall || 0),
   );
 
   const normalized = [
@@ -394,7 +417,10 @@ export async function getWorldTopPlayers() {
     ...normalizeSourceCandidates(sourcePools.nhl, SOURCE_WEIGHTS.nhl),
     ...normalizeSourceCandidates(sourcePools.nfl, SOURCE_WEIGHTS.nfl),
     ...normalizeSourceCandidates(sourcePools.cbb, SOURCE_WEIGHTS.cbb),
-    ...footballByLeague.flatMap((pool) => normalizeSourceCandidates(pool, SOURCE_WEIGHTS.football + ((FOOTBALL_LEAGUES[pool[0]?.leagueKey]?.competitionWeight || 1) * 0.08))),
+    ...normalizeSourceCandidates(
+      footballPool,
+      SOURCE_WEIGHTS.football,
+    ),
   ];
 
   const players = includeDiversityPicks(
