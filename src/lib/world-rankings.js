@@ -22,7 +22,7 @@ import {
 } from '@/public/vendor/nhl/src/analytics.js';
 
 const CACHE = new Map();
-const WORLD_CACHE_VERSION = 'v7';
+const WORLD_CACHE_VERSION = 'v8';
 const DEFAULT_HEADSHOT = 'https://a.espncdn.com/i/headshots/nophoto.png';
 const MAX_PLAYERS_PER_SPORT = 2;
 const THIRD_PLAYER_CLEAR_MARGIN = 3;
@@ -258,7 +258,12 @@ function normalizeSourceCandidates(candidates, sourceWeight) {
   return sorted.map((candidate, index) => {
     const next = sorted[index + 1];
     const percentile = sorted.length === 1 ? 1 : 1 - index / Math.max(1, sorted.length - 1);
-    const separation = Math.max(0, Number(candidate.overall || 0) - Number(next?.overall ?? (candidate.overall || 0) - 1.5));
+    const rawSeparation = Math.max(0, Number(candidate.overall || 0) - Number(next?.overall ?? (candidate.overall || 0) - 1.5));
+    const tiedTopLeader =
+      index === 0 &&
+      next &&
+      Math.abs(Number(candidate.overall || 0) - Number(next?.overall || 0)) <= 0.15;
+    const separation = tiedTopLeader ? Math.max(rawSeparation, 1.5) : rawSeparation;
     const role = positionDifficulty(candidate.position);
     const reliability = clamp(0.46 + (candidate.signalCount || 1) * 0.12, 0.48, 0.94);
     const form = clamp(Number(candidate.formScore || candidate.overall || 70) / 100, 0.4, 1);
