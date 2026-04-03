@@ -27,6 +27,8 @@ function ensureHeadshotFallback(event) {
   event.currentTarget.src = 'https://a.espncdn.com/i/headshots/nophoto.png';
 }
 
+const HERO_CACHE_KEY = 'composite-hub-hero-v2';
+
 export default function SportHubPage() {
   const cards = getSportCards();
   const sportRailRef = useRef(null);
@@ -42,10 +44,24 @@ export default function SportHubPage() {
     document.body.removeAttribute('data-theme');
     document.body.dataset.compositeRoute = 'hub';
 
+    try {
+      const cached = window.sessionStorage.getItem(HERO_CACHE_KEY);
+      if (cached) {
+        setHero(JSON.parse(cached));
+        setLoading(false);
+      }
+    } catch (_error) {
+      // ignore storage issues
+    }
+
     async function loadHero() {
       try {
-        let response = await fetch('/api/hub/hero', { cache: 'no-store' });
-        let json = await response.json();
+        const response = await fetch('/api/hub/hero', { cache: 'no-store' });
+        const json = await response.json();
+        const hasMeaningfulContent =
+          Array.isArray(json?.worldBoard?.players) && json.worldBoard.players.length ||
+          Array.isArray(json?.heroStories) && json.heroStories.length ||
+          Array.isArray(json?.betLegs) && json.betLegs.length;
         const invalidHero =
           !response.ok ||
           !Array.isArray(json?.worldBoard?.players) ||
@@ -53,12 +69,29 @@ export default function SportHubPage() {
           !Array.isArray(json?.heroStories) ||
           !json.heroStories.length;
 
-        if (invalidHero) {
-          response = await fetch('/api/hub/hero?force=1', { cache: 'no-store' });
-          json = await response.json();
+        if (response.ok && hasMeaningfulContent) {
+          setHero(json);
+          try {
+            window.sessionStorage.setItem(HERO_CACHE_KEY, JSON.stringify(json));
+          } catch (_error) {
+            // ignore storage issues
+          }
         }
 
-        setHero(json);
+        setLoading(false);
+
+        if (invalidHero) {
+          const refreshResponse = await fetch('/api/hub/hero?force=1', { cache: 'no-store' });
+          const refreshJson = await refreshResponse.json();
+          if (refreshResponse.ok) {
+            setHero(refreshJson);
+            try {
+              window.sessionStorage.setItem(HERO_CACHE_KEY, JSON.stringify(refreshJson));
+            } catch (_error) {
+              // ignore storage issues
+            }
+          }
+        }
       } finally {
         setLoading(false);
       }
@@ -303,10 +336,8 @@ export default function SportHubPage() {
             </div>
             <p className="hub-parlay-note">
               {hero?.status === 'closed'
-                  ? 'The parlay card resets at 6:00 AM ET and returns as soon as at least two same-day cross-sport legs are available.'
-                  : hero?.status === 'two-leg'
-                    ? 'The board automatically drops to the best two live legs when the daily slate gets thin later in the day.'
-                  : 'The parlay card is the only betting module on the main menu. It uses verified odds math and the strongest same-day cross-sport edge set after the 6:00 AM ET reset.'}
+                ? 'The parlay card resets at 6:00 AM ET and returns as soon as at least two same-day cross-sport legs are available.'
+                : 'The parlay card is the only betting module on the main menu. It uses verified odds math and the strongest same-day cross-sport edge set after the 6:00 AM ET reset.'}
             </p>
           </article>
         </div>

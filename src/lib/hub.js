@@ -26,7 +26,7 @@ import {
 const STORY_TTL_MS = 5 * 60 * 1000;
 const BETS_TTL_MS = 90 * 1000;
 const HERO_TTL_MS = 60 * 1000;
-const HUB_CACHE_VERSION = 'v11';
+const HUB_CACHE_VERSION = 'v13';
 
 const EXTERNAL_NEWS_SOURCES = [
   {
@@ -573,9 +573,13 @@ function buildGenericBetCandidates(board, sportLabel) {
 
 async function buildMlbBetCandidates() {
   const scoreboard = await fetchMlbScoreboard();
-  const sameDayGames = (scoreboard?.games || []).filter((game) => game.state === 'pre');
+  const nowMs = Date.now();
+  const sameDayGames = (scoreboard?.games || [])
+    .filter((game) => ['pre', 'scheduled', 'created'].includes(String(game.state || 'pre')))
+    .filter((game) => game.startTime && new Date(game.startTime).getTime() > nowMs)
+    .sort((left, right) => new Date(left.startTime).getTime() - new Date(right.startTime).getTime());
   const predictions = await Promise.allSettled(
-    sameDayGames.slice(0, 10).map(async (game) => ({
+    sameDayGames.slice(0, 12).map(async (game) => ({
       game,
       prediction: await predictMlbGame(game.away.teamId, game.home.teamId, { neutralSite: false }),
     })),
@@ -617,9 +621,11 @@ async function buildNhlBetCandidates() {
   ]);
 
   const strengthMap = parseStrengthStandings(standingsPayload);
+  const nowMs = Date.now();
 
   return games
-    .filter((game) => game.state === 'pre')
+    .filter((game) => ['pre', 'scheduled', 'created'].includes(String(game.state || 'pre')))
+    .filter((game) => game.startTime && new Date(game.startTime).getTime() > nowMs)
     .map((game) => {
       const homeStrength = strengthMap[game.home.teamId] || {};
       const awayStrength = strengthMap[game.away.teamId] || {};
@@ -851,13 +857,14 @@ async function buildCardSpotlights() {
 }
 
 async function buildTopBetsSnapshot() {
-  const [nflBoardResult, footballBoardsResult, mlbCandidatesResult, nbaSnapshotResult, footballLandingResult, nhlCandidatesResult] = await Promise.allSettled([
+  const [nflBoardResult, footballBoardsResult, mlbCandidatesResult, nbaSnapshotResult, footballLandingResult, nhlCandidatesResult, cbbBoardResult] = await Promise.allSettled([
     getGenericSportSnapshot('nfl'),
     Promise.allSettled(Object.keys(FOOTBALL_LEAGUES).map((leagueKey) => getFootballLeagueSnapshot(leagueKey))),
     buildMlbBetCandidates(),
     getNbaBootstrapSnapshot(),
     getFootballLandingSnapshot(),
     buildNhlBetCandidates(),
+    getGenericSportSnapshot('cbb'),
   ]);
 
   const nflBoard = settledValue(nflBoardResult, { predictors: [], scoreboard: [] });
@@ -868,13 +875,18 @@ async function buildTopBetsSnapshot() {
   const nbaSnapshot = settledValue(nbaSnapshotResult, null);
   const footballLanding = settledValue(footballLandingResult, null);
   const nhlCandidates = settledValue(nhlCandidatesResult, []);
+  const cbbBoard = settledValue(cbbBoardResult, { predictors: [], scoreboard: [] });
 
   const nflCandidates = buildGenericBetCandidates(nflBoard, 'NFL');
   const footballCandidates = footballBoards.flatMap((board) => buildFootballBetCandidates(board));
+  const cbbCandidates = buildGenericBetCandidates(cbbBoard, 'CBB');
+  const currentMs = Date.now();
 
   const nbaCandidates = (nbaSnapshot?.games || [])
-    .filter((event) => event?.competitions?.[0]?.status?.type?.state === 'pre')
-    .slice(0, 6)
+    .filter((event) => ['pre', 'scheduled', 'created'].includes(String(event?.competitions?.[0]?.status?.type?.state || 'pre')))
+    .filter((event) => event?.date && new Date(event.date).getTime() > currentMs)
+    .sort((left, right) => new Date(left.date || 0).getTime() - new Date(right.date || 0).getTime())
+    .slice(0, 10)
     .map((event) => {
       const competition = event.competitions?.[0];
       const away = competition?.competitors?.find((team) => team.homeAway === 'away');
@@ -908,51 +920,41 @@ async function buildTopBetsSnapshot() {
     .filter(Boolean);
 
   const cycle = getEasternCycleWindow({ resetHour: 6 });
-  const nowMs = Date.now();
-  const candidates = [...mlbCandidates, ...nflCandidates, ...footballCandidates, ...nbaCandidates, ...nhlCandidates]
+  const candidates = [...mlbCandidates, ...nflCandidates, ...footballCandidates, ...nbaCandidates, ...nhlCandidates, ...cbbCandidates]
     .filter((candidate) => candidate?.americanOdds !== null && candidate?.americanOdds !== undefined)
     .filter((candidate) => candidate?.startTime && isSameEasternDateKey(candidate.startTime, cycle.cycleDateEt))
     .filter((candidate) => ['pre', 'scheduled', 'created'].includes(String(candidate?.state || 'pre')))
-    .map((candidate) => enrichBetCandidate(candidate, nowMs))
-    .filter((candidate) => Number.isFinite(candidate.startMs) && candidate.startMs > nowMs)
+    .map((candidate) => enrichBetCandidate(candidate, currentMs))
+    .filter((candidate) => Number.isFinite(candidate.startMs) && candidate.startMs > currentMs)
     .sort(compareBetCandidates);
 
   const selected = [];
   const bySport = new Set();
-  const earliestMinutes = candidates[0]?.minutesUntilStart ?? Number.POSITIVE_INFINITY;
-  const priorityPool = candidates.filter((candidate) => candidate.minutesUntilStart <= earliestMinutes + 120);
-  const orderedPools = [priorityPool, candidates];
 
-  for (const pool of orderedPools) {
-    for (const candidate of pool) {
-      if (selected.length >= 3) break;
-      const decimal = americanToDecimal(candidate.americanOdds);
-      if (!Number.isFinite(decimal)) continue;
-      if (selected.some((entry) => entry.league === candidate.league && entry.gameId === candidate.gameId)) continue;
-      if (bySport.has(candidate.sport)) continue;
-      bySport.add(candidate.sport);
-      selected.push({
-        ...candidate,
-        americanOddsLabel: formatAmericanOdds(candidate.americanOdds),
-        startLabel: formatEasternDisplay(candidate.startTime),
-      });
-    }
+  for (const candidate of candidates) {
     if (selected.length >= 3) break;
+    const decimal = americanToDecimal(candidate.americanOdds);
+    if (!Number.isFinite(decimal)) continue;
+    if (selected.some((entry) => entry.league === candidate.league && entry.gameId === candidate.gameId)) continue;
+    if (bySport.has(candidate.sport)) continue;
+    bySport.add(candidate.sport);
+    selected.push({
+      ...candidate,
+      americanOddsLabel: formatAmericanOdds(candidate.americanOdds),
+      startLabel: formatEasternDisplay(candidate.startTime),
+    });
   }
 
-  for (const pool of orderedPools) {
-    for (const candidate of pool) {
-      if (selected.length >= 3) break;
-      const decimal = americanToDecimal(candidate.americanOdds);
-      if (!Number.isFinite(decimal)) continue;
-      if (selected.some((entry) => entry.league === candidate.league && entry.gameId === candidate.gameId)) continue;
-      selected.push({
-        ...candidate,
-        americanOddsLabel: formatAmericanOdds(candidate.americanOdds),
-        startLabel: formatEasternDisplay(candidate.startTime),
-      });
-    }
+  for (const candidate of candidates) {
     if (selected.length >= 3) break;
+    const decimal = americanToDecimal(candidate.americanOdds);
+    if (!Number.isFinite(decimal)) continue;
+    if (selected.some((entry) => entry.league === candidate.league && entry.gameId === candidate.gameId)) continue;
+    selected.push({
+      ...candidate,
+      americanOddsLabel: formatAmericanOdds(candidate.americanOdds),
+      startLabel: formatEasternDisplay(candidate.startTime),
+    });
   }
 
   const minimumLegsMet = selected.length >= 2;

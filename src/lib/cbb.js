@@ -11,7 +11,7 @@ import {
 
 const SITE = 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball';
 const CACHE = new Map();
-const MODEL_VERSION = 'v4';
+const MODEL_VERSION = 'v5';
 
 function cacheKey(scope, extra = '') {
   return `cbb:${MODEL_VERSION}:${scope}:${extra}`;
@@ -979,10 +979,10 @@ function parseRosterPlayers(payload, team) {
 }
 
 function bucketTier(rating) {
-  if (rating >= 92) return 'All-American';
-  if (rating >= 86) return 'All-Conference';
-  if (rating >= 79) return 'Starter';
-  if (rating >= 71) return 'Rotation';
+  if (rating >= 88) return 'All-American';
+  if (rating >= 82) return 'All-Conference';
+  if (rating >= 74) return 'Starter';
+  if (rating >= 66) return 'Rotation';
   return 'Depth';
 }
 
@@ -996,8 +996,8 @@ function playerPositionBucket(position) {
 function buildPlayerRating(player, team) {
   const stats = player.stats || {};
   const bucket = playerPositionBucket(player.position);
-  const teamBoost = clamp(10 - ((team?.compositeRank || 180) / 28), -3, 4);
-  const hotnessBoost = clamp(((team?.hotness || 50) - 50) * 0.04, -2, 2.5);
+  const teamBoost = clamp(8 - ((team?.compositeRank || 180) / 34), -3.5, 3);
+  const hotnessBoost = clamp(((team?.hotness || 50) - 50) * 0.03, -1.5, 2);
   const minutes = Number(stats.minutes || 0);
   const points = Number(stats.points || 0);
   const rebounds = Number(stats.rebounds || 0);
@@ -1008,14 +1008,14 @@ function buildPlayerRating(player, team) {
   const fgPct = Number(stats.fgPct || 42);
   const threePct = Number(stats.threePct || 31);
   const usageRate = minutes > 0 ? (points + assists * 1.35 + rebounds * 0.65) / Math.max(1, minutes) : 0;
-  const efficiencyBoost = clamp((fgPct - 43) * 0.24 + (threePct - 32) * 0.18, -4, 5);
-  const rosterSlotBoost = clamp(9 - Number(player.rosterOrder || 14) * 0.72, -5, 5);
+  const efficiencyBoost = clamp((fgPct - 43) * 0.18 + (threePct - 32) * 0.12, -3.5, 4);
+  const rosterSlotBoost = clamp(7 - Number(player.rosterOrder || 14) * 0.62, -5, 4);
   const statReliability = clamp(
-    (minutes / 24) * 0.55 +
-      (points / 16) * 0.2 +
+    (minutes / 24) * 0.58 +
+      (points / 18) * 0.18 +
       ((rebounds + assists + steals + blocks) / 12) * 0.15 +
       ((player.leaders || []).length ? 0.1 : 0),
-    0.1,
+    0.08,
     1,
   );
   const classBoost =
@@ -1030,47 +1030,47 @@ function buildPlayerRating(player, team) {
   let production = 0;
   if (bucket === 'guard') {
     production =
-      points * 1.85 +
-      assists * 3 +
-      steals * 2.3 +
-      minutes * 0.26 +
-      threePct * 0.11 +
-      fgPct * 0.08 -
-      turnovers * 1.25 +
-      usageRate * 9;
+      points * 1.55 +
+      assists * 2.35 +
+      steals * 1.95 +
+      minutes * 0.2 +
+      threePct * 0.08 +
+      fgPct * 0.05 -
+      turnovers * 1.08 +
+      usageRate * 6.8;
   } else if (bucket === 'wing') {
     production =
-      points * 1.75 +
-      rebounds * 1.7 +
-      assists * 1.8 +
-      steals * 1.8 +
-      blocks * 1.5 +
-      minutes * 0.24 +
-      fgPct * 0.08 -
-      turnovers * 1.08 +
-      usageRate * 8;
+      points * 1.45 +
+      rebounds * 1.45 +
+      assists * 1.45 +
+      steals * 1.45 +
+      blocks * 1.2 +
+      minutes * 0.2 +
+      fgPct * 0.06 -
+      turnovers * 0.95 +
+      usageRate * 6.1;
   } else {
     production =
-      points * 1.55 +
-      rebounds * 2.55 +
-      blocks * 3.1 +
-      assists * 1.1 +
-      minutes * 0.24 +
-      fgPct * 0.1 -
-      turnovers * 0.92 +
-      usageRate * 7;
+      points * 1.3 +
+      rebounds * 2 +
+      blocks * 2.35 +
+      assists * 0.9 +
+      minutes * 0.19 +
+      fgPct * 0.07 -
+      turnovers * 0.8 +
+      usageRate * 5.5;
   }
 
   const leaderBoost = (player.leaders || [])
     .slice(0, 3)
-    .reduce((total, entry) => total + Math.max(0, 18 - Number(entry.rank || 18)) * 0.85, 0);
+    .reduce((total, entry) => total + Math.max(0, 16 - Number(entry.rank || 16)) * 0.65, 0);
 
   const statPresenceBoost =
-    (points > 0 ? 2.2 : -2) +
-    (assists > 0 ? 1.2 : 0) +
-    (rebounds > 0 ? 1.2 : 0) +
-    (minutes >= 12 ? 3 : minutes > 0 ? 1 : -4) +
-    (fgPct > 0 ? 0.8 : 0);
+    (points >= 8 ? 1.8 : points > 0 ? 0.4 : -3.4) +
+    (assists > 0 ? 0.8 : 0) +
+    (rebounds > 0 ? 0.8 : 0) +
+    (minutes >= 18 ? 2.4 : minutes >= 10 ? 0.8 : -4.8) +
+    (fgPct > 0 ? 0.5 : 0);
 
   return round(
     (production * statReliability) +
@@ -1204,22 +1204,35 @@ async function buildLocalSnapshot() {
         0,
         1,
       );
+      const teamRankLift = clamp(18 - ((team?.compositeRank || 180) / 4.5), -10, 16);
+      const teamHotLift = clamp(((team?.hotness || 50) - 50) * 0.05, -2.5, 3.5);
+      const leaderLift = Math.min(3.2, (player.leaders || []).length * 0.75);
       const rating = round(
         clamp(
-          46 +
-            overallPct * 18 +
-            bucketPct * 10 +
-            statStrength * 15 +
-            clamp(8 - ((team?.compositeRank || 180) / 24), -2, 4) +
-            Math.min(4, (player.leaders || []).length * 1.1),
-          43,
-          92,
+          41 +
+            overallPct * 15 +
+            bucketPct * 7 +
+            statStrength * 12 +
+            teamRankLift * 0.3 +
+            teamHotLift * 0.6 +
+            leaderLift,
+          38,
+          89,
         ),
         1,
+      );
+      const boardScore = round(
+        rating +
+          teamRankLift +
+          teamHotLift +
+          leaderLift +
+          clamp((Number(stats.points || 0) - 10) * 0.32 + (Number(stats.minutes || 0) - 20) * 0.16, -6, 8),
+        2,
       );
 
       return {
         ...player,
+        boardScore,
         rating,
         tier: bucketTier(rating),
         usageSummary:
@@ -1230,7 +1243,7 @@ async function buildLocalSnapshot() {
               : `${player.team.abbreviation} rotation`,
       };
     })
-    .sort((left, right) => right.rating - left.rating || right.rawScore - left.rawScore || left.displayName.localeCompare(right.displayName))
+    .sort((left, right) => right.boardScore - left.boardScore || right.rating - left.rating || right.rawScore - left.rawScore || left.displayName.localeCompare(right.displayName))
     .map((player, index) => ({
       ...player,
       rank: index + 1,
@@ -1243,7 +1256,8 @@ async function buildLocalSnapshot() {
     playersByTeam.set(player.team.id, list);
   });
 
-  const featuredPlayers = players.slice(0, 12);
+  const contenderPlayers = players.filter((player) => (rankingMap[player.team.id]?.compositeRank || 999) <= 40);
+  const featuredPlayers = (contenderPlayers.length >= 12 ? contenderPlayers : players).slice(0, 12);
   const teamsWithLeaders = rankings.map((team) => ({
     ...team,
     leaders: (playersByTeam.get(team.id) || []).slice(0, 3),
@@ -1269,7 +1283,7 @@ async function buildLocalSnapshot() {
     teams: teamsWithLeaders,
     news,
     featuredPlayers,
-    topPlayers: players.slice(0, 3),
+    topPlayers: (contenderPlayers.length >= 3 ? contenderPlayers : players).slice(0, 3),
     playersCatalog: {
       players,
       totalPlayers: players.length,

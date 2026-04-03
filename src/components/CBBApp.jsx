@@ -365,6 +365,13 @@ function Overview({
             <ResumePill label="Players" value={bootstrap.playersCatalog?.players?.length || 0} />
             <ResumePill label="Sources" value="6" />
           </div>
+          {heroGames.length ? (
+            <div className="cbb-hero-score-grid">
+              {heroGames.map((game) => (
+                <HeroScoreTile key={game.id} game={game} prediction={predictionMap[game.id]} onOpen={openGame} />
+              ))}
+            </div>
+          ) : null}
         </div>
         <div className="cbb-hero-side">
           {leadStory?.image ? (
@@ -375,13 +382,6 @@ function Overview({
                 <strong>{leadStory.headline}</strong>
               </div>
             </button>
-          ) : null}
-          {heroGames.length ? (
-            <div className="cbb-hero-score-grid">
-              {heroGames.map((game) => (
-                <HeroScoreTile key={game.id} game={game} prediction={predictionMap[game.id]} onOpen={openGame} />
-              ))}
-            </div>
           ) : null}
           <button className="cbb-hero-note" type="button" onClick={() => setPage('rankings')}>
             <span>Resume Board</span>

@@ -516,29 +516,29 @@ def build_player_rating(player: dict[str, Any], team: dict[str, Any]) -> float:
     fg_pct = float(stats.get("fgPct") or 42)
     three_pct = float(stats.get("threePct") or 31)
     leaders = player.get("leaders") or []
-    team_boost = clamp(10 - ((team.get("compositeRank") or 180) / 28), -3, 4)
-    hotness = clamp((float(team.get("hotness") or 50) - 50) * 0.04, -2, 2.5)
+    team_boost = clamp(8 - ((team.get("compositeRank") or 180) / 34), -3.5, 3)
+    hotness = clamp((float(team.get("hotness") or 50) - 50) * 0.03, -1.5, 2)
     usage_rate = (points + assists * 1.35 + rebounds * 0.65) / max(1.0, minutes) if minutes > 0 else 0
-    efficiency_boost = clamp((fg_pct - 43) * 0.24 + (three_pct - 32) * 0.18, -4, 5)
-    roster_slot = clamp(9 - float(player.get("rosterOrder") or 14) * 0.72, -5, 5)
+    efficiency_boost = clamp((fg_pct - 43) * 0.18 + (three_pct - 32) * 0.12, -3.5, 4)
+    roster_slot = clamp(7 - float(player.get("rosterOrder") or 14) * 0.62, -5, 4)
     stat_reliability = clamp(
-        (minutes / 24) * 0.55 +
-        (points / 16) * 0.2 +
+        (minutes / 24) * 0.58 +
+        (points / 18) * 0.18 +
         ((rebounds + assists + steals + blocks) / 12) * 0.15 +
         (0.1 if leaders else 0),
-        0.1,
+        0.08,
         1,
     )
     class_year = str(player.get("classYear") or "")
     class_boost = 1 if re.search(r"sr|senior", class_year, re.I) else 0.7 if re.search(r"jr|junior", class_year, re.I) else 0.35 if re.search(r"so|sophomore", class_year, re.I) else 0.1
     if bucket == "guard":
-        production = points * 1.85 + assists * 3 + steals * 2.3 + minutes * 0.26 + three_pct * 0.11 + fg_pct * 0.08 - turnovers * 1.25 + usage_rate * 9
+        production = points * 1.55 + assists * 2.35 + steals * 1.95 + minutes * 0.2 + three_pct * 0.08 + fg_pct * 0.05 - turnovers * 1.08 + usage_rate * 6.8
     elif bucket == "wing":
-        production = points * 1.75 + rebounds * 1.7 + assists * 1.8 + steals * 1.8 + blocks * 1.5 + minutes * 0.24 + fg_pct * 0.08 - turnovers * 1.08 + usage_rate * 8
+        production = points * 1.45 + rebounds * 1.45 + assists * 1.45 + steals * 1.45 + blocks * 1.2 + minutes * 0.2 + fg_pct * 0.06 - turnovers * 0.95 + usage_rate * 6.1
     else:
-        production = points * 1.55 + rebounds * 2.55 + blocks * 3.1 + assists * 1.1 + minutes * 0.24 + fg_pct * 0.1 - turnovers * 0.92 + usage_rate * 7
-    leader_boost = sum(max(0, 18 - int(item.get("rank") or 18)) * 0.85 for item in leaders[:3])
-    stat_presence = (2.2 if points > 0 else -2) + (1.2 if assists > 0 else 0) + (1.2 if rebounds > 0 else 0) + (3 if minutes >= 12 else 1 if minutes > 0 else -4) + (0.8 if fg_pct > 0 else 0)
+        production = points * 1.3 + rebounds * 2 + blocks * 2.35 + assists * 0.9 + minutes * 0.19 + fg_pct * 0.07 - turnovers * 0.8 + usage_rate * 5.5
+    leader_boost = sum(max(0, 16 - int(item.get("rank") or 16)) * 0.65 for item in leaders[:3])
+    stat_presence = (1.8 if points >= 8 else 0.4 if points > 0 else -3.4) + (0.8 if assists > 0 else 0) + (0.8 if rebounds > 0 else 0) + (2.4 if minutes >= 18 else 0.8 if minutes >= 10 else -4.8) + (0.5 if fg_pct > 0 else 0)
     return round_value((production * stat_reliability) + leader_boost + team_boost + hotness + efficiency_boost + roster_slot + class_boost + stat_presence, 3) or 42.0
 
 
@@ -753,15 +753,39 @@ async def build_bootstrap_snapshot() -> dict[str, Any]:
             0,
             1,
         )
-        rating = round_value(clamp(46 + pct * 18 + stat_strength * 15 + clamp(8 - ((team.get("compositeRank") or 180) / 24), -2, 4) + min(4, len(player.get("leaders") or []) * 1.1), 43, 92), 1)
+        team_rank_lift = clamp(18 - ((team.get("compositeRank") or 180) / 4.5), -10, 16)
+        team_hot_lift = clamp(((team.get("hotness") or 50) - 50) * 0.05, -2.5, 3.5)
+        leader_lift = min(3.2, len(player.get("leaders") or []) * 0.75)
+        rating = round_value(
+            clamp(
+                41 +
+                pct * 15 +
+                stat_strength * 12 +
+                team_rank_lift * 0.3 +
+                team_hot_lift * 0.6 +
+                leader_lift,
+                38,
+                89,
+            ),
+            1,
+        )
+        board_score = round_value(
+            rating +
+            team_rank_lift +
+            team_hot_lift +
+            leader_lift +
+            clamp((float(stats.get("points") or 0) - 10) * 0.32 + (float(stats.get("minutes") or 0) - 20) * 0.16, -6, 8),
+            2,
+        )
         player["rating"] = rating
-        player["tier"] = "All-American" if rating >= 92 else "All-Conference" if rating >= 86 else "Starter" if rating >= 79 else "Rotation" if rating >= 71 else "Depth"
+        player["boardScore"] = board_score
+        player["tier"] = "All-American" if rating >= 88 else "All-Conference" if rating >= 82 else "Starter" if rating >= 74 else "Rotation" if rating >= 66 else "Depth"
         player["usageSummary"] = (
             f"{round_value(player['stats']['points'], 1)} PPG • {round_value(player['stats']['assists'], 1)} APG • {round_value(player['stats']['rebounds'], 1)} RPG"
             if player["stats"]["points"] > 0
             else (f"{player['leaders'][0]['label']} #{player['leaders'][0]['rank']}" if player["leaders"] else f"{player['team']['abbreviation']} rotation")
         )
-    players.sort(key=lambda player: (-player["rating"], player["displayName"]))
+    players.sort(key=lambda player: (-player.get("boardScore", player["rating"]), -player["rating"], player["displayName"]))
     for index, player in enumerate(players, start=1):
         player["rank"] = index
 
@@ -852,13 +876,16 @@ async def build_bootstrap_snapshot() -> dict[str, Any]:
             }
         )
 
+    team_rank_map = {row["id"]: row.get("compositeRank", 999) for row in rows}
+    contender_players = [player for player in players if team_rank_map.get(player["team"]["id"], 999) <= 40]
+
     snapshot = {
         "sport": "cbb",
         "headline": "Composite CBB",
         "rankings": rows,
         "teams": rows,
-        "topPlayers": players[:3],
-        "featuredPlayers": players[:12],
+        "topPlayers": (contender_players if len(contender_players) >= 3 else players)[:3],
+        "featuredPlayers": (contender_players if len(contender_players) >= 12 else players)[:12],
         "playersCatalog": {"players": players, "totalPlayers": len(players), "lastUpdated": utc_now()},
         "scoreboard": scoreboard,
         "predictors": predictors,
