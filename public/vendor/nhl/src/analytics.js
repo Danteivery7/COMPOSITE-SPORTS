@@ -501,7 +501,7 @@ export function buildPlayerCard(bundle, teamsById = {}) {
   const weighted =
     baseline * (1 - sampleTrust) +
     (seasonComponent * 0.74 + careerComponent * 0.26) * sampleTrust;
-  const overall = clamp(round(weighted - agePenalty, 0), 32, 99);
+  const overall = clamp(round(weighted - agePenalty + 5, 0), 37, 99);
   const tone = classifyTone(hotnessScore);
 
   return {

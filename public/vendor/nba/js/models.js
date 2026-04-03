@@ -697,8 +697,8 @@ const models = {
             }
         }
 
-        // Hard cap at 96.8 per user request to avoid "peak level" 99
-        playerOverall = Math.max(60, Math.min(96.8, playerOverall));
+        // Allow true MVP-level peaks to reach the upper 90s without flattening the rest of the board
+        playerOverall = Math.max(60, Math.min(99, playerOverall));
 
         // Strict 20 Game Qualification Floor for top tier
         if (s.gp < 20) {

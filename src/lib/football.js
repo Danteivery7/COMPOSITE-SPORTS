@@ -505,7 +505,7 @@ function buildFootballPlayerRating(player, team, leaderEntries = []) {
   const stabilizedBaseline =
     positionGroup === 'GK' ? 58 : positionGroup === 'DEF' ? 56 : positionGroup === 'MID' ? 58 : 59;
   const stabilized = stabilizedBaseline + ((rawRating - stabilizedBaseline) * reliability);
-  const rating = clampNumber(Math.round(stabilized * 10) / 10, 44, 94.5);
+  const rating = clampNumber(Math.round((stabilized + 3) * 10) / 10, 47, 97.5);
 
   return {
     rating,

@@ -26,7 +26,7 @@ import {
 const STORY_TTL_MS = 5 * 60 * 1000;
 const BETS_TTL_MS = 90 * 1000;
 const HERO_TTL_MS = 60 * 1000;
-const HUB_CACHE_VERSION = 'v10';
+const HUB_CACHE_VERSION = 'v11';
 
 const EXTERNAL_NEWS_SOURCES = [
   {
