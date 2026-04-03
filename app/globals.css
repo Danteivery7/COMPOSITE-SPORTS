@@ -711,9 +711,9 @@ body[data-composite-route='hub'] {
 
 .sport-intro[data-motif='bracket'] .sport-intro-runway {
   background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0 1.8%, transparent 1.8% 14%, rgba(255, 255, 255, 0.08) 14% 15.2%, transparent 15.2% 84.8%, rgba(255, 255, 255, 0.08) 84.8% 86%, transparent 86% 98.2%, rgba(255, 255, 255, 0.08) 98.2% 100%),
-    linear-gradient(180deg, transparent 0 17%, rgba(255, 255, 255, 0.08) 17% 18.2%, transparent 18.2% 38%, rgba(255, 255, 255, 0.08) 38% 39.2%, transparent 39.2% 59%, rgba(255, 255, 255, 0.08) 59% 60.2%, transparent 60.2% 80%, rgba(255, 255, 255, 0.08) 80% 81.2%, transparent 81.2%),
-    linear-gradient(180deg, rgba(146, 84, 18, 0.16), transparent);
+    linear-gradient(90deg, rgba(255, 249, 216, 0.08) 0 2%, transparent 2% 14%, rgba(255, 249, 216, 0.08) 14% 15.2%, transparent 15.2% 84.8%, rgba(255, 249, 216, 0.08) 84.8% 86%, transparent 86% 98.2%, rgba(255, 249, 216, 0.08) 98.2% 100%),
+    linear-gradient(180deg, transparent 0 16%, rgba(255, 249, 216, 0.08) 16% 17.2%, transparent 17.2% 37.6%, rgba(255, 249, 216, 0.08) 37.6% 38.8%, transparent 38.8% 58.8%, rgba(255, 249, 216, 0.08) 58.8% 60%, transparent 60% 80%, rgba(255, 249, 216, 0.08) 80% 81.2%, transparent 81.2%),
+    linear-gradient(180deg, rgba(175, 110, 50, 0.22), transparent);
 }
 
 .sport-intro[data-motif='bracket'] .sport-intro-scorebug {
@@ -727,27 +727,29 @@ body[data-composite-route='hub'] {
   width: min(54rem, 90vw);
   height: 19rem;
   background:
-    repeating-linear-gradient(90deg, rgba(193, 129, 68, 0.62) 0 18px, rgba(122, 72, 34, 0.76) 18px 36px),
-    linear-gradient(180deg, rgba(255,255,255,0.08), rgba(0,0,0,0.16));
-  opacity: 0.58;
+    radial-gradient(circle at 50% 46%, transparent 0 13%, rgba(255, 248, 214, 0.28) 13% 13.6%, transparent 13.6%),
+    linear-gradient(90deg, transparent 0 49.4%, rgba(255, 248, 214, 0.24) 49.4% 50.6%, transparent 50.6%),
+    repeating-linear-gradient(90deg, rgba(221, 170, 93, 0.68) 0 18px, rgba(154, 98, 49, 0.8) 18px 36px),
+    linear-gradient(180deg, rgba(255,255,255,0.1), rgba(0,0,0,0.16));
+  opacity: 0.72;
 }
 
 .sport-intro[data-motif='bracket'] .sport-intro-backboard {
-  top: 24%;
-  right: 20%;
-  opacity: 0.24;
+  top: 22%;
+  right: 18%;
+  opacity: 0.38;
 }
 
 .sport-intro[data-motif='bracket'] .sport-intro-banner {
-  top: 14%;
+  top: 13%;
   width: min(24rem, 64vw);
   background: linear-gradient(90deg, rgba(255,255,255,0.08), rgba(255,236,178,0.34), rgba(255,255,255,0.08));
 }
 
 .sport-intro[data-motif='bracket'] .sport-intro-bracket-wall {
-  inset: 18% 13% auto;
+  inset: 17% 13% auto;
   height: 16rem;
-  opacity: 0.44;
+  opacity: 0.28;
 }
 
 .sport-intro[data-motif='bracket'] .sport-intro-portal {
@@ -2375,15 +2377,15 @@ body[data-composite-route='hub'] {
 
 .cbb-route-shell {
   background:
-    radial-gradient(circle at top, rgba(255, 209, 96, 0.16), transparent 26%),
-    radial-gradient(circle at 84% 12%, rgba(255, 246, 189, 0.08), transparent 20%),
-    linear-gradient(180deg, rgba(36, 20, 10, 0.98), rgba(20, 12, 8, 0.98));
+    radial-gradient(circle at top, rgba(255, 223, 159, 0.2), transparent 24%),
+    radial-gradient(circle at 84% 12%, rgba(214, 101, 44, 0.16), transparent 18%),
+    linear-gradient(180deg, rgba(104, 60, 34, 0.94), rgba(43, 26, 17, 0.98));
 }
 
 .cbb-app-shell .generic-sidebar {
   background:
-    radial-gradient(circle at top, rgba(255, 224, 140, 0.18), transparent 30%),
-    linear-gradient(180deg, rgba(82, 46, 20, 0.96), rgba(33, 19, 12, 0.99));
+    radial-gradient(circle at top, rgba(255, 236, 184, 0.28), transparent 28%),
+    linear-gradient(180deg, rgba(164, 92, 48, 0.96), rgba(82, 47, 28, 0.98));
 }
 
 .cbb-brand p {
@@ -2405,8 +2407,8 @@ body[data-composite-route='hub'] {
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(circle at top right, rgba(255, 234, 165, 0.2), transparent 28%),
-    linear-gradient(135deg, rgba(120, 72, 28, 0.52), rgba(43, 26, 17, 0.92));
+    radial-gradient(circle at top right, rgba(255, 241, 197, 0.32), transparent 28%),
+    linear-gradient(135deg, rgba(196, 122, 62, 0.58), rgba(92, 53, 27, 0.9));
 }
 
 .cbb-hero::before,
@@ -2434,14 +2436,8 @@ body[data-composite-route='hub'] {
 
 .cbb-hero-copy h2 {
   margin: 10px 0;
-  font-size: clamp(2rem, 3vw, 3.4rem);
-  line-height: 0.98;
-}
-
-.cbb-hero-copy p:last-of-type {
-  max-width: 42rem;
-  color: #e8edf8;
-  line-height: 1.75;
+  font-size: clamp(2rem, 3vw, 3rem);
+  line-height: 1.02;
 }
 
 .cbb-hero-side {
@@ -2449,12 +2445,60 @@ body[data-composite-route='hub'] {
   gap: 12px;
 }
 
+.cbb-hero-visual {
+  position: relative;
+  overflow: hidden;
+  min-height: 12.5rem;
+  padding: 0;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 236, 190, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  text-align: left;
+  color: inherit;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.cbb-hero-visual:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 214, 108, 0.34);
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.2);
+}
+
+.cbb-hero-visual-image {
+  width: 100%;
+  height: 100%;
+  min-height: 12.5rem;
+  object-fit: cover;
+  display: block;
+  filter: saturate(1.04);
+}
+
+.cbb-hero-visual-copy {
+  position: absolute;
+  inset: auto 0 0;
+  display: grid;
+  gap: 6px;
+  padding: 18px;
+  background: linear-gradient(180deg, transparent, rgba(24, 14, 9, 0.92));
+}
+
+.cbb-hero-visual-copy span {
+  color: rgba(255, 239, 201, 0.78);
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.cbb-hero-visual-copy strong {
+  line-height: 1.3;
+}
+
 .cbb-hero-note {
   text-align: left;
   padding: 16px 18px;
   border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 246, 225, 0.08);
+  border: 1px solid rgba(255, 232, 191, 0.16);
+  background: rgba(255, 246, 225, 0.14);
   color: var(--text);
   transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
 }
@@ -2554,7 +2598,7 @@ body[data-composite-route='hub'] {
   padding: 16px;
   border-radius: 22px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(135deg, rgba(255, 246, 225, 0.08), rgba(255, 255, 255, 0.03));
+  background: linear-gradient(135deg, rgba(255, 246, 225, 0.16), rgba(255, 248, 233, 0.08));
   color: var(--text);
   text-align: left;
   transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
@@ -2573,7 +2617,7 @@ body[data-composite-route='hub'] {
 
 .cbb-top-player-card p {
   margin: 8px 0 0;
-  color: #e7edf8;
+  color: rgba(255, 245, 229, 0.9);
   font-size: 0.93rem;
   line-height: 1.5;
 }
@@ -2649,6 +2693,11 @@ body[data-composite-route='hub'] {
   text-align: left;
   display: grid;
   gap: 0;
+  background: linear-gradient(180deg, rgba(255, 249, 235, 0.12), rgba(255, 255, 255, 0.03));
+}
+
+.cbb-brand p {
+  max-width: 16rem;
 }
 
 .cbb-news-image {

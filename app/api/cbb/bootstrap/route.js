@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getGenericSportSnapshot } from '@/src/lib/live-sports-backend';
+import { getCBBBootstrap } from '@/src/lib/cbb';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   try {
-    const data = await getGenericSportSnapshot('cbb', {
+    const data = await getCBBBootstrap({
       force: request.nextUrl.searchParams.get('force') === '1',
     });
     return NextResponse.json(data);

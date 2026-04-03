@@ -11,7 +11,7 @@ import {
 
 const SITE = 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball';
 const CACHE = new Map();
-const MODEL_VERSION = 'v1';
+const MODEL_VERSION = 'v3';
 
 function cacheKey(scope, extra = '') {
   return `cbb:${MODEL_VERSION}:${scope}:${extra}`;
@@ -41,10 +41,36 @@ function round(value, digits = 1) {
   return Math.round(value * factor) / factor;
 }
 
+function weightedAverage(pairs) {
+  const usable = pairs.filter((entry) => Number.isFinite(entry?.value) && Number.isFinite(entry?.weight) && entry.weight > 0);
+  if (!usable.length) return null;
+  const totalWeight = usable.reduce((sum, entry) => sum + entry.weight, 0);
+  if (!totalWeight) return null;
+  return round(
+    usable.reduce((sum, entry) => sum + entry.value * entry.weight, 0) / totalWeight,
+    2,
+  );
+}
+
 function normalizeKey(value) {
   return String(value || '')
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
+}
+
+function decodeHtml(value = '') {
+  return String(value)
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&#(\d+);/g, (_match, code) => String.fromCharCode(Number(code)));
+}
+
+function stripHtml(value = '') {
+  return decodeHtml(String(value).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
 }
 
 function uniqBy(items, getKey) {
@@ -81,6 +107,22 @@ async function fetchJson(url, ttlMs = 60_000) {
     throw new Error(`${response.status} ${response.statusText}`);
   }
   return writeCache(key, await response.json(), ttlMs);
+}
+
+async function fetchText(url, ttlMs = 60_000) {
+  const key = cacheKey('text', url);
+  const cached = readCache(key);
+  if (cached) return cached;
+  const response = await fetch(url, {
+    cache: 'no-store',
+    headers: {
+      Accept: 'text/html,application/xhtml+xml,application/xml,text/xml;q=0.9,*/*;q=0.8',
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`${response.status} ${response.statusText}`);
+  }
+  return writeCache(key, await response.text(), ttlMs);
 }
 
 function flattenStats(stats = []) {
@@ -359,6 +401,132 @@ async function fetchPolls() {
   }
 }
 
+function makeTeamLookup(teams) {
+  const lookup = new Map();
+  const aliases = {
+    stjohns: 'stjohns',
+    saintjohns: 'stjohns',
+    uconn: 'connecticut',
+    olemiss: 'mississippi',
+    missst: 'mississippistate',
+    unc: 'northcarolina',
+    smu: 'southernmethodist',
+    byu: 'brighamyoung',
+    ucf: 'centralflorida',
+    lsu: 'louisianastate',
+    cal: 'california',
+    usu: 'utahstate',
+    ncstate: 'northcarolinastate',
+    vcu: 'virginiacommonwealth',
+    tcu: 'texaschristian',
+    uab: 'alabamabirmingham',
+    ucirvine: 'californiairvine',
+    ucsandiego: 'californiasandiego',
+    ucdavis: 'californiadavis',
+    ucsb: 'californiasanta barbara',
+  };
+
+  teams.forEach((team) => {
+    const keys = new Set([
+      normalizeKey(team.displayName),
+      normalizeKey(team.shortDisplayName),
+      normalizeKey(team.abbreviation),
+      normalizeKey(team.location),
+    ]);
+
+    keys.forEach((key) => {
+      if (key) lookup.set(key, team.id);
+      if (aliases[key]) lookup.set(normalizeKey(aliases[key]), team.id);
+    });
+  });
+
+  return lookup;
+}
+
+function resolveTeamId(teamLookup, name = '', abbreviation = '') {
+  const candidates = [
+    normalizeKey(name),
+    normalizeKey(name.replace(/\b(st)\.?$/i, 'state')),
+    normalizeKey(name.replace(/\bsaint\b/gi, 'st')),
+    normalizeKey(name.replace(/\buniv\b/gi, 'university')),
+    normalizeKey(abbreviation),
+  ].filter(Boolean);
+
+  for (const key of candidates) {
+    if (teamLookup.has(key)) return teamLookup.get(key);
+  }
+  return null;
+}
+
+async function fetchNetRankings(teams) {
+  const key = cacheKey('net-rankings');
+  const cached = readCache(key);
+  if (cached) return cached;
+
+  try {
+    const html = await fetchText('https://www.ncaa.com/rankings/basketball-men/d1/ncaa-mens-basketball-net-rankings', 2 * 60 * 60 * 1000);
+    const tbodyMatch = html.match(/<table class="sticky"[\s\S]*?<tbody>([\s\S]*?)<\/tbody>/i);
+    const rows = tbodyMatch?.[1]?.match(/<tr[\s\S]*?<\/tr>/gi) || [];
+    const lookup = makeTeamLookup(teams);
+    const entries = rows
+      .map((row) => {
+        const cells = Array.from(row.matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)).map((match) => stripHtml(match[1]));
+        const rank = Number(cells[0]);
+        const name = cells[1] || '';
+        if (!rank || !name) return null;
+        const teamId = resolveTeamId(lookup, name);
+        if (!teamId) return null;
+        return {
+          teamId,
+          rank,
+          teamName: name,
+          record: cells[2] || '',
+          conference: cells[3] || '',
+        };
+      })
+      .filter(Boolean);
+
+    return writeCache(key, entries, 2 * 60 * 60 * 1000);
+  } catch (_error) {
+    return writeCache(key, [], 10 * 60 * 1000);
+  }
+}
+
+async function fetchHaslametrics(teams) {
+  const key = cacheKey('haslametrics');
+  const cached = readCache(key);
+  if (cached) return cached;
+
+  try {
+    const xml = await fetchText('https://haslametrics.com/ratings.xml', 2 * 60 * 60 * 1000);
+    const rows = xml.match(/<mr\b[^>]*\/>/gi) || [];
+    const lookup = makeTeamLookup(teams);
+    const entries = rows
+      .map((row) => {
+        const attrs = Object.fromEntries(
+          Array.from(row.matchAll(/([a-zA-Z0-9_]+)="([^"]*)"/g)).map((match) => [match[1], decodeHtml(match[2])]),
+        );
+        const rank = Number(attrs.rk || 0);
+        const teamId = resolveTeamId(lookup, attrs.t, attrs.abbr);
+        if (!rank || !teamId) return null;
+        return {
+          teamId,
+          rank,
+          teamName: attrs.t || '',
+          abbreviation: attrs.abbr || '',
+          offenseValue: Number(attrs.oe || 0) || null,
+          defenseValue: Number(attrs.de || 0) || null,
+          momentum: Number(attrs.mom || 0) || 0,
+        };
+      })
+      .filter(Boolean);
+
+    return writeCache(key, entries, 2 * 60 * 60 * 1000);
+  } catch (_error) {
+    return writeCache(key, [], 10 * 60 * 1000);
+  }
+}
+
 function parsePollRankMap(polls) {
   const poll =
     polls.find((entry) => /associated press|ap/i.test(entry.displayName || entry.name || '')) ||
@@ -423,39 +591,6 @@ function makeTeamResume(rows) {
       1,
     );
   });
-
-  rows.forEach((row) => {
-    row.torvikValue = round(row.offenseAdj - row.defenseAdj + row.resumeScore * 0.22, 3);
-    row.kenpomValue = round(row.offenseAdj * 1.018 - row.defenseAdj * 0.982 + row.resumeScore * 0.19, 3);
-    row.haslaValue = round(row.offenseAdj * 0.97 - row.defenseAdj * 1.01 + row.hotness * 0.11, 3);
-    row.evanValue = round(row.offenseAdj * 0.94 - row.defenseAdj * 1.04 + row.assistRate * 0.3 + row.hotness * 0.08, 3);
-
-    row.torvikOffValue = round(row.offenseAdj + row.ppg * 0.18 + row.assists * 0.6 - row.turnovers * 0.45, 3);
-    row.kenpomOffValue = round(row.offenseAdj * 1.02 + row.fieldGoalPct * 0.12 + row.threePointPct * 0.08, 3);
-    row.haslaOffValue = round(row.offenseAdj * 0.98 + row.offRebounds * 0.7 + row.ppg * 0.1, 3);
-    row.evanOffValue = round(row.offenseAdj * 0.96 + row.assistRate * 0.4 + row.pointsDiff * 0.16, 3);
-
-    row.torvikDefValue = round(row.defenseAdj - row.steals * 0.26 - row.blocks * 0.21, 3);
-    row.kenpomDefValue = round(row.defenseAdj - row.ppgAgainst * 0.08 - row.blocks * 0.18, 3);
-    row.haslaDefValue = round(row.defenseAdj - row.steals * 0.24 - row.opponentFieldGoalPct * 0.08, 3);
-    row.evanDefValue = round(row.defenseAdj - row.ppgAgainst * 0.1 - row.pointsDiff * 0.09, 3);
-  });
-
-  assignRanks(rows, (row) => row.resumeScore, { field: 'netRank' });
-  assignRanks(rows, (row) => row.torvikValue, { field: 'torvikRank' });
-  assignRanks(rows, (row) => row.kenpomValue, { field: 'kenpomRank' });
-  assignRanks(rows, (row) => row.haslaValue, { field: 'haslametricsRank' });
-  assignRanks(rows, (row) => row.evanValue, { field: 'evanmiyaRank' });
-
-  assignRanks(rows, (row) => row.torvikOffValue, { field: 'torvikOffRank' });
-  assignRanks(rows, (row) => row.kenpomOffValue, { field: 'kenpomOffRank' });
-  assignRanks(rows, (row) => row.haslaOffValue, { field: 'haslaOffRank' });
-  assignRanks(rows, (row) => row.evanOffValue, { field: 'evanOffRank' });
-
-  assignRanks(rows, (row) => row.torvikDefValue, { ascending: true, field: 'torvikDefRank' });
-  assignRanks(rows, (row) => row.kenpomDefValue, { ascending: true, field: 'kenpomDefRank' });
-  assignRanks(rows, (row) => row.haslaDefValue, { ascending: true, field: 'haslaDefRank' });
-  assignRanks(rows, (row) => row.evanDefValue, { ascending: true, field: 'evanDefRank' });
 }
 
 function applyPollRanks(rows, pollRankMap) {
@@ -484,32 +619,26 @@ function applyPollRanks(rows, pollRankMap) {
 }
 
 function finalizeRanks(rows) {
-  function averageAvailable(values) {
-    const usable = values.filter((value) => Number.isFinite(value));
-    if (!usable.length) return null;
-    return round(usable.reduce((sum, value) => sum + value, 0) / usable.length, 2);
-  }
-
   rows.forEach((row) => {
-    row.avgRank = averageAvailable([
-      row.apRank,
-      row.netRank,
-      row.torvikRank,
-      row.kenpomRank,
-      row.haslametricsRank,
-      row.evanmiyaRank,
+    row.avgRank = weightedAverage([
+      { value: row.apRank, weight: 1.45 },
+      { value: row.netRank, weight: 1.7 },
+      { value: row.torvikRank, weight: 1.2 },
+      { value: row.kenpomRank, weight: 1.2 },
+      { value: row.haslametricsRank, weight: 1.25 },
+      { value: row.evanmiyaRank, weight: 1.2 },
     ]);
-    row.offRank = averageAvailable([
-      row.torvikOffRank,
-      row.kenpomOffRank,
-      row.haslaOffRank,
-      row.evanOffRank,
+    row.offRank = weightedAverage([
+      { value: row.torvikOffRank, weight: 1.15 },
+      { value: row.kenpomOffRank, weight: 1.15 },
+      { value: row.haslaOffRank, weight: 1.3 },
+      { value: row.evanOffRank, weight: 1.15 },
     ]);
-    row.defRank = averageAvailable([
-      row.torvikDefRank,
-      row.kenpomDefRank,
-      row.haslaDefRank,
-      row.evanDefRank,
+    row.defRank = weightedAverage([
+      { value: row.torvikDefRank, weight: 1.15 },
+      { value: row.kenpomDefRank, weight: 1.15 },
+      { value: row.haslaDefRank, weight: 1.3 },
+      { value: row.evanDefRank, weight: 1.15 },
     ]);
   });
 
@@ -519,15 +648,17 @@ function finalizeRanks(rows) {
     .forEach((row, index) => {
       row.compositeRank = index + 1;
       row.ovrRank = index + 1;
-      row.ovrScore = round(clamp(97 - index * 0.08 - (row.avgRank ?? 200) * 0.055 + row.hotness * 0.05, 58, 97), 1);
+      row.ovrScore = round(clamp(96.5 - (row.avgRank ?? 220) * 0.07 + row.hotness * 0.06 - index * 0.035, 56, 97), 1);
     });
 }
 
-function buildRankingRows(teams, standings, teamStats, schedules, polls) {
+function buildRankingRows(teams, standings, teamStats, schedules, polls, netRankings = [], haslametrics = []) {
   const standingsMap = Object.fromEntries(standings.map((entry) => [entry.teamId, entry]));
   const statsMap = Object.fromEntries(teamStats.filter(Boolean).map((entry) => [entry.teamId, entry.stats]));
   const scheduleMap = Object.fromEntries(schedules.filter(Boolean).map((entry) => [entry.teamId, entry.schedule]));
   const { rankMap: pollRankMap, label: pollLabel, isFallback: pollFallback, pollAvailable } = parsePollRankMap(polls);
+  const netMap = new Map(netRankings.map((entry) => [String(entry.teamId), entry]));
+  const haslamMap = new Map(haslametrics.map((entry) => [String(entry.teamId), entry]));
 
   const rows = teams.map((team) => {
     const standing = standingsMap[team.id] || {};
@@ -611,6 +742,53 @@ function buildRankingRows(teams, standings, teamStats, schedules, polls) {
 
   makeTeamResume(rows);
   applyPollRanks(rows, pollRankMap);
+
+  rows.forEach((row) => {
+    const netEntry = netMap.get(row.id);
+    const haslamEntry = haslamMap.get(row.id);
+
+    row.netRank = Number.isFinite(netEntry?.rank) ? netEntry.rank : null;
+    row.torvikRank = null;
+    row.kenpomRank = null;
+    row.haslametricsRank = Number.isFinite(haslamEntry?.rank) ? haslamEntry.rank : null;
+    row.evanmiyaRank = null;
+
+    row.torvikOffRank = null;
+    row.kenpomOffRank = null;
+    row.evanOffRank = null;
+    row.torvikDefRank = null;
+    row.kenpomDefRank = null;
+    row.evanDefRank = null;
+
+    row.torvikValue = null;
+    row.kenpomValue = null;
+    row.evanValue = null;
+    row.torvikOffValue = null;
+    row.kenpomOffValue = null;
+    row.evanOffValue = null;
+    row.torvikDefValue = null;
+    row.kenpomDefValue = null;
+    row.evanDefValue = null;
+
+    row.haslaValue = Number.isFinite(haslamEntry?.rank) ? haslamEntry.rank : null;
+    row.haslaOffValue = Number.isFinite(haslamEntry?.offenseValue) ? round(haslamEntry.offenseValue, 3) : null;
+    row.haslaDefValue = Number.isFinite(haslamEntry?.defenseValue) ? round(haslamEntry.defenseValue, 3) : null;
+    row.haslaOffRank = null;
+    row.haslaDefRank = null;
+    row.netRecord = netEntry?.record || '';
+  });
+
+  assignRanks(
+    rows.filter((row) => Number.isFinite(row.haslaOffValue)),
+    (row) => row.haslaOffValue,
+    { field: 'haslaOffRank' },
+  );
+  assignRanks(
+    rows.filter((row) => Number.isFinite(row.haslaDefValue)),
+    (row) => row.haslaDefValue,
+    { ascending: true, field: 'haslaDefRank' },
+  );
+
   finalizeRanks(rows);
 
   rows.forEach((row) => {
@@ -812,8 +990,8 @@ function playerPositionBucket(position) {
 function buildPlayerRating(player, team) {
   const stats = player.stats || {};
   const bucket = playerPositionBucket(player.position);
-  const teamBoost = clamp(16 - ((team?.compositeRank || 180) / 16), -6, 10);
-  const hotnessBoost = (team?.hotness || 50) * 0.06;
+  const teamBoost = clamp(21 - ((team?.compositeRank || 180) / 12), -7, 13);
+  const hotnessBoost = (team?.hotness || 50) * 0.12;
   const minutes = Number(stats.minutes || 0);
   const points = Number(stats.points || 0);
   const rebounds = Number(stats.rebounds || 0);
@@ -823,72 +1001,84 @@ function buildPlayerRating(player, team) {
   const turnovers = Number(stats.turnovers || 0);
   const fgPct = Number(stats.fgPct || 42);
   const threePct = Number(stats.threePct || 31);
-  const rosterSlotBoost = clamp(13 - Number(player.rosterOrder || 14) * 0.72, -6, 12);
+  const usageRate = minutes > 0 ? (points + assists * 1.35 + rebounds * 0.65) / Math.max(1, minutes) : 0;
+  const efficiencyBoost = clamp((fgPct - 43) * 0.6 + (threePct - 32) * 0.45, -8, 12);
+  const rosterSlotBoost = clamp(15 - Number(player.rosterOrder || 14) * 1.05, -9, 14);
   const classBoost =
     /sr|senior/i.test(String(player.classYear || ''))
-      ? 2.6
+      ? 1.8
       : /jr|junior/i.test(String(player.classYear || ''))
-        ? 1.7
+        ? 1.2
         : /so|sophomore/i.test(String(player.classYear || ''))
-          ? 1
-          : 0.35;
+          ? 0.7
+          : 0.2;
 
   let production = 0;
   if (bucket === 'guard') {
     production =
-      points * 2.1 +
-      assists * 3.1 +
-      steals * 2.8 +
-      minutes * 0.34 +
-      threePct * 0.12 +
-      fgPct * 0.08 -
-      turnovers * 1.6;
+      points * 2.9 +
+      assists * 4.8 +
+      steals * 3.5 +
+      minutes * 0.55 +
+      threePct * 0.35 +
+      fgPct * 0.16 -
+      turnovers * 1.8 +
+      usageRate * 24;
   } else if (bucket === 'wing') {
     production =
-      points * 2.2 +
-      rebounds * 1.5 +
-      assists * 1.9 +
-      steals * 1.8 +
-      blocks * 1.2 +
-      minutes * 0.32 +
-      fgPct * 0.1 -
-      turnovers * 1.2;
+      points * 2.7 +
+      rebounds * 2.25 +
+      assists * 2.8 +
+      steals * 2.2 +
+      blocks * 1.8 +
+      minutes * 0.54 +
+      fgPct * 0.18 -
+      turnovers * 1.28 +
+      usageRate * 22;
   } else {
     production =
-      points * 1.8 +
-      rebounds * 2.6 +
-      blocks * 3.1 +
-      assists * 1.1 +
-      minutes * 0.34 +
-      fgPct * 0.14 -
-      turnovers * 1.1;
+      points * 2.35 +
+      rebounds * 3.9 +
+      blocks * 4.8 +
+      assists * 1.8 +
+      minutes * 0.52 +
+      fgPct * 0.22 -
+      turnovers * 1.1 +
+      usageRate * 20;
   }
 
   const leaderBoost = (player.leaders || [])
     .slice(0, 3)
-    .reduce((total, entry) => total + Math.max(0, 16 - Number(entry.rank || 16)), 0);
+    .reduce((total, entry) => total + Math.max(0, 24 - Number(entry.rank || 24)) * 1.45, 0);
 
   const statPresenceBoost =
-    (points > 0 ? 5.4 : 0) +
-    (assists > 0 ? 2.4 : 0) +
-    (rebounds > 0 ? 2.2 : 0) +
-    (minutes > 0 ? 4.1 : 0);
-  const rating = round(
-    clamp(
-      51 +
-        production * 0.52 +
-        leaderBoost * 1.05 +
-        teamBoost +
-        hotnessBoost +
-        rosterSlotBoost +
-        classBoost +
-        statPresenceBoost,
-      48,
-      98,
-    ),
-    1,
+    (points > 0 ? 6.4 : 0) +
+    (assists > 0 ? 3.2 : 0) +
+    (rebounds > 0 ? 3 : 0) +
+    (minutes > 0 ? 5.2 : 0) +
+    (fgPct > 0 ? 2.2 : 0);
+
+  return round(
+    production +
+      leaderBoost +
+      teamBoost +
+      hotnessBoost +
+      efficiencyBoost +
+      rosterSlotBoost +
+      classBoost +
+      statPresenceBoost,
+    3,
   );
-  return rating;
+}
+
+function createScoreScale(values) {
+  const usable = values.filter((value) => Number.isFinite(value));
+  const min = usable.length ? Math.min(...usable) : 0;
+  const max = usable.length ? Math.max(...usable) : 1;
+  if (!usable.length || min === max) {
+    return () => 0.5;
+  }
+  return (value) => clamp((value - min) / (max - min), 0, 1);
 }
 
 async function fetchAthleteStats(athleteId) {
@@ -922,6 +1112,11 @@ async function buildLocalSnapshot() {
     fetchLeaders(),
   ]);
 
+  const [netRankings, haslametrics] = await Promise.all([
+    fetchNetRankings(teams),
+    fetchHaslametrics(teams),
+  ]);
+
   const [teamStats, schedules] = await Promise.all([
     mapLimit(
       teams,
@@ -941,7 +1136,7 @@ async function buildLocalSnapshot() {
     ),
   ]);
 
-  const rankings = buildRankingRows(teams, standings, teamStats, schedules, polls);
+  const rankings = buildRankingRows(teams, standings, teamStats, schedules, polls, netRankings, haslametrics);
   const rankingMap = Object.fromEntries(rankings.map((team) => [team.id, team]));
   const leaderMap = new Map();
   leaders.forEach((leader) => {
@@ -959,27 +1154,59 @@ async function buildLocalSnapshot() {
     14,
   );
 
-  const players = uniqBy(rosters.flat().filter(Boolean), (player) => player.id)
+  const playerBase = uniqBy(rosters.flat().filter(Boolean), (player) => player.id)
     .map((player) => {
       const leadersForPlayer = leaderMap.get(player.id) || [];
       const enriched = {
         ...player,
         leaders: leadersForPlayer,
       };
-      const rating = buildPlayerRating(enriched, rankingMap[player.team.id] || player.team);
       return {
         ...enriched,
+        rawScore: buildPlayerRating(enriched, rankingMap[player.team.id] || player.team),
+        positionBucket: playerPositionBucket(enriched.position),
+      };
+    });
+
+  const overallScale = createScoreScale(playerBase.map((player) => player.rawScore));
+  const bucketScaleMap = Object.fromEntries(
+    ['guard', 'wing', 'big'].map((bucket) => [
+      bucket,
+      createScoreScale(playerBase.filter((player) => player.positionBucket === bucket).map((player) => player.rawScore)),
+    ]),
+  );
+
+  const players = playerBase
+    .map((player) => {
+      const overallPct = overallScale(player.rawScore);
+      const bucketPct = (bucketScaleMap[player.positionBucket] || (() => 0.5))(player.rawScore);
+      const team = rankingMap[player.team.id] || player.team;
+      const rating = round(
+        clamp(
+          49 +
+            overallPct * 28 +
+            bucketPct * 16 +
+            clamp(14 - ((team?.compositeRank || 180) / 16), -4, 8) +
+            Math.min(7, (player.leaders || []).length * 1.9),
+          48,
+          99,
+        ),
+        1,
+      );
+
+      return {
+        ...player,
         rating,
         tier: bucketTier(rating),
         usageSummary:
           Number(player.stats?.points || 0) > 0
             ? `${round(Number(player.stats.points), 1)} PPG • ${round(Number(player.stats.assists || 0), 1)} APG • ${round(Number(player.stats.rebounds || 0), 1)} RPG`
-            : leadersForPlayer[0]
-              ? `${leadersForPlayer[0].label} #${leadersForPlayer[0].rank}`
+            : player.leaders?.[0]
+              ? `${player.leaders[0].label} #${player.leaders[0].rank}`
               : `${player.team.abbreviation} rotation`,
       };
     })
-    .sort((left, right) => right.rating - left.rating || left.displayName.localeCompare(right.displayName))
+    .sort((left, right) => right.rating - left.rating || right.rawScore - left.rawScore || left.displayName.localeCompare(right.displayName))
     .map((player, index) => ({
       ...player,
       rank: index + 1,
@@ -1001,7 +1228,7 @@ async function buildLocalSnapshot() {
   const predictors = buildPredictorSlate(scoreboard, teamsWithLeaders);
   return {
     sport: 'cbb',
-    headline: 'Composite CBB blends six ranking inputs into one live resume board with player and predictor layers.',
+    headline: 'Composite CBB',
     scoreboard,
     rankings: teamsWithLeaders,
     teams: teamsWithLeaders,
@@ -1016,15 +1243,17 @@ async function buildLocalSnapshot() {
     predictors,
     sourceState: {
       apPoll: polls.length ? 'live-or-coaches' : 'missing',
-      net: 'derived-fallback',
-      torvik: hasRemoteCBBService() ? 'remote-or-fallback' : 'local-derived',
-      kenpom: hasRemoteCBBService() ? 'remote-or-fallback' : 'scaled-from-local',
-      haslametrics: hasRemoteCBBService() ? 'remote-or-fallback' : 'local-derived',
-      evanmiya: hasRemoteCBBService() ? 'remote-or-fallback' : 'scaled-from-local',
+      net: netRankings.length >= 300 ? 'live' : 'missing',
+      torvik: hasRemoteCBBService() ? 'remote-or-fallback' : 'service-required',
+      kenpom: hasRemoteCBBService() ? 'remote-or-fallback' : 'service-required',
+      haslametrics: haslametrics.length >= 300 ? 'live' : 'missing',
+      evanmiya: hasRemoteCBBService() ? 'remote-or-fallback' : 'service-required',
     },
     sourceTimestamps: {
       snapshot: new Date().toISOString(),
       apPoll: polls.length ? new Date().toISOString() : null,
+      net: netRankings.length ? new Date().toISOString() : null,
+      haslametrics: haslametrics.length ? new Date().toISOString() : null,
     },
     meta: {
       liveGames: scoreboard.filter((game) => game.state === 'in').length,
@@ -1062,23 +1291,31 @@ async function getModel({ force = false } = {}) {
 function buildPredictor(awayTeam, homeTeam, game = null) {
   if (!awayTeam || !homeTeam) return null;
   const averagePace = 71;
-  const compositeGap = awayTeam.compositeRank - homeTeam.compositeRank;
-  const top50Matchup = awayTeam.compositeRank <= 50 && homeTeam.compositeRank <= 50;
-  const defenseSuppressionHome = homeTeam.defRank <= 30 ? (31 - homeTeam.defRank) * 0.22 : 0;
-  const defenseSuppressionAway = awayTeam.defRank <= 30 ? (31 - awayTeam.defRank) * 0.22 : 0;
+  const awayComposite = awayTeam.compositeRank || awayTeam.avgRank || 180;
+  const homeComposite = homeTeam.compositeRank || homeTeam.avgRank || 180;
+  const awayOff = awayTeam.offRank || 180;
+  const homeOff = homeTeam.offRank || 180;
+  const awayDef = awayTeam.defRank || 180;
+  const homeDef = homeTeam.defRank || 180;
+  const awayNet = awayTeam.netRank || awayComposite;
+  const homeNet = homeTeam.netRank || homeComposite;
+  const compositeGap = awayComposite - homeComposite;
+  const top50Matchup = awayComposite <= 50 && homeComposite <= 50;
+  const defenseSuppressionHome = homeDef <= 30 ? (31 - homeDef) * 0.22 : 0;
+  const defenseSuppressionAway = awayDef <= 30 ? (31 - awayDef) * 0.22 : 0;
   const homeBase =
     homeTeam.ppg +
-    (100 - awayTeam.defRank) * 0.08 +
-    (100 - homeTeam.offRank) * 0.06 +
-    (100 - homeTeam.netRank) * 0.035 +
-    (100 - homeTeam.compositeRank) * 0.05 +
+    (100 - awayDef) * 0.08 +
+    (100 - homeOff) * 0.06 +
+    (100 - homeNet) * 0.035 +
+    (100 - homeComposite) * 0.05 +
     (homeTeam.apRank <= 25 ? (26 - homeTeam.apRank) * 0.05 : 0);
   const awayBase =
     awayTeam.ppg +
-    (100 - homeTeam.defRank) * 0.08 +
-    (100 - awayTeam.offRank) * 0.06 +
-    (100 - awayTeam.netRank) * 0.035 +
-    (100 - awayTeam.compositeRank) * 0.05 +
+    (100 - homeDef) * 0.08 +
+    (100 - awayOff) * 0.06 +
+    (100 - awayNet) * 0.035 +
+    (100 - awayComposite) * 0.05 +
     (awayTeam.apRank <= 25 ? (26 - awayTeam.apRank) * 0.05 : 0);
 
   let projectedHomeScore = round(
@@ -1098,21 +1335,21 @@ function buildPredictor(awayTeam, homeTeam, game = null) {
 
   const gapMagnitude = Math.abs(compositeGap);
   const dynamicGapBoost = top50Matchup ? gapMagnitude * 0.03 : gapMagnitude > 100 ? gapMagnitude * 0.09 : gapMagnitude * 0.055;
-  if (homeTeam.compositeRank < awayTeam.compositeRank) {
+  if (homeComposite < awayComposite) {
     projectedHomeScore += dynamicGapBoost;
   } else {
     projectedAwayScore += dynamicGapBoost;
   }
 
   const homeStrength =
-    (100 - homeTeam.compositeRank) * 1.15 +
-    (100 - homeTeam.offRank) * 0.85 +
-    (100 - homeTeam.defRank) * 0.8 +
+    (100 - homeComposite) * 1.15 +
+    (100 - homeOff) * 0.85 +
+    (100 - homeDef) * 0.8 +
     (homeTeam.hotness - 50) * 0.7;
   const awayStrength =
-    (100 - awayTeam.compositeRank) * 1.15 +
-    (100 - awayTeam.offRank) * 0.85 +
-    (100 - awayTeam.defRank) * 0.8 +
+    (100 - awayComposite) * 1.15 +
+    (100 - awayOff) * 0.85 +
+    (100 - awayDef) * 0.8 +
     (awayTeam.hotness - 50) * 0.7;
 
   const homeWinProbability = clamp(
@@ -1194,8 +1431,8 @@ function buildPredictor(awayTeam, homeTeam, game = null) {
           : 'Lean',
     explanation: [
       `${leaningHome ? homeTeam.displayName : awayTeam.displayName} owns the stronger composite resume and efficiency blend.`,
-      `${homeTeam.displayName}: OFF ${homeTeam.offRank} • DEF ${homeTeam.defRank} • NET ${homeTeam.netRank}.`,
-      `${awayTeam.displayName}: OFF ${awayTeam.offRank} • DEF ${awayTeam.defRank} • NET ${awayTeam.netRank}.`,
+      `${homeTeam.displayName}: OFF ${homeOff} • DEF ${homeDef} • NET ${homeNet}.`,
+      `${awayTeam.displayName}: OFF ${awayOff} • DEF ${awayDef} • NET ${awayNet}.`,
       top50Matchup
         ? 'Top-50 matchup logic keeps the game tighter than a raw rank gap would.'
         : 'Large resume gaps create a wider margin once offense-vs-defense suppression is applied.',

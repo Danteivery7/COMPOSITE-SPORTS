@@ -1,11 +1,10 @@
 # Composite CBB Backend
 
-This scaffold is the dedicated college-basketball ingestion service referenced by the app plan.
+This service is the dedicated college-basketball ingestion backend referenced by the app plan.
 
 Intended responsibilities:
 
-- scrape and normalize AP Poll, NET, Torvik, and Haslametrics
-- derive KenPom-like and EvanMiya-like systems from Torvik
+- scrape and normalize AP Poll, NET, Torvik, KenPom, Haslametrics, and EvanMiya
 - ingest ESPN scoreboard, schedule, roster, player, and news data
 - store hot snapshots in MongoDB
 - expose a stable read API for the Next frontend

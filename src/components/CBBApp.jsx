@@ -322,13 +322,14 @@ function Overview({
   const predictions = bootstrap.predictors || [];
   const predictionMap = Object.fromEntries(predictions.map((entry) => [entry.gameId, entry]));
   const topPlayers = bootstrap.topPlayers || bootstrap.featuredPlayers?.slice(0, 3) || [];
+  const leadStory = bootstrap.news?.[0] || null;
 
   return (
     <section className="cbb-shell">
       <article className="generic-card cbb-hero">
         <div className="cbb-hero-copy">
-          <p className="eyebrow">Campus Pulse</p>
-          <h2>Live college basketball boards, resume pressure, and tournament-level player movement.</h2>
+          <p className="eyebrow">Campus Court</p>
+          <h2>{bootstrap.headline || 'Composite College Basketball'}</h2>
           <div className="cbb-card-footer">
             <ResumePill label="Teams" value={bootstrap.meta?.teamCount || 0} accent />
             <ResumePill label="Players" value={bootstrap.playersCatalog?.players?.length || 0} />
@@ -336,17 +337,22 @@ function Overview({
           </div>
         </div>
         <div className="cbb-hero-side">
+          {leadStory?.image ? (
+            <button className="cbb-hero-visual" type="button" onClick={() => openStory(leadStory, 'overview')}>
+              <img src={leadStory.image} alt={leadStory.headline} className="cbb-hero-visual-image" />
+              <div className="cbb-hero-visual-copy">
+                <span>{leadStory.source || 'CBB News'}</span>
+                <strong>{leadStory.headline}</strong>
+              </div>
+            </button>
+          ) : null}
           <button className="cbb-hero-note" type="button" onClick={() => setPage('rankings')}>
             <span>Resume Board</span>
-            <strong>Full composite average across AP, NET, Torvik, KenPom, Haslametrics, and EvanMiya.</strong>
+            <strong>AP, NET, Haslametrics, and the live six-source composite when the dedicated backend feed is available.</strong>
           </button>
           <button className="cbb-hero-note" type="button" onClick={() => setPage('predictor')}>
             <span>Upset Watch</span>
-            <strong>The Ivery-Simmons model leans on scoring, defensive suppression, and full resume context.</strong>
-          </button>
-          <button className="cbb-hero-note" type="button" onClick={() => setPage('news')}>
-            <span>News Desk</span>
-            <strong>Open the biggest stories on players, teams, coaches, and tournament movement.</strong>
+            <strong>Model reads built from scoring shape, defensive pressure, and real resume context.</strong>
           </button>
         </div>
       </article>
@@ -398,7 +404,7 @@ function Overview({
           <div className="sportview-panel-head">
             <div>
               <h3>Resume Board</h3>
-              <p>Top composite teams with source context and record.</p>
+              <p>Top teams with real source rank context and current record.</p>
             </div>
             <button type="button" onClick={() => setPage('rankings')}>
               Rankings
@@ -440,7 +446,7 @@ function Overview({
           <div className="sportview-panel-head">
             <div>
               <h3>Bubble Watch</h3>
-              <p>Trending schools and resume stress points.</p>
+              <p>Resume pressure, at-large texture, and schools moving fastest.</p>
             </div>
           </div>
           <div className="sportview-note-list">
@@ -459,7 +465,7 @@ function Overview({
           <div className="sportview-panel-head">
             <div>
               <h3>Tournament Risers</h3>
-              <p>The board’s best player movers right now.</p>
+              <p>The strongest player board movers right now.</p>
             </div>
           </div>
           <div className="cbb-player-feature-grid">
@@ -869,7 +875,7 @@ export default function CBBApp({ initialEntry = null }) {
       return (
         <section className="generic-loading">
           <p className="eyebrow">CBB Sync</p>
-          <h2>Pulling six-source rankings, campus scores, player boards, and predictor signals.</h2>
+          <h2>Syncing the campus board and the latest composite snapshot.</h2>
         </section>
       );
     }
@@ -924,7 +930,7 @@ export default function CBBApp({ initialEntry = null }) {
           <section className="cbb-settings-grid">
             <article className="generic-card">
               <h3>Ranking inputs</h3>
-              <p>AP, NET, Torvik, KenPom, Haslametrics, and EvanMiya all feed the composite Avg board, with fallback handling per source.</p>
+              <p>AP, NET, Torvik, KenPom, Haslametrics, and EvanMiya feed the composite Avg board, with missing live sources excluded instead of fabricated.</p>
             </article>
             <article className="generic-card">
               <h3>Refresh model</h3>
@@ -937,7 +943,7 @@ export default function CBBApp({ initialEntry = null }) {
             <article className="generic-card">
               <h3>Source health</h3>
               <p>
-                AP {bootstrap?.sourceState?.apPoll || 'unknown'} • NET {bootstrap?.sourceState?.net || 'unknown'} • Torvik {bootstrap?.sourceState?.torvik || 'unknown'}
+                AP {bootstrap?.sourceState?.apPoll || 'unknown'} • NET {bootstrap?.sourceState?.net || 'unknown'} • Torvik {bootstrap?.sourceState?.torvik || 'unknown'} • Haslam {bootstrap?.sourceState?.haslametrics || 'unknown'}
               </p>
             </article>
           </section>
@@ -1003,7 +1009,7 @@ export default function CBBApp({ initialEntry = null }) {
         <div className="generic-brand cbb-brand">
           <span>Composite CBB</span>
           <h2>Campus Board</h2>
-          <p>Resume board, bubble watch, and player movement across all of D-I.</p>
+          <p>365 teams, real resume context, and a live player board.</p>
         </div>
         <nav className="generic-nav">
           {NAV_ITEMS.map((item) => (
