@@ -22,7 +22,8 @@ import {
 } from '@/public/vendor/nhl/src/analytics.js';
 
 const CACHE = new Map();
-const WORLD_CACHE_VERSION = 'v3';
+const WORLD_CACHE_VERSION = 'v4';
+const DEFAULT_HEADSHOT = 'https://a.espncdn.com/i/headshots/nophoto.png';
 
 const SOURCE_WEIGHTS = {
   mlb: 1.18,
@@ -66,6 +67,15 @@ function uniqBy(items, getKey) {
   const map = new Map();
   items.forEach((item) => map.set(getKey(item), item));
   return Array.from(map.values());
+}
+
+function resolveHeadshot(...sources) {
+  for (const source of sources) {
+    if (typeof source === 'string' && source.trim()) {
+      return source;
+    }
+  }
+  return DEFAULT_HEADSHOT;
 }
 
 function positionDifficulty(position = '') {
@@ -127,7 +137,7 @@ async function getNBACandidates() {
         id: `nba-${player.id}`,
         playerId: String(player.id),
         displayName: player.fullName || player.displayName,
-        headshot: player.headshot,
+        headshot: resolveHeadshot(player.headshot),
         position: player.rating?.posAbbrev || player.position?.abbreviation || player.position || 'NBA',
         leagueLabel: 'NBA',
         sportKey: 'nba',
@@ -175,7 +185,7 @@ async function getNHLCandidates() {
           id: `nhl-${card.playerId}`,
           playerId: String(card.playerId),
           displayName: card.fullName || card.shortName || 'NHL Player',
-          headshot: card.headshot || card.team?.logo || '',
+          headshot: resolveHeadshot(card.headshot),
           position: card.position || 'NHL',
           leagueLabel: 'NHL',
           sportKey: 'nhl',
@@ -293,7 +303,7 @@ async function getHubCandidates() {
     id: `mlb-${player.id}`,
     playerId: String(player.id),
     displayName: player.name || player.displayName,
-    headshot: player.headshot || player.teamLogo || '',
+    headshot: resolveHeadshot(player.headshot),
     position: player.position || 'MLB',
     leagueLabel: 'MLB',
     sportKey: 'mlb',
@@ -312,7 +322,7 @@ async function getHubCandidates() {
       id: `${sportKey}-${player.id}`,
       playerId: String(player.id),
       displayName: player.displayName,
-      headshot: player.headshot || player.team?.logo || '',
+      headshot: resolveHeadshot(player.headshot),
       position: player.position || leagueLabel,
       leagueLabel,
       sportKey,
@@ -332,7 +342,7 @@ async function getHubCandidates() {
       id: `${leagueKey}-${player.id}`,
       playerId: String(player.id),
       displayName: player.displayName,
-      headshot: player.headshot || player.team?.logo || '',
+      headshot: resolveHeadshot(player.headshot),
       position: player.position || 'Football',
       leagueLabel: league.label,
       sportKey: 'football',

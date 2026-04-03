@@ -21,6 +21,12 @@ function getSportRailStep(rail) {
   return card.getBoundingClientRect().width + gap;
 }
 
+function ensureHeadshotFallback(event) {
+  if (event.currentTarget.dataset.fallbackApplied === '1') return;
+  event.currentTarget.dataset.fallbackApplied = '1';
+  event.currentTarget.src = 'https://a.espncdn.com/i/headshots/nophoto.png';
+}
+
 export default function SportHubPage() {
   const cards = getSportCards();
   const sportRailRef = useRef(null);
@@ -356,7 +362,7 @@ export default function SportHubPage() {
                 <Link className="hub-world-card" key={player.id} href={player.href || '#'}>
                   <div className="hub-world-rank">#{player.worldRank}</div>
                   {player.headshot ? (
-                    <img src={player.headshot} alt={player.displayName} className="hub-world-headshot" />
+                    <img src={player.headshot} alt={player.displayName} className="hub-world-headshot" onError={ensureHeadshotFallback} />
                   ) : (
                     <div className="hub-world-headshot hub-world-headshot-fallback">{player.displayName?.slice(0, 2)?.toUpperCase() || 'PL'}</div>
                   )}

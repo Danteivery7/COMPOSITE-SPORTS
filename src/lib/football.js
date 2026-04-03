@@ -241,6 +241,10 @@ function toFiniteNumber(value, fallback = 0) {
   return Number.isFinite(numeric) ? numeric : fallback;
 }
 
+function clampNumber(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
 function parseRecordSummary(summary = '') {
   const match = String(summary).match(/(\d+)\s*-\s*(\d+)\s*-\s*(\d+)/);
   if (!match) {
@@ -393,83 +397,102 @@ function buildFootballPlayerRating(player, team, leaderEntries = []) {
   const foulsCommitted = getPlayerStat(stats, ['foulscommitted', 'fc'], 0);
   const foulsSuffered = getPlayerStat(stats, ['foulssuffered', 'fa'], 0);
 
-  const reliability = Math.max(0.18, Math.min(1, appearances / 24));
-  const teamOffBoost = Math.max(0, ((team?.offScore || 50) - 50) * 0.28);
-  const teamDefBoost = Math.max(0, ((team?.defScore || 50) - 50) * 0.3);
-  const teamResultsBoost = Math.max(0, ((team?.resultsScore || 50) - 50) * 0.24);
-  const leaderBoost = leaderEntries
+  const appearanceScale = clampNumber(appearances / 34, 0, 1);
+  const startShare = clampNumber(starts / Math.max(1, appearances || starts || 1), 0, 1);
+  const reliability = clampNumber(0.28 + appearanceScale * 0.72, 0.28, 1);
+  const goalRate = goals / Math.max(1, appearances);
+  const assistRate = assists / Math.max(1, appearances);
+  const shotRate = shots / Math.max(1, appearances);
+  const shotOnTargetRate = shotsOnTarget / Math.max(1, appearances);
+  const shotAccuracy = shots > 0 ? shotsOnTarget / shots : 0;
+  const saveRate = shotsFaced > 0 ? saves / shotsFaced : saves / Math.max(1, appearances * 3.2);
+  const savesPerMatch = saves / Math.max(1, appearances);
+  const goalsAgainstPerMatch = goalsConceded / Math.max(1, appearances);
+
+  const teamOffBoost = clampNumber(((team?.offScore || 50) - 50) * 0.09, -2.4, 4.8);
+  const teamDefBoost = clampNumber(((team?.defScore || 50) - 50) * 0.09, -2.4, 4.8);
+  const teamResultsBoost = clampNumber(((team?.resultsScore || 50) - 50) * 0.09, -2.4, 4.8);
+  const leaderBoost = clampNumber(
+    leaderEntries
     .slice(0, 4)
-    .reduce((total, entry) => total + Math.max(0, 16 - Number(entry.rank || 16)) * 0.7, 0);
-  const startsBoost = starts * 0.48;
+    .reduce((total, entry) => total + Math.max(0, 16 - Number(entry.rank || 16)) * 0.24, 0),
+    0,
+    6,
+  );
+  const availabilityBoost = appearanceScale * 10;
+  const startsBoost = startShare * 7;
   const disciplinePenalty = (yellowCards * 0.18) + (redCards * 1.75) + (foulsCommitted * 0.04);
   const foulDrawBonus = foulsSuffered * 0.08;
 
-  let rawRating = 58;
+  let rawRating = 54;
   let summary = `${appearances} apps`;
 
   if (positionGroup === 'GK') {
-    const saveRate = shotsFaced > 0 ? saves / shotsFaced : 0.68;
-    const goalsAgainstPerMatch = appearances > 0 ? goalsConceded / appearances : 1.4;
     rawRating =
-      64 +
-      startsBoost +
-      (saveRate * 20) +
-      teamDefBoost +
-      (teamResultsBoost * 0.8) +
-      (leaderBoost * 0.28) -
-      (goalsAgainstPerMatch * 3.2) -
+      53 +
+      availabilityBoost +
+      (startsBoost * 1.1) +
+      Math.min(10, saveRate * 20) +
+      Math.min(7, savesPerMatch * 1.8) +
+      (teamDefBoost * 1.15) +
+      (teamResultsBoost * 0.75) +
+      (leaderBoost * 0.72) -
+      Math.min(8, goalsAgainstPerMatch * 4.4) -
       (disciplinePenalty * 0.12);
     summary = `${saves} saves • ${goalsConceded} GA`;
   } else if (positionGroup === 'DEF') {
     rawRating =
-      60 +
-      startsBoost +
-      teamDefBoost +
-      (teamResultsBoost * 0.7) +
-      (goals * 4.2) +
-      (assists * 3.9) +
-      (shotsOnTarget * 0.6) +
-      (leaderBoost * 0.34) +
-      foulDrawBonus -
+      51 +
+      availabilityBoost +
+      (startsBoost * 1.15) +
+      (teamDefBoost * 1.3) +
+      (teamResultsBoost * 0.82) +
+      Math.min(7, (goals * 1.8) + (assists * 1.7)) +
+      Math.min(3, shotOnTargetRate * 2.8) +
+      (leaderBoost * 0.86) +
+      Math.min(2.4, foulDrawBonus * 0.2) -
       disciplinePenalty;
     summary = `${goals} G • ${assists} A • ${appearances} apps`;
   } else if (positionGroup === 'MID') {
     rawRating =
-      61 +
-      startsBoost +
-      (goals * 4.8) +
-      (assists * 5.1) +
-      (shotsOnTarget * 0.82) +
-      (shots * 0.18) +
-      (teamOffBoost * 0.9) +
-      (teamDefBoost * 0.45) +
-      (teamResultsBoost * 0.7) +
-      (leaderBoost * 0.44) +
-      foulDrawBonus -
+      52 +
+      availabilityBoost +
+      (startsBoost * 1.1) +
+      Math.min(9, goalRate * 18) +
+      Math.min(10, assistRate * 22) +
+      Math.min(5, shotOnTargetRate * 4.2) +
+      Math.min(2.5, shotRate * 0.9) +
+      (teamOffBoost * 0.88) +
+      (teamDefBoost * 0.5) +
+      (teamResultsBoost * 0.9) +
+      leaderBoost +
+      Math.min(2.4, foulDrawBonus * 0.18) -
       (disciplinePenalty * 0.85);
     summary = `${goals} G • ${assists} A • ${appearances} apps`;
   } else {
     const finishingRate = shots > 0 ? shotsOnTarget / shots : 0;
     rawRating =
-      62 +
-      (startsBoost * 0.9) +
-      (goals * 5.9) +
-      (assists * 4.1) +
-      (shotsOnTarget * 1.2) +
-      (shots * 0.2) +
-      (finishingRate * 8) +
-      teamOffBoost +
-      (teamResultsBoost * 0.62) +
-      (leaderBoost * 0.58) -
+      52 +
+      availabilityBoost +
+      startsBoost +
+      Math.min(16, goalRate * 30) +
+      Math.min(8, assistRate * 18) +
+      Math.min(7, shotOnTargetRate * 5.2) +
+      Math.min(4, shotRate * 1.25) +
+      Math.min(5, finishingRate * 6) +
+      (teamOffBoost * 1.02) +
+      (teamResultsBoost * 0.8) +
+      (leaderBoost * 1.04) +
+      Math.min(2.2, foulDrawBonus * 0.14) -
       (offsides * 0.08) -
       (disciplinePenalty * 0.7);
     summary = `${goals} G • ${assists} A • ${shotsOnTarget}/${shots} SOT`;
   }
 
   const stabilizedBaseline =
-    positionGroup === 'GK' ? 68 : positionGroup === 'DEF' ? 65 : positionGroup === 'MID' ? 66 : 67;
+    positionGroup === 'GK' ? 58 : positionGroup === 'DEF' ? 56 : positionGroup === 'MID' ? 58 : 59;
   const stabilized = stabilizedBaseline + ((rawRating - stabilizedBaseline) * reliability);
-  const rating = Math.max(42, Math.min(97.5, Math.round(stabilized * 10) / 10));
+  const rating = clampNumber(Math.round(stabilized * 10) / 10, 44, 94.5);
 
   return {
     rating,
