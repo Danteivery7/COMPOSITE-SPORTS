@@ -377,7 +377,7 @@ async def fetch_net_rankings(teams: list[dict[str, Any]]) -> list[dict[str, Any]
         team_id = resolve_team_id(lookup, cells[1], "")
         if not team_id:
             continue
-        entries.append({"teamId": team_id, "rank": rank, "teamName": cells[1]})
+        entries.append({"teamId": team_id, "rank": rank, "teamName": cells[1], "record": cells[2] if len(cells) > 2 else ""})
     return entries
 
 
@@ -516,18 +516,30 @@ def build_player_rating(player: dict[str, Any], team: dict[str, Any]) -> float:
     fg_pct = float(stats.get("fgPct") or 42)
     three_pct = float(stats.get("threePct") or 31)
     leaders = player.get("leaders") or []
-    team_boost = clamp(18 - ((team.get("compositeRank") or 180) / 14), -8, 11)
-    hotness = float(team.get("hotness") or 50) * 0.08
-    roster_slot = clamp(14 - float(player.get("rosterOrder") or 14) * 0.9, -8, 12)
+    team_boost = clamp(10 - ((team.get("compositeRank") or 180) / 28), -3, 4)
+    hotness = clamp((float(team.get("hotness") or 50) - 50) * 0.04, -2, 2.5)
+    usage_rate = (points + assists * 1.35 + rebounds * 0.65) / max(1.0, minutes) if minutes > 0 else 0
+    efficiency_boost = clamp((fg_pct - 43) * 0.24 + (three_pct - 32) * 0.18, -4, 5)
+    roster_slot = clamp(9 - float(player.get("rosterOrder") or 14) * 0.72, -5, 5)
+    stat_reliability = clamp(
+        (minutes / 24) * 0.55 +
+        (points / 16) * 0.2 +
+        ((rebounds + assists + steals + blocks) / 12) * 0.15 +
+        (0.1 if leaders else 0),
+        0.1,
+        1,
+    )
+    class_year = str(player.get("classYear") or "")
+    class_boost = 1 if re.search(r"sr|senior", class_year, re.I) else 0.7 if re.search(r"jr|junior", class_year, re.I) else 0.35 if re.search(r"so|sophomore", class_year, re.I) else 0.1
     if bucket == "guard":
-        production = points * 2.5 + assists * 4 + steals * 3.2 + minutes * 0.44 + three_pct * 0.2 + fg_pct * 0.12 - turnovers * 1.9
+        production = points * 1.85 + assists * 3 + steals * 2.3 + minutes * 0.26 + three_pct * 0.11 + fg_pct * 0.08 - turnovers * 1.25 + usage_rate * 9
     elif bucket == "wing":
-        production = points * 2.45 + rebounds * 1.9 + assists * 2.3 + steals * 2.1 + blocks * 1.5 + minutes * 0.42 + fg_pct * 0.14 - turnovers * 1.35
+        production = points * 1.75 + rebounds * 1.7 + assists * 1.8 + steals * 1.8 + blocks * 1.5 + minutes * 0.24 + fg_pct * 0.08 - turnovers * 1.08 + usage_rate * 8
     else:
-        production = points * 2 + rebounds * 3.3 + blocks * 4.1 + assists * 1.4 + minutes * 0.42 + fg_pct * 0.18 - turnovers * 1.2
-    leader_boost = sum(max(0, 24 - int(item.get("rank") or 24)) * 1.45 for item in leaders[:3])
-    stat_presence = (6.4 if points > 0 else 0) + (3.2 if assists > 0 else 0) + (3 if rebounds > 0 else 0) + (5.2 if minutes > 0 else 0)
-    return round_value(production + leader_boost + team_boost + hotness + roster_slot + stat_presence, 3) or 50.0
+        production = points * 1.55 + rebounds * 2.55 + blocks * 3.1 + assists * 1.1 + minutes * 0.24 + fg_pct * 0.1 - turnovers * 0.92 + usage_rate * 7
+    leader_boost = sum(max(0, 18 - int(item.get("rank") or 18)) * 0.85 for item in leaders[:3])
+    stat_presence = (2.2 if points > 0 else -2) + (1.2 if assists > 0 else 0) + (1.2 if rebounds > 0 else 0) + (3 if minutes >= 12 else 1 if minutes > 0 else -4) + (0.8 if fg_pct > 0 else 0)
+    return round_value((production * stat_reliability) + leader_boost + team_boost + hotness + efficiency_boost + roster_slot + class_boost + stat_presence, 3) or 42.0
 
 
 async def build_bootstrap_snapshot() -> dict[str, Any]:
@@ -572,11 +584,14 @@ async def build_bootstrap_snapshot() -> dict[str, Any]:
         wins = standing.get("wins", 0)
         losses = standing.get("losses", 0)
         win_pct = standing.get("winPct", 0)
+        net_entry = net_map.get(team["id"], {})
+        standing_record = standing.get("record") or ""
+        record = standing_record if standing_record and standing_record != "0-0" else (net_entry.get("record") or f"{int(wins)}-{int(losses)}")
         hotness = round_value(clamp(48 + form["recentFormPoints"] * 6 + form["streakValue"] * 4 + (win_pct - 0.5) * 40, 10, 99), 1)
         row = {
             **team,
             "conference": standing.get("conference") or "Division I",
-            "record": standing.get("record") or f"{int(wins)}-{int(losses)}",
+            "record": record,
             "wins": wins,
             "losses": losses,
             "ppg": ppg,
@@ -586,7 +601,7 @@ async def build_bootstrap_snapshot() -> dict[str, Any]:
             "streak": form["streak"],
             "recent": form["recent"],
             "apRank": None,
-            "netRank": net_map.get(team["id"], {}).get("rank"),
+            "netRank": net_entry.get("rank"),
             "torvikRank": torvik_map.get(team["id"], {}).get("rank"),
             "kenpomRank": kenpom_map.get(team["id"], {}).get("rank"),
             "haslametricsRank": haslam_map.get(team["id"], {}).get("rank"),
@@ -729,7 +744,16 @@ async def build_bootstrap_snapshot() -> dict[str, Any]:
     for player, raw in zip(players, raw_scores):
         team = next(team for team in rows if team["id"] == player["team"]["id"])
         pct = 0.5 if raw_max == raw_min else (raw - raw_min) / (raw_max - raw_min)
-        rating = round_value(clamp(52 + pct * 38 + clamp(12 - ((team.get("compositeRank") or 180) / 18), -3, 7), 50, 98), 1)
+        stats = player.get("stats") or {}
+        stat_strength = clamp(
+            (float(stats.get("minutes") or 0) / 24) * 0.4 +
+            (float(stats.get("points") or 0) / 18) * 0.25 +
+            ((float(stats.get("rebounds") or 0) + float(stats.get("assists") or 0)) / 10) * 0.2 +
+            (0.15 if player.get("leaders") else 0),
+            0,
+            1,
+        )
+        rating = round_value(clamp(46 + pct * 18 + stat_strength * 15 + clamp(8 - ((team.get("compositeRank") or 180) / 24), -2, 4) + min(4, len(player.get("leaders") or []) * 1.1), 43, 92), 1)
         player["rating"] = rating
         player["tier"] = "All-American" if rating >= 92 else "All-Conference" if rating >= 86 else "Starter" if rating >= 79 else "Rotation" if rating >= 71 else "Depth"
         player["usageSummary"] = (
@@ -743,6 +767,7 @@ async def build_bootstrap_snapshot() -> dict[str, Any]:
 
     events = scoreboard_payload.get("events") or []
     scoreboard = []
+    ranking_record_map = {row["id"]: row["record"] for row in rows}
     for event in events:
         comp = (event.get("competitions") or [{}])[0]
         competitors = comp.get("competitors") or []
@@ -762,7 +787,7 @@ async def build_bootstrap_snapshot() -> dict[str, Any]:
                     "displayName": home.get("team", {}).get("displayName") or "Home",
                     "logo": home.get("team", {}).get("logo") or "",
                     "score": home.get("score") or "0",
-                    "record": ((home.get("records") or [{}])[0]).get("summary") or "",
+                    "record": ((home.get("records") or [{}])[0]).get("summary") or ranking_record_map.get(str(home.get("team", {}).get("id") or ""), ""),
                 },
                 "away": {
                     "teamId": str(away.get("team", {}).get("id") or ""),
@@ -770,7 +795,7 @@ async def build_bootstrap_snapshot() -> dict[str, Any]:
                     "displayName": away.get("team", {}).get("displayName") or "Away",
                     "logo": away.get("team", {}).get("logo") or "",
                     "score": away.get("score") or "0",
-                    "record": ((away.get("records") or [{}])[0]).get("summary") or "",
+                    "record": ((away.get("records") or [{}])[0]).get("summary") or ranking_record_map.get(str(away.get("team", {}).get("id") or ""), ""),
                 },
             }
         )
@@ -807,6 +832,8 @@ async def build_bootstrap_snapshot() -> dict[str, Any]:
         away_comp = away.get("compositeRank") or 180
         home_score = round_value(71 + (home["ppg"] - away["ppgAgainst"]) * 0.42 + (100 - away_def) * 0.08 + (100 - home_off) * 0.06 + (100 - home_comp) * 0.05, 0) or 70
         away_score = round_value(71 + (away["ppg"] - home["ppgAgainst"]) * 0.42 + (100 - home_def) * 0.08 + (100 - away_off) * 0.06 + (100 - away_comp) * 0.05, 0) or 69
+        home_score = int(round(home_score))
+        away_score = int(round(away_score))
         if home_score == away_score:
             home_score += 1
         home_win = 55 if home_score > away_score else 45

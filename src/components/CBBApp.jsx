@@ -87,6 +87,35 @@ function ScoreCard({ game, prediction, onOpen }) {
   );
 }
 
+function HeroScoreTile({ game, prediction, onOpen }) {
+  return (
+    <button className="cbb-hero-score-tile" type="button" onClick={() => onOpen(game.id)}>
+      <div className="cbb-hero-score-top">
+        <span className={`generic-status-pill is-${game.state}`}>{game.statusLabel}</span>
+        <span>{game.startLabel || game.broadcast || 'Today'}</span>
+      </div>
+      {[game.away, game.home].map((team) => (
+        <div className="cbb-hero-score-row" key={`${game.id}-${team.teamId}`}>
+          <div className="generic-score-team">
+            <TeamLogo team={team} />
+            <div>
+              <strong>{team.abbreviation || team.displayName}</strong>
+              <span>{team.record || team.displayName}</span>
+            </div>
+          </div>
+          <strong className="sportview-score-number">{team.score ?? '-'}</strong>
+        </div>
+      ))}
+      {prediction ? (
+        <div className="cbb-hero-score-foot">
+          <span>Proj {prediction.projectedAwayScore}-{prediction.projectedHomeScore}</span>
+          <strong>{prediction.bettingLean}</strong>
+        </div>
+      ) : null}
+    </button>
+  );
+}
+
 function RankingsTable({ rankings, onOpenTeam }) {
   return (
     <div className="generic-table-wrap">
@@ -323,6 +352,7 @@ function Overview({
   const predictionMap = Object.fromEntries(predictions.map((entry) => [entry.gameId, entry]));
   const topPlayers = bootstrap.topPlayers || bootstrap.featuredPlayers?.slice(0, 3) || [];
   const leadStory = bootstrap.news?.[0] || null;
+  const heroGames = scoreboard.slice(0, 2);
 
   return (
     <section className="cbb-shell">
@@ -345,6 +375,13 @@ function Overview({
                 <strong>{leadStory.headline}</strong>
               </div>
             </button>
+          ) : null}
+          {heroGames.length ? (
+            <div className="cbb-hero-score-grid">
+              {heroGames.map((game) => (
+                <HeroScoreTile key={game.id} game={game} prediction={predictionMap[game.id]} onOpen={openGame} />
+              ))}
+            </div>
           ) : null}
           <button className="cbb-hero-note" type="button" onClick={() => setPage('rankings')}>
             <span>Resume Board</span>
