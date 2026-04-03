@@ -75,6 +75,10 @@ body[data-composite-route='hub'] {
   isolation: isolate;
 }
 
+.hub-page-has-ticker {
+  padding-top: 116px;
+}
+
 .hub-page::before,
 .hub-page::after {
   content: '';
@@ -3907,7 +3911,14 @@ body[data-composite-route='football'] {
   align-items: center;
   gap: 12px;
   width: max-content;
+}
+
+.hub-story-marquee-track {
   animation: hubMarquee 26s linear infinite;
+}
+
+.hub-live-ticker-track {
+  animation: hubMarquee 28.6s linear infinite;
 }
 
 .hub-story-marquee-pill {
@@ -3929,11 +3940,12 @@ body[data-composite-route='football'] {
 }
 
 .hub-live-ticker {
-  position: sticky;
-  bottom: 14px;
-  z-index: 8;
-  max-width: 96rem;
-  margin: 26px auto 0;
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  z-index: 30;
+  width: min(96rem, calc(100vw - 56px));
+  transform: translateX(-50%);
   overflow: hidden;
   padding: 12px 0;
   border-radius: 999px;
@@ -4260,7 +4272,8 @@ body[data-composite-route='football'] {
   }
 
   .hub-live-ticker {
-    bottom: 10px;
+    top: 10px;
+    width: calc(100vw - 20px);
     border-radius: 24px;
   }
 

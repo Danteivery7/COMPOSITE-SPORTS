@@ -105,13 +105,30 @@ export default function SportHubPage() {
   }
 
   return (
-    <main className="hub-page">
+    <main className={`hub-page ${tickerLoop.length ? 'hub-page-has-ticker' : ''}`}>
       <div className="hub-aurora aurora-a" aria-hidden="true" />
       <div className="hub-aurora aurora-b" aria-hidden="true" />
       <div className="hub-aurora aurora-c" aria-hidden="true" />
       <div className="hub-gridline" aria-hidden="true" />
       <div className="hub-orbit orbit-a" aria-hidden="true" />
       <div className="hub-orbit orbit-b" aria-hidden="true" />
+
+      {tickerLoop.length ? (
+        <section className="hub-live-ticker" aria-label="Composite Sports live ticker">
+          <div className="hub-live-ticker-track">
+            {tickerLoop.map((item, index) => (
+              <span className="hub-live-ticker-item" key={`${item.id}-${index}`}>
+                <strong>{item.league}</strong>
+                {item.awayLogo ? <img src={item.awayLogo} alt="" className="hub-live-ticker-logo" /> : null}
+                <span>{item.matchup}</span>
+                <span>{item.scoreLabel}</span>
+                {item.homeLogo ? <img src={item.homeLogo} alt="" className="hub-live-ticker-logo" /> : null}
+                <em>{item.statusLabel}</em>
+              </span>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="hub-hero hub-hero-expanded">
         <div className="hub-hero-copy">
@@ -364,22 +381,6 @@ export default function SportHubPage() {
         </div>
       </section>
 
-      {tickerLoop.length ? (
-        <section className="hub-live-ticker" aria-label="Composite Sports live ticker">
-          <div className="hub-live-ticker-track">
-            {tickerLoop.map((item, index) => (
-              <span className="hub-live-ticker-item" key={`${item.id}-${index}`}>
-                <strong>{item.league}</strong>
-                {item.awayLogo ? <img src={item.awayLogo} alt="" className="hub-live-ticker-logo" /> : null}
-                <span>{item.matchup}</span>
-                <span>{item.scoreLabel}</span>
-                {item.homeLogo ? <img src={item.homeLogo} alt="" className="hub-live-ticker-logo" /> : null}
-                <em>{item.statusLabel}</em>
-              </span>
-            ))}
-          </div>
-        </section>
-      ) : null}
     </main>
   );
 }

@@ -1,19 +1,31 @@
-import { computeTopPlayers } from '@/src/mlb/lib/topPlayers';
+import {
+  computeTopPlayers,
+  getCachedTopPlayers,
+  getStaleTopPlayers,
+} from '@/src/mlb/lib/topPlayers';
 import { FOOTBALL_LEAGUES } from '@/src/lib/football';
 import { getFootballLeagueSnapshot, getGenericSportSnapshot } from '@/src/lib/live-sports-backend';
+import { getNbaBootstrapSnapshot } from '@/src/lib/nba-backend';
 
 const CACHE = new Map();
 
 const SOURCE_WEIGHTS = {
-  mlb: 1.2,
+  mlb: 1.18,
   nba: 1.24,
-  nhl: 1.18,
-  nfl: 1.22,
+  nhl: 1.2,
+  nfl: 1.14,
   cbb: 0.96,
+  football: 1.12,
 };
+
+const DIVERSITY_SPORTS = ['nba', 'nhl', 'football'];
 
 function settledValue(result, fallback) {
   return result.status === 'fulfilled' ? result.value : fallback;
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
 }
 
 function cacheKey(scope) {
@@ -110,6 +122,7 @@ async function fetchLeagueLeaders({ site }) {
             '',
         },
         teamId: node.team?.id ? String(node.team.id) : '',
+        teamLogo: node.team?.logo || node.team?.logos?.[0]?.href || '',
       });
     }
   });
@@ -119,65 +132,78 @@ async function fetchLeagueLeaders({ site }) {
 function positionDifficulty(position = '') {
   const pos = String(position).toUpperCase();
   if (['QB', 'PG', 'C', 'GK', 'SP', 'G'].includes(pos)) return 1;
-  if (['CF', 'ST', 'C', 'RW', 'LW', 'WR', 'RB', 'PF', 'SG'].includes(pos)) return 0.82;
-  if (['D', 'DF', 'CB', 'LB', 'RB', 'TE', 'SF', '3B', 'SS'].includes(pos)) return 0.74;
-  return 0.66;
+  if (['CF', 'ST', 'LW', 'RW', 'CAM', 'CM', 'WR', 'RB', 'PF', 'SG', '1B', 'RF', 'LF'].includes(pos)) return 0.84;
+  if (['D', 'DF', 'CB', 'LB', 'RB', 'TE', 'SF', '3B', 'SS', 'CDM', 'DM'].includes(pos)) return 0.76;
+  return 0.68;
 }
 
-function normalizeSourceCandidates(candidates, sourceWeight) {
-  const sorted = [...candidates].sort((left, right) => right.rating - left.rating);
-  return sorted.map((candidate, index) => {
-    const next = sorted[index + 1];
-    const percentile = sorted.length === 1 ? 1 : 1 - index / Math.max(1, sorted.length - 1);
-    const separation = Math.max(0, candidate.rating - (next?.rating || candidate.rating - 2));
-    const role = positionDifficulty(candidate.position);
-    const reliability = Math.min(1, 0.42 + (candidate.signalCount || 1) * 0.12);
-    const predictive = Math.min(1, 0.5 + Math.min(20, separation) / 32);
-    const dominanceScore =
-      percentile * 42 +
-      Math.min(18, separation * 2.4) +
-      role * 14 +
-      reliability * 12 +
-      predictive * 12 +
-      sourceWeight * 8;
-    const overall = Math.max(80, Math.min(99, Math.round(78 + dominanceScore / 3.2)));
+function getMlbTopPlayersSnapshot(limit = 50) {
+  return getCachedTopPlayers(50) || getStaleTopPlayers() || computeTopPlayers(Math.max(limit, 50));
+}
 
-    return {
-      ...candidate,
-      sourcePercentile: percentile,
-      normalizedDominance: Math.round(dominanceScore * 10) / 10,
-      overall,
-    };
-  });
+function computeNbaSiteOverall(player) {
+  const stats = player?.realStats;
+  if (!stats?.gp) return 69;
+
+  const baseline = stats?.lastSeason?.gp ? stats.lastSeason : (stats?.career?.gp ? stats.career : null);
+  const baselineOverall = baseline
+    ? clamp(
+        64 +
+          (Number(baseline.ppg || 0) * 0.7) +
+          (Number(baseline.apg || 0) * 1.15) +
+          (Number(baseline.rpg || 0) * 0.62) +
+          ((Number(baseline.spg || 0) + Number(baseline.bpg || 0)) * 2.2) +
+          ((Number(baseline.tsPct || 55) - 55) * 0.32),
+        62,
+        93,
+      )
+    : null;
+
+  const creation = (Number(stats.ppg || 0) * 0.86) + (Number(stats.apg || 0) * 1.32) + (Number(stats.rpg || 0) * 0.58);
+  const disruption = (Number(stats.spg || 0) * 3.6) + (Number(stats.bpg || 0) * 3.4);
+  const efficiency = ((Number(stats.tsPct || 55) - 55) * 0.44) + ((Number(stats.efgPct || 52) - 52) * 0.18);
+  const load = Math.min(6.8, (Number(stats.mpg || 0) - 18) * 0.22);
+  const advanced = ((Number(stats.per || 15) - 15) * 0.36) + (Number(stats.vorp || 0) * 1.15);
+  const ballSecurity = (Number(stats.astTovRatio || 0) - 1.5) * 1.6;
+  const currentOverall = 63 + creation + disruption + efficiency + load + advanced + ballSecurity;
+  const trustedOverall = baselineOverall == null
+    ? currentOverall
+    : (currentOverall * 0.74) + (baselineOverall * 0.26);
+
+  return clamp(Math.round(trustedOverall * 10) / 10, 64, 97.6);
 }
 
 async function getNBACandidates() {
-  const site = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba';
-  const [leaders, standingsPayload] = await Promise.all([
-    fetchLeagueLeaders({ site }),
-    fetchJson(`${site}/standings`, 30 * 60 * 1000),
-  ]);
-  const standings = parseStandings(standingsPayload);
-  return uniqBy(
-    leaders.map((entry) => {
-      const teamBoost = (standings[entry.teamId]?.winPct || 0.5) * 16;
-      const base = 86 - (entry.rank - 1) * 1.65 + teamBoost + positionDifficulty(entry.athlete.position) * 6;
+  const snapshot = await getNbaBootstrapSnapshot();
+  return (snapshot?.playerCatalog || [])
+    .filter((player) => player?.displayName && player?.headshot)
+    .map((player) => {
+      const overall = computeNbaSiteOverall(player);
+      const trend = clamp(
+        ((Number(player.realStats?.ppg || 0) - Number(player.realStats?.lastSeason?.ppg || 0)) * 0.7) +
+          ((Number(player.realStats?.tsPct || 55) - Number(player.realStats?.lastSeason?.tsPct || 55)) * 0.16),
+        -4,
+        8,
+      );
       return {
-        id: `nba-${entry.athleteId}`,
-        playerId: entry.athleteId,
-        displayName: entry.athlete.displayName,
-        headshot: entry.athlete.headshot,
-        position: entry.athlete.position || 'NBA',
+        id: `nba-${player.id}`,
+        playerId: String(player.id),
+        displayName: player.displayName,
+        headshot: player.headshot,
+        position: player.position || 'NBA',
         leagueLabel: 'NBA',
-        sourceKey: 'nba',
-        rating: Math.max(68, Math.min(98, Math.round(base))),
-        signalCount: 1,
+        sportKey: 'nba',
+        leagueKey: 'nba',
+        overall,
+        overallLabel: overall.toFixed(1),
+        signalCount: player.hasOfficialStats ? 3 : 1,
+        contextScore: clamp(62 + trend * 4, 48, 94),
+        formScore: clamp(60 + trend * 5, 48, 96),
+        teamAbbr: player.teamAbbr || '',
       };
-    }),
-    (entry) => entry.id,
-  )
-    .sort((left, right) => right.rating - left.rating)
-    .slice(0, 12);
+    })
+    .sort((left, right) => right.overall - left.overall)
+    .slice(0, 18);
 }
 
 async function getNHLCandidates() {
@@ -189,30 +215,106 @@ async function getNHLCandidates() {
   const standings = parseStandings(standingsPayload);
   return uniqBy(
     leaders.map((entry) => {
-      const teamBoost = (standings[entry.teamId]?.winPct || 0.5) * 14;
-      const base = 85 - (entry.rank - 1) * 1.55 + teamBoost + positionDifficulty(entry.athlete.position) * 5.4;
+      const teamBoost = (standings[entry.teamId]?.winPct || 0.5) * 12;
+      const overall = clamp(
+        Math.round(79 - (entry.rank - 1) * 1.55 + teamBoost + positionDifficulty(entry.athlete.position) * 5.6),
+        68,
+        97,
+      );
       return {
         id: `nhl-${entry.athleteId}`,
         playerId: entry.athleteId,
         displayName: entry.athlete.displayName,
-        headshot: entry.athlete.headshot,
+        headshot: entry.athlete.headshot || entry.teamLogo || '',
         position: entry.athlete.position || 'NHL',
         leagueLabel: 'NHL',
-        sourceKey: 'nhl',
-        rating: Math.max(66, Math.min(98, Math.round(base))),
-        signalCount: 1,
+        sportKey: 'nhl',
+        leagueKey: 'nhl',
+        overall,
+        overallLabel: String(overall),
+        signalCount: 2,
+        contextScore: clamp(56 + teamBoost * 0.8, 46, 92),
+        formScore: clamp(92 - (entry.rank - 1) * 3.4, 44, 96),
+        teamLogo: entry.teamLogo || '',
       };
     }),
     (entry) => entry.id,
   )
-    .sort((left, right) => right.rating - left.rating)
-    .slice(0, 12);
+    .sort((left, right) => right.overall - left.overall)
+    .slice(0, 14);
+}
+
+function buildHubHref(candidate) {
+  if (candidate.sportKey === 'mlb') {
+    return `/mlb?player=${encodeURIComponent(candidate.playerId)}&from=hub`;
+  }
+  if (candidate.sportKey === 'nba') {
+    return `/nba?view=player&id=${encodeURIComponent(candidate.playerId)}&from=hub`;
+  }
+  if (candidate.sportKey === 'nhl') {
+    return `/nhl?view=player&id=${encodeURIComponent(candidate.playerId)}&from=hub`;
+  }
+  if (candidate.sportKey === 'football') {
+    return `/football/${candidate.leagueKey}?player=${encodeURIComponent(candidate.playerId)}&from=hub`;
+  }
+  return `/${candidate.sportKey}?player=${encodeURIComponent(candidate.playerId)}&from=hub`;
+}
+
+function normalizeSourceCandidates(candidates, sourceWeight) {
+  const sorted = [...candidates].sort((left, right) => right.overall - left.overall);
+  return sorted.map((candidate, index) => {
+    const next = sorted[index + 1];
+    const percentile = sorted.length === 1 ? 1 : 1 - index / Math.max(1, sorted.length - 1);
+    const separation = Math.max(0, Number(candidate.overall || 0) - Number(next?.overall ?? (candidate.overall || 0) - 1.5));
+    const role = positionDifficulty(candidate.position);
+    const reliability = clamp(0.46 + (candidate.signalCount || 1) * 0.12, 0.48, 0.94);
+    const form = clamp(Number(candidate.formScore || candidate.overall || 70) / 100, 0.4, 1);
+    const context = clamp(Number(candidate.contextScore || candidate.overall || 70) / 100, 0.4, 1);
+    const worldScore =
+      (Number(candidate.overall || 0) * 0.48) +
+      (percentile * 24) +
+      Math.min(18, separation * 3.1) +
+      (role * 8) +
+      (reliability * 8) +
+      (form * 9) +
+      (context * 5) +
+      (sourceWeight * 5);
+
+    return {
+      ...candidate,
+      sourcePercentile: percentile,
+      normalizedDominance: Math.round(worldScore * 10) / 10,
+      href: buildHubHref(candidate),
+    };
+  });
+}
+
+function includeDiversityPicks(sorted) {
+  const selected = [];
+  const selectedIds = new Set();
+
+  function pushCandidate(candidate) {
+    if (!candidate || selectedIds.has(candidate.id) || selected.length >= 5) return;
+    selected.push(candidate);
+    selectedIds.add(candidate.id);
+  }
+
+  const topScore = sorted[0]?.normalizedDominance || 0;
+  DIVERSITY_SPORTS.forEach((sportKey) => {
+    const candidate = sorted.find((entry) => entry.sportKey === sportKey);
+    if (candidate && candidate.normalizedDominance >= Math.max(84, topScore - 12)) {
+      pushCandidate(candidate);
+    }
+  });
+
+  sorted.forEach((candidate) => pushCandidate(candidate));
+  return selected.slice(0, 5);
 }
 
 async function getHubCandidates() {
   const footballLeagueKeys = Object.keys(FOOTBALL_LEAGUES);
   const [mlbResult, nflResult, cbbResult, nbaResult, nhlResult, ...footballResults] = await Promise.allSettled([
-    computeTopPlayers(12),
+    getMlbTopPlayersSnapshot(50),
     getGenericSportSnapshot('nfl'),
     getGenericSportSnapshot('cbb'),
     getNBACandidates(),
@@ -236,44 +338,67 @@ async function getHubCandidates() {
       board: result.value,
     }));
 
-  const mlbCandidates = (mlb.players || []).slice(0, 10).map((player) => ({
+  const mlbCandidates = (mlb.players || []).slice(0, 12).map((player) => ({
     id: `mlb-${player.id}`,
     playerId: String(player.id),
     displayName: player.name || player.displayName,
-    headshot: player.headshot,
+    headshot: player.headshot || player.teamLogo || '',
     position: player.position || 'MLB',
     leagueLabel: 'MLB',
-    sourceKey: 'mlb',
-    rating: Number(player.rating || 75),
+    sportKey: 'mlb',
+    leagueKey: 'mlb',
+    overall: Number(player.rating || 75),
+    overallLabel: String(Number(player.rating || 75)),
     signalCount: player.isTwoWay ? 3 : 2,
+    contextScore: clamp(Number(player.rating || 75) + (player.isTwoWay ? 4 : 0), 50, 99),
+    formScore: clamp(Number(player.rating || 75) + (player.rank <= 5 ? 4 : 0), 50, 99),
+    teamAbbr: player.teamAbbr || '',
+    teamLogo: player.teamLogo || '',
   }));
 
-  const genericCandidates = (board, sourceKey, leagueLabel) =>
-    (board.featuredPlayers || []).slice(0, 10).map((player) => ({
-      id: `${sourceKey}-${player.id}`,
+  const genericCandidates = (board, sportKey, leagueLabel) =>
+    (board.featuredPlayers || []).slice(0, 12).map((player, index) => ({
+      id: `${sportKey}-${player.id}`,
       playerId: String(player.id),
       displayName: player.displayName,
-      headshot: player.headshot,
+      headshot: player.headshot || player.team?.logo || '',
       position: player.position || leagueLabel,
       leagueLabel,
-      sourceKey,
-      rating: Number(player.rating || 72),
-      signalCount: 1,
+      sportKey,
+      leagueKey: sportKey,
+      overall: Number(player.rating || 72),
+      overallLabel: String(Number(player.rating || 72)),
+      signalCount: (player.leaders || []).length ? 2 : 1,
+      contextScore: clamp(Number(player.rating || 72) + Math.max(0, 6 - index), 48, 96),
+      formScore: clamp(Number(player.rating || 72) + (String(player.tier || '').toLowerCase().includes('elite') ? 4 : 0), 48, 96),
+      teamAbbr: player.team?.abbreviation || '',
+      teamLogo: player.team?.logo || '',
     }));
 
   const footballCandidates = footballBoards.flatMap(({ leagueKey, board }) => {
     const league = FOOTBALL_LEAGUES[leagueKey];
-    return (board?.featuredPlayers || []).slice(0, 6).map((player) => ({
+    return (board?.featuredPlayers || []).slice(0, 8).map((player, index) => ({
       id: `${leagueKey}-${player.id}`,
       playerId: String(player.id),
       displayName: player.displayName,
-      headshot: player.headshot,
+      headshot: player.headshot || player.team?.logo || '',
       position: player.position || 'Football',
       leagueLabel: league.label,
-      sourceKey: leagueKey,
-      rating: Number(player.rating || 72),
-      signalCount: 1,
-      sourceWeight: league?.competitionWeight || 1,
+      sportKey: 'football',
+      leagueKey,
+      overall: Number(player.rating || 72),
+      overallLabel: String(Number(player.rating || 72)),
+      signalCount: (player.leaders || []).length ? 2 : 1,
+      contextScore: clamp(
+        Number(player.rating || 72) +
+          ((league.competitionWeight || 1) * 4.8) +
+          Math.max(0, 4 - index),
+        48,
+        96,
+      ),
+      formScore: clamp(Number(player.rating || 72) + Math.max(0, 5 - index), 48, 96),
+      teamAbbr: player.team?.abbreviation || '',
+      teamLogo: player.team?.logo || '',
     }));
   });
 
@@ -295,28 +420,33 @@ export async function getWorldTopPlayers() {
   const sourcePools = await getHubCandidates();
   const footballByLeague = Array.from(
     sourcePools.football.reduce((map, candidate) => {
-      const key = candidate.leagueLabel;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key).push(candidate);
+      const groupKey = candidate.leagueKey;
+      if (!map.has(groupKey)) map.set(groupKey, []);
+      map.get(groupKey).push(candidate);
       return map;
     }, new Map()).values(),
   );
+
   const normalized = [
     ...normalizeSourceCandidates(sourcePools.mlb, SOURCE_WEIGHTS.mlb),
     ...normalizeSourceCandidates(sourcePools.nba, SOURCE_WEIGHTS.nba),
     ...normalizeSourceCandidates(sourcePools.nhl, SOURCE_WEIGHTS.nhl),
     ...normalizeSourceCandidates(sourcePools.nfl, SOURCE_WEIGHTS.nfl),
     ...normalizeSourceCandidates(sourcePools.cbb, SOURCE_WEIGHTS.cbb),
-    ...footballByLeague.flatMap((pool) => normalizeSourceCandidates(pool, pool[0]?.sourceWeight || 1)),
+    ...footballByLeague.flatMap((pool) => normalizeSourceCandidates(pool, SOURCE_WEIGHTS.football + ((FOOTBALL_LEAGUES[pool[0]?.leagueKey]?.competitionWeight || 1) * 0.08))),
   ];
 
-  const players = uniqBy(normalized, (entry) => entry.id)
-    .sort((left, right) => right.normalizedDominance - left.normalizedDominance || right.overall - left.overall)
-    .slice(0, 5)
-    .map((player, index) => ({
-      ...player,
-      worldRank: index + 1,
-    }));
+  const players = includeDiversityPicks(
+    uniqBy(normalized, (entry) => entry.id)
+      .sort(
+        (left, right) =>
+          right.normalizedDominance - left.normalizedDominance ||
+          Number(right.overall || 0) - Number(left.overall || 0),
+      ),
+  ).map((player, index) => ({
+    ...player,
+    worldRank: index + 1,
+  }));
 
   return writeCache(
     key,
