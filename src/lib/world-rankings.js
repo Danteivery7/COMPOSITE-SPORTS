@@ -22,8 +22,10 @@ import {
 } from '@/public/vendor/nhl/src/analytics.js';
 
 const CACHE = new Map();
-const WORLD_CACHE_VERSION = 'v6';
+const WORLD_CACHE_VERSION = 'v7';
 const DEFAULT_HEADSHOT = 'https://a.espncdn.com/i/headshots/nophoto.png';
+const MAX_PLAYERS_PER_SPORT = 2;
+const THIRD_PLAYER_CLEAR_MARGIN = 3;
 
 const SOURCE_WEIGHTS = {
   mlb: 1.18,
@@ -299,13 +301,60 @@ function includeDiversityPicks(sorted) {
   });
 
   sorted.forEach((candidate) => pushCandidate(candidate));
-  return selected
+  const preliminary = selected
     .sort(
       (left, right) =>
         right.normalizedDominance - left.normalizedDominance ||
         Number(right.overall || 0) - Number(left.overall || 0),
     )
     .slice(0, 5);
+
+  const sportCounts = preliminary.reduce((map, candidate) => {
+    map.set(candidate.sportKey, (map.get(candidate.sportKey) || 0) + 1);
+    return map;
+  }, new Map());
+
+  let refined = [...preliminary];
+
+  const crowdedSports = Array.from(sportCounts.entries())
+    .filter(([, count]) => count > MAX_PLAYERS_PER_SPORT)
+    .map(([sportKey]) => sportKey);
+
+  crowdedSports.forEach((sportKey) => {
+    const sportPlayers = refined
+      .filter((candidate) => candidate.sportKey === sportKey)
+      .sort((left, right) => right.normalizedDominance - left.normalizedDominance);
+
+    const overflowPlayers = sportPlayers.slice(MAX_PLAYERS_PER_SPORT);
+    overflowPlayers.forEach((overflowPlayer) => {
+      const replacement = sorted.find((candidate) => {
+        if (!candidate || candidate.id === overflowPlayer.id) return false;
+        if (refined.some((entry) => entry.id === candidate.id)) return false;
+        if (candidate.sportKey === sportKey) return false;
+        const existingCount = refined.filter((entry) => entry.sportKey === candidate.sportKey).length;
+        return existingCount < MAX_PLAYERS_PER_SPORT;
+      });
+
+      if (!replacement) return;
+      const keepOverflow =
+        Number(overflowPlayer.normalizedDominance || 0) >=
+        Number(replacement.normalizedDominance || 0) + THIRD_PLAYER_CLEAR_MARGIN;
+
+      if (!keepOverflow) {
+        refined = refined
+          .filter((entry) => entry.id !== overflowPlayer.id)
+          .concat(replacement)
+          .sort(
+            (left, right) =>
+              right.normalizedDominance - left.normalizedDominance ||
+              Number(right.overall || 0) - Number(left.overall || 0),
+          )
+          .slice(0, 5);
+      }
+    });
+  });
+
+  return refined;
 }
 
 async function getHubCandidates() {
