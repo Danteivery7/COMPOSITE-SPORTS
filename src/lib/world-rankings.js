@@ -22,7 +22,7 @@ import {
 } from '@/public/vendor/nhl/src/analytics.js';
 
 const CACHE = new Map();
-const WORLD_CACHE_VERSION = 'v5';
+const WORLD_CACHE_VERSION = 'v6';
 const DEFAULT_HEADSHOT = 'https://a.espncdn.com/i/headshots/nophoto.png';
 
 const SOURCE_WEIGHTS = {
@@ -100,6 +100,13 @@ function positionDifficulty(position = '') {
   if (['CF', 'ST', 'LW', 'RW', 'CAM', 'CM', 'WR', 'RB', 'PF', 'SG', '1B', 'RF', 'LF'].includes(pos)) return 0.84;
   if (['D', 'DF', 'CB', 'LB', 'RB', 'TE', 'SF', '3B', 'SS', 'CDM', 'DM'].includes(pos)) return 0.76;
   return 0.68;
+}
+
+function roleImpactAdjustment(position = '') {
+  const pos = String(position).toUpperCase();
+  if (['RP', 'CL', 'CP'].includes(pos)) return -6;
+  if (['DH'].includes(pos)) return -2;
+  return 0;
 }
 
 async function getMlbTopPlayersSnapshot(limit = 50) {
@@ -259,6 +266,7 @@ function normalizeSourceCandidates(candidates, sourceWeight) {
       (percentile * 24) +
       Math.min(18, separation * 3.1) +
       (role * 8) +
+      roleImpactAdjustment(candidate.position) +
       (reliability * 8) +
       (form * 9) +
       (context * 5) +
