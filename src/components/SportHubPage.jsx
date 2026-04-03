@@ -90,6 +90,7 @@ export default function SportHubPage() {
   const heroStories = hero?.heroStories || [];
   const secondaryStories = hero?.secondaryStories || [];
   const parlay = hero?.parlaySummary || hero?.parlay || null;
+  const betLegs = hero?.betLegs || [];
   const liveTicker = hero?.liveTicker || [];
   const featuredStory = heroStories[storyIndex] || heroStories[0] || null;
   const movingStories = secondaryStories.length > 1 ? [...secondaryStories, ...secondaryStories] : secondaryStories;
@@ -242,14 +243,13 @@ export default function SportHubPage() {
                 <h2>Cross-Sport Parlay</h2>
               </div>
               <span>
-                {parlay?.americanLabel ||
-                  (hero?.status === 'closed'
-                    ? 'Slate closed'
-                    : hero?.status === 'building'
-                      ? 'Building'
-                      : hero?.status === 'two-leg'
-                        ? '2-leg live'
-                        : 'Syncing')}
+                {hero?.status === 'closed'
+                  ? 'Slate closed'
+                  : hero?.status === 'building'
+                    ? 'Building'
+                    : betLegs.length
+                      ? `${betLegs.length} legs live`
+                      : 'Syncing'}
               </span>
             </div>
             <div className="hub-parlay-summary">
@@ -266,20 +266,46 @@ export default function SportHubPage() {
                 <strong>{parlay?.return ? `$${parlay.return}` : '--'}</strong>
               </div>
             </div>
+            {betLegs.length ? (
+              <div className="hub-parlay-legs" aria-label="Active parlay legs">
+                {betLegs.map((bet) => (
+                  <div className="hub-parlay-leg" key={`${bet.league}-${bet.gameId}`}>
+                    <div className="hub-parlay-leg-top">
+                      <span>{bet.league}</span>
+                      <strong>{bet.startLabel}</strong>
+                    </div>
+                    <div className="hub-parlay-leg-main">
+                      <div className="hub-bet-logos">
+                        {bet.teamLogo ? <img src={bet.teamLogo} alt="" className="hub-bet-logo" /> : null}
+                        {bet.opponentLogo ? <img src={bet.opponentLogo} alt="" className="hub-bet-logo is-ghost" /> : null}
+                      </div>
+                      <div className="hub-parlay-leg-copy">
+                        <strong>{bet.selection}</strong>
+                        <p>{bet.lineType}</p>
+                      </div>
+                      <div className="hub-parlay-leg-meta">
+                        <MoneylineTag value={bet.americanOddsLabel} />
+                        <span>{Math.round(bet.winProbability || 0)}% win</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             <div className="hub-parlay-footnote">
               {hero?.status === 'closed'
                 ? 'Today’s board is closed. Fewer than two live parlay legs remain on the current ET slate.'
                 : hero?.status === 'building'
                   ? `Building the next board for ${hero?.resetAtEt || '6:00 AM ET'}`
                   : parlay?.verifiedAt
-                    ? `Verified ${new Date(parlay.verifiedAt).toLocaleTimeString()} • Resets ${hero?.resetAtEt || '6:00 AM ET'}`
+                    ? `Verified ${new Date(parlay.verifiedAt).toLocaleTimeString()} • ${betLegs.length} active legs • ${hero?.remainingEligibleGames || betLegs.length} upcoming games remain today`
                     : 'Live parlay board syncing now'}
             </div>
             <p className="hub-parlay-note">
-              {hero?.status === 'two-leg'
-                ? `Two-leg fallback is active. ${hero?.remainingEligibleGames || 0} same-day games remain in the ET cycle.`
-                : hero?.status === 'closed'
+              {hero?.status === 'closed'
                   ? 'The parlay card resets at 6:00 AM ET and returns as soon as at least two same-day cross-sport legs are available.'
+                  : hero?.status === 'two-leg'
+                    ? 'The board automatically drops to the best two live legs when the daily slate gets thin later in the day.'
                   : 'The parlay card is the only betting module on the main menu. It uses verified odds math and the strongest same-day cross-sport edge set after the 6:00 AM ET reset.'}
             </p>
           </article>

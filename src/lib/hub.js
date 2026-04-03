@@ -26,7 +26,7 @@ import {
 const STORY_TTL_MS = 5 * 60 * 1000;
 const BETS_TTL_MS = 90 * 1000;
 const HERO_TTL_MS = 60 * 1000;
-const HUB_CACHE_VERSION = 'v9';
+const HUB_CACHE_VERSION = 'v10';
 
 const EXTERNAL_NEWS_SOURCES = [
   {
@@ -653,6 +653,23 @@ async function buildNhlBetCandidates() {
     .filter((candidate) => candidate.americanOdds !== null && candidate.americanOdds !== undefined);
 }
 
+function enrichBetCandidate(candidate, nowMs = Date.now()) {
+  const startMs = candidate?.startTime ? new Date(candidate.startTime).getTime() : Number.NaN;
+  const minutesUntilStart = Number.isFinite(startMs) ? Math.max(0, Math.round((startMs - nowMs) / 60000)) : Number.POSITIVE_INFINITY;
+  return {
+    ...candidate,
+    startMs,
+    minutesUntilStart,
+    timeBucket: Number.isFinite(minutesUntilStart) ? Math.floor(minutesUntilStart / 90) : Number.POSITIVE_INFINITY,
+  };
+}
+
+function compareBetCandidates(left, right) {
+  if (left.timeBucket !== right.timeBucket) return left.timeBucket - right.timeBucket;
+  if ((right.edgeMagnitude || 0) !== (left.edgeMagnitude || 0)) return (right.edgeMagnitude || 0) - (left.edgeMagnitude || 0);
+  return (left.startMs || Number.POSITIVE_INFINITY) - (right.startMs || Number.POSITIVE_INFINITY);
+}
+
 function normalizeTickerGame({ league, sport, gameId, state, statusLabel, startTime, away, home }) {
   const isLive = ['in', 'live'].includes(String(state || '').toLowerCase());
   const isToday = startTime ? isSameEasternDate(startTime, new Date()) : false;
@@ -891,41 +908,55 @@ async function buildTopBetsSnapshot() {
     .filter(Boolean);
 
   const cycle = getEasternCycleWindow({ resetHour: 6 });
+  const nowMs = Date.now();
   const candidates = [...mlbCandidates, ...nflCandidates, ...footballCandidates, ...nbaCandidates, ...nhlCandidates]
     .filter((candidate) => candidate?.americanOdds !== null && candidate?.americanOdds !== undefined)
     .filter((candidate) => candidate?.startTime && isSameEasternDateKey(candidate.startTime, cycle.cycleDateEt))
     .filter((candidate) => ['pre', 'scheduled', 'created'].includes(String(candidate?.state || 'pre')))
-    .sort((left, right) => (right.edgeMagnitude || 0) - (left.edgeMagnitude || 0));
+    .map((candidate) => enrichBetCandidate(candidate, nowMs))
+    .filter((candidate) => Number.isFinite(candidate.startMs) && candidate.startMs > nowMs)
+    .sort(compareBetCandidates);
 
   const selected = [];
   const bySport = new Set();
-  for (const candidate of candidates) {
+  const earliestMinutes = candidates[0]?.minutesUntilStart ?? Number.POSITIVE_INFINITY;
+  const priorityPool = candidates.filter((candidate) => candidate.minutesUntilStart <= earliestMinutes + 120);
+  const orderedPools = [priorityPool, candidates];
+
+  for (const pool of orderedPools) {
+    for (const candidate of pool) {
+      if (selected.length >= 3) break;
+      const decimal = americanToDecimal(candidate.americanOdds);
+      if (!Number.isFinite(decimal)) continue;
+      if (selected.some((entry) => entry.league === candidate.league && entry.gameId === candidate.gameId)) continue;
+      if (bySport.has(candidate.sport)) continue;
+      bySport.add(candidate.sport);
+      selected.push({
+        ...candidate,
+        americanOddsLabel: formatAmericanOdds(candidate.americanOdds),
+        startLabel: formatEasternDisplay(candidate.startTime),
+      });
+    }
     if (selected.length >= 3) break;
-    const decimal = americanToDecimal(candidate.americanOdds);
-    if (!Number.isFinite(decimal)) continue;
-    if (bySport.has(candidate.sport)) continue;
-    bySport.add(candidate.sport);
-    selected.push({
-      ...candidate,
-      americanOddsLabel: formatAmericanOdds(candidate.americanOdds),
-      startLabel: formatEasternDisplay(candidate.startTime),
-    });
   }
 
-  for (const candidate of candidates) {
+  for (const pool of orderedPools) {
+    for (const candidate of pool) {
+      if (selected.length >= 3) break;
+      const decimal = americanToDecimal(candidate.americanOdds);
+      if (!Number.isFinite(decimal)) continue;
+      if (selected.some((entry) => entry.league === candidate.league && entry.gameId === candidate.gameId)) continue;
+      selected.push({
+        ...candidate,
+        americanOddsLabel: formatAmericanOdds(candidate.americanOdds),
+        startLabel: formatEasternDisplay(candidate.startTime),
+      });
+    }
     if (selected.length >= 3) break;
-    const decimal = americanToDecimal(candidate.americanOdds);
-    if (!Number.isFinite(decimal)) continue;
-    if (selected.some((entry) => entry.league === candidate.league && entry.gameId === candidate.gameId)) continue;
-    selected.push({
-      ...candidate,
-      americanOddsLabel: formatAmericanOdds(candidate.americanOdds),
-      startLabel: formatEasternDisplay(candidate.startTime),
-    });
   }
 
   const minimumLegsMet = selected.length >= 2;
-  const parlay = cycle.beforeReset ? null : buildParlayOdds(selected);
+  const parlay = !cycle.beforeReset && minimumLegsMet ? buildParlayOdds(selected) : null;
   const verifiedAt = new Date().toISOString();
   const betLegs = selected.map((bet) => ({
     ...bet,
@@ -948,25 +979,21 @@ async function buildTopBetsSnapshot() {
     resetAtEt: `${cycle.nextCycleDateEt} 6:00 AM ET`,
     remainingEligibleGames: candidates.length,
     parlay: parlay
-      ? !cycle.beforeReset && minimumLegsMet
-        ? {
-          ...parlay,
-          americanLabel: formatAmericanOdds(parlay.american),
-          stake: 10,
-          return: calculateReturn(10, parlay.american),
-        }
-        : null
+      ? {
+        ...parlay,
+        americanLabel: formatAmericanOdds(parlay.american),
+        stake: 10,
+        return: calculateReturn(10, parlay.american),
+      }
       : null,
     parlaySummary: parlay
-      ? !cycle.beforeReset && minimumLegsMet
-        ? {
-          ...parlay,
-          americanLabel: formatAmericanOdds(parlay.american),
-          stake: 10,
-          return: calculateReturn(10, parlay.american),
-          verifiedAt,
-        }
-        : null
+      ? {
+        ...parlay,
+        americanLabel: formatAmericanOdds(parlay.american),
+        stake: 10,
+        return: calculateReturn(10, parlay.american),
+        verifiedAt,
+      }
       : null,
     verifiedAt,
     footballLanding,
