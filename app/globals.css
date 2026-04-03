@@ -2814,6 +2814,7 @@ body[data-composite-route='football'] {
 
 .football-landing-hero,
 .football-marquee-board,
+.football-top-player-board,
 .football-league-selector,
 .football-stage,
 .football-sidebar {
@@ -2823,6 +2824,7 @@ body[data-composite-route='football'] {
 
 .football-landing-hero,
 .football-marquee-board,
+.football-top-player-board,
 .football-league-selector {
   max-width: 96rem;
   margin: 0 auto 24px;
@@ -2845,6 +2847,7 @@ body[data-composite-route='football'] {
 }
 
 .football-marquee-board,
+.football-top-player-board,
 .football-league-selector,
 .football-stage,
 .football-sidebar,
@@ -2859,6 +2862,7 @@ body[data-composite-route='football'] {
 }
 
 .football-marquee-board,
+.football-top-player-board,
 .football-league-selector {
   padding: 24px;
 }
@@ -2928,7 +2932,8 @@ body[data-composite-route='football'] {
 }
 
 .football-marquee-grid,
-.football-league-grid {
+.football-league-grid,
+.football-top-player-grid {
   display: grid;
   gap: 18px;
 }
@@ -2938,6 +2943,10 @@ body[data-composite-route='football'] {
 }
 
 .football-league-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.football-top-player-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
@@ -2953,13 +2962,15 @@ body[data-composite-route='football'] {
 
 .football-marquee-league,
 .football-league-card-top,
+.football-top-player-head,
 .football-marquee-side,
 .football-team-row,
 .football-team-copy,
 .football-player-cell,
 .football-row-team,
 .football-top-club,
-.football-top-player {
+.football-top-player,
+.football-top-player-body {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -2988,6 +2999,40 @@ body[data-composite-route='football'] {
 
 .football-marquee-side {
   min-width: 0;
+}
+
+.football-marquee-side > div,
+.football-team-copy > div,
+.football-player-cell > div,
+.football-row-team > div,
+.football-top-club > div,
+.football-top-player > div,
+.football-top-player-body > div {
+  min-width: 0;
+}
+
+.football-marquee-side strong,
+.football-team-row strong,
+.football-player-cell strong,
+.football-top-player strong,
+.football-top-club strong,
+.football-top-player-body strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.football-marquee-side span,
+.football-team-row span,
+.football-player-cell span,
+.football-top-player span,
+.football-top-club span,
+.football-top-player-body span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .football-marquee-center,
@@ -3032,6 +3077,12 @@ body[data-composite-route='football'] {
   background: rgba(255, 255, 255, 0.06);
 }
 
+.football-player-headshot.is-large {
+  width: 76px;
+  height: 76px;
+  border-radius: 22px;
+}
+
 .football-logo-fallback {
   display: inline-flex;
   align-items: center;
@@ -3064,6 +3115,34 @@ body[data-composite-route='football'] {
   position: relative;
   display: grid;
   gap: 16px;
+}
+
+.football-top-player-card {
+  display: grid;
+  gap: 16px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.football-top-player-head {
+  justify-content: space-between;
+}
+
+.football-top-player-body {
+  min-width: 0;
+}
+
+.football-rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--football-league-accent, #8db1ff) 20%, rgba(255, 255, 255, 0.04));
+  color: var(--football-league-accent-alt, #edf3ff);
+  font-weight: 800;
+  letter-spacing: 0.08em;
 }
 
 .football-league-card-surface {
@@ -3296,6 +3375,9 @@ body[data-composite-route='football'] {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 1.12rem;
   color: #eef3ff;
+  flex-shrink: 0;
+  min-width: 3ch;
+  text-align: right;
 }
 
 .football-table-wrap {
@@ -3466,7 +3548,8 @@ body[data-composite-route='football'] {
 
 @media (max-width: 1180px) {
   .hub-world-grid,
-  .football-marquee-grid {
+  .football-marquee-grid,
+  .football-top-player-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
@@ -3504,6 +3587,7 @@ body[data-composite-route='football'] {
 @media (max-width: 720px) {
   .hub-world-board,
   .football-marquee-board,
+  .football-top-player-board,
   .football-league-selector,
   .football-stage,
   .football-sidebar {
@@ -3512,6 +3596,7 @@ body[data-composite-route='football'] {
 
   .hub-world-grid,
   .football-marquee-grid,
+  .football-top-player-grid,
   .football-league-grid,
   .football-overview-grid,
   .football-overview-lower,
@@ -3847,10 +3932,12 @@ body[data-composite-route='football'] {
   inset: auto -4% 16% auto;
   width: min(48%, 210px);
   height: 58%;
-  opacity: 0.44;
-  filter: saturate(1.08) contrast(1.06);
+  opacity: 0.62;
+  filter: saturate(1.08) contrast(1.06) drop-shadow(0 24px 28px rgba(0, 0, 0, 0.3));
   pointer-events: none;
-  mix-blend-mode: lighten;
+  mix-blend-mode: screen;
+  mask-image: radial-gradient(circle at 45% 45%, black 0 56%, transparent 84%);
+  -webkit-mask-image: radial-gradient(circle at 45% 45%, black 0 56%, transparent 84%);
 }
 
 .hub-card-spotlight {
@@ -3872,6 +3959,20 @@ body[data-composite-route='football'] {
 
 .hub-card-spotlight strong {
   font-size: 1.15rem;
+}
+
+.hub-world-card,
+.hub-card-compact {
+  color: inherit;
+  text-decoration: none;
+}
+
+.hub-parlay-footnote {
+  grid-column: 1 / -1;
+  color: rgba(229, 237, 255, 0.64);
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .hub-card-footer.compact {

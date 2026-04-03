@@ -5,6 +5,15 @@
    ============================================================ */
 const app = {
 
+    hydrateDeepLinkFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const view = params.get('view');
+        const id = params.get('id');
+        if (view === 'player' && id) {
+            window.ui.showPlayerDetail(id);
+        }
+    },
+
     async init() {
         console.log('[CompositeNBA] Initializing...');
 
@@ -35,6 +44,7 @@ const app = {
         }
 
         await this.fetchBaseData();
+        this.hydrateDeepLinkFromUrl();
         this.startLivePolling();
 
         setInterval(() => {

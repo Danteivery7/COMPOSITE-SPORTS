@@ -6,6 +6,7 @@ import {
 import { FOOTBALL_LEAGUES } from '@/src/lib/football';
 import { getFootballLeagueSnapshot, getGenericSportSnapshot } from '@/src/lib/live-sports-backend';
 import { getNbaBootstrapSnapshot } from '@/src/lib/nba-backend';
+import { getHotSnapshot } from '@/src/lib/snapshot-store';
 
 const CACHE = new Map();
 
@@ -137,8 +138,22 @@ function positionDifficulty(position = '') {
   return 0.68;
 }
 
-function getMlbTopPlayersSnapshot(limit = 50) {
-  return getCachedTopPlayers(50) || getStaleTopPlayers() || computeTopPlayers(Math.max(limit, 50));
+async function getMlbTopPlayersSnapshot(limit = 50) {
+  const snapshot = await getHotSnapshot(
+    'hub-mlb-top-players',
+    async () => {
+      const cached = getCachedTopPlayers(50);
+      if (cached) return cached;
+
+      const stale = getStaleTopPlayers();
+      if (stale) return stale;
+
+      return computeTopPlayers(Math.max(limit, 50));
+    },
+    { ttlMs: 15 * 60 * 1000 },
+  );
+
+  return snapshot?.players ? snapshot : { players: [], totalPlayers: 0, lastUpdated: null };
 }
 
 function computeNbaSiteOverall(player) {

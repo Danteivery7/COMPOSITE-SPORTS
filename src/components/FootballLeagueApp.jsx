@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import StoryDetailCard from '@/src/components/StoryDetailCard';
 import { getFootballLeagueConfig } from '@/src/lib/football';
 
@@ -422,10 +422,10 @@ function TeamDetailView({ detail, openPlayer, setPage }) {
   );
 }
 
-function PlayerDetailView({ detail, setPage }) {
+function PlayerDetailView({ detail, setPage, onBack }) {
   return (
     <section className="football-stack">
-      <button className="football-back-button" type="button" onClick={() => setPage('players')}>
+      <button className="football-back-button" type="button" onClick={onBack || (() => setPage('players'))}>
         Back to players
       </button>
       <article className="football-panel football-detail-hero">
@@ -562,7 +562,7 @@ function GameDetailView({ detail, predictors, setPage }) {
   );
 }
 
-export default function FootballLeagueApp({ leagueKey }) {
+export default function FootballLeagueApp({ leagueKey, initialEntry = null }) {
   const leagueConfig = getFootballLeagueConfig(leagueKey);
   const apiBase = `/api/football/${leagueKey}`;
   const [page, setPage] = useState('overview');
@@ -576,6 +576,8 @@ export default function FootballLeagueApp({ leagueKey }) {
   const [playersQuery, setPlayersQuery] = useState('');
   const [loadingBootstrap, setLoadingBootstrap] = useState(true);
   const [loadingPlayers, setLoadingPlayers] = useState(false);
+  const [hubOriginPlayer, setHubOriginPlayer] = useState(false);
+  const initialEntryHandledRef = useRef(false);
 
   async function fetchBootstrap() {
     try {
@@ -628,9 +630,10 @@ export default function FootballLeagueApp({ leagueKey }) {
     setMobileNavOpen(false);
   }
 
-  async function openPlayer(playerId) {
+  async function openPlayer(playerId, options = {}) {
     const response = await fetch(`${apiBase}/players/${playerId}`);
     const data = await response.json();
+    setHubOriginPlayer(Boolean(options.fromHub));
     setPlayerDetail(data);
     setPage('player-detail');
     setMobileNavOpen(false);
@@ -652,6 +655,14 @@ export default function FootballLeagueApp({ leagueKey }) {
     setPage('story-detail');
     setMobileNavOpen(false);
   }
+
+  useEffect(() => {
+    if (initialEntryHandledRef.current) return;
+    if (!initialEntry?.playerId) return;
+    if (loadingBootstrap) return;
+    initialEntryHandledRef.current = true;
+    openPlayer(initialEntry.playerId, { fromHub: Boolean(initialEntry.fromHub) });
+  }, [initialEntry, loadingBootstrap]);
 
   const rankings = useMemo(() => bootstrap?.rankings || [], [bootstrap]);
   const teams = useMemo(() => bootstrap?.teams || [], [bootstrap]);
@@ -697,7 +708,19 @@ export default function FootballLeagueApp({ leagueKey }) {
       case 'team-detail':
         return teamDetail ? <TeamDetailView detail={teamDetail} openPlayer={openPlayer} setPage={setPage} /> : null;
       case 'player-detail':
-        return playerDetail ? <PlayerDetailView detail={playerDetail} setPage={setPage} /> : null;
+        return playerDetail ? (
+          <PlayerDetailView
+            detail={playerDetail}
+            setPage={setPage}
+            onBack={() => {
+              if (hubOriginPlayer) {
+                window.location.href = '/';
+                return;
+              }
+              setPage('players');
+            }}
+          />
+        ) : null;
       case 'game-detail':
         return gameDetail ? <GameDetailView detail={gameDetail} predictors={predictors} setPage={setPage} /> : null;
       case 'story-detail':

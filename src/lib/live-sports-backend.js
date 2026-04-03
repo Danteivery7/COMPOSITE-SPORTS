@@ -37,10 +37,8 @@ async function buildGenericSportSnapshot(sport) {
 }
 
 async function buildFootballLeagueSnapshot(leagueKey) {
-  const [bootstrap, playersCatalog] = await Promise.all([
-    getFootballBootstrap(leagueKey),
-    getFootballPlayerCatalog(leagueKey),
-  ]);
+  const bootstrap = await getFootballBootstrap(leagueKey);
+  const playersCatalog = bootstrap?.playersCatalog || (await getFootballPlayerCatalog(leagueKey));
 
   return {
     ...bootstrap,

@@ -41,6 +41,7 @@ export default function FootballLandingRoute() {
   }, []);
 
   const topMatches = data?.topMatches || [];
+  const topPlayers = data?.topPlayers || [];
   const leagues = data?.leagues || [];
 
   return (
@@ -116,6 +117,46 @@ export default function FootballLandingRoute() {
               ))}
             </div>
           )}
+        </section>
+
+        <section className="football-top-player-board">
+          <div className="football-section-head">
+            <div>
+              <p className="eyebrow">World Footballers</p>
+              <h2>Top 3 Players In The Sport</h2>
+            </div>
+            <span>Ranked strictly by the live football overall model.</span>
+          </div>
+          <div className="football-top-player-grid">
+            {loading ? (
+              [...Array(3)].map((_, index) => <div className="football-card football-loading-card" key={index} />)
+            ) : (
+              topPlayers.map((player, index) => (
+                <Link
+                  href={`/football/${player.leagueKey}?player=${encodeURIComponent(player.id)}`}
+                  className="football-card football-top-player-card"
+                  key={`${player.leagueKey}-${player.id}`}
+                >
+                  <div className="football-top-player-head">
+                    <span className="football-rank-badge">#{index + 1}</span>
+                    <span className="football-chip">{player.leagueLabel}</span>
+                  </div>
+                  <div className="football-top-player-body">
+                    {player.headshot ? (
+                      <img src={player.headshot} alt={player.displayName} className="football-player-headshot is-large" />
+                    ) : (
+                      <span className="football-logo-fallback">{player.displayName?.slice(0, 2)?.toUpperCase() || 'PL'}</span>
+                    )}
+                    <div>
+                      <strong>{player.displayName}</strong>
+                      <span>{player.team?.displayName || player.team?.abbreviation || player.leagueLabel}</span>
+                      <p>{player.position} • {player.rating} OVR</p>
+                    </div>
+                  </div>
+                </Link>
+              ))
+            )}
+          </div>
         </section>
 
         <section className="football-league-selector">

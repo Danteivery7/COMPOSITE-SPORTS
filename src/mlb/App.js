@@ -30,7 +30,7 @@ const MLB_PRIMARY_REFRESH_ROUTES = [
   '/api/mlb/rankings',
 ];
 
-export default function Home({ theme = 'dark', toggleTheme }) {
+export default function Home({ theme = 'dark', toggleTheme, initialEntry = null }) {
   const [currentPage, setCurrentPage] = useState('overview');
   const [favorites, setFavorites] = useState([]);
   const [selectedTeamId, setSelectedTeamId] = useState(null);
@@ -38,6 +38,7 @@ export default function Home({ theme = 'dark', toggleTheme }) {
   const [selectedGameId, setSelectedGameId] = useState(null);
   const [selectedStory, setSelectedStory] = useState(null);
   const prevPageRef = useRef('players'); // Track where user came from
+  const initialEntryHandledRef = useRef(false);
 
   useEffect(() => {
     const savedFavs = localStorage.getItem('composite-hub-mlb-favorites');
@@ -112,6 +113,13 @@ export default function Home({ theme = 'dark', toggleTheme }) {
     setCurrentPage('story-detail');
   }, []);
 
+  useEffect(() => {
+    if (initialEntryHandledRef.current) return;
+    if (!initialEntry?.playerId) return;
+    initialEntryHandledRef.current = true;
+    navigateToPlayer(initialEntry.playerId, initialEntry.fromHub ? 'hub' : 'players');
+  }, [initialEntry, navigateToPlayer]);
+
   const goBack = useCallback(() => {
     setCurrentPage('teams');
     setSelectedTeamId(null);
@@ -121,7 +129,9 @@ export default function Home({ theme = 'dark', toggleTheme }) {
     setSelectedPlayerId(null);
     // Go back to where user came from
     const prev = prevPageRef.current;
-    if (prev === 'team-detail') {
+    if (prev === 'hub') {
+      window.location.href = '/';
+    } else if (prev === 'team-detail') {
       setCurrentPage('team-detail');
     } else {
       setCurrentPage('players');

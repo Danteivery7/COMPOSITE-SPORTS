@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import SportIntroGate from '@/src/components/SportIntroGate';
 import { getSportConfig } from '@/src/data/sports';
 
 export default function SportFrameRoute({ sportKey, frameSrc }) {
   const config = getSportConfig(sportKey);
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     document.body.dataset.compositeRoute = sportKey;
@@ -14,6 +16,22 @@ export default function SportFrameRoute({ sportKey, frameSrc }) {
       delete document.body.dataset.compositeRoute;
     };
   }, [sportKey]);
+
+  const frameParams = new URLSearchParams();
+  const deepLinkId = searchParams.get('id');
+  const deepLinkView = searchParams.get('view');
+  if (searchParams.get('from') === 'hub') {
+    frameParams.set('from', 'hub');
+  }
+  if (sportKey === 'nba' && deepLinkView === 'player' && deepLinkId) {
+    frameParams.set('view', 'player');
+    frameParams.set('id', deepLinkId);
+  }
+  const frameQuery = frameParams.toString();
+  const resolvedFrameSrc =
+    sportKey === 'nhl' && deepLinkView === 'player' && deepLinkId
+      ? `${frameSrc}${frameQuery ? `?${frameQuery}` : ''}#player/${encodeURIComponent(deepLinkId)}`
+      : `${frameSrc}${frameQuery ? `?${frameQuery}` : ''}`;
 
   const content = (
     <section className="vendor-shell" data-sport={sportKey}>
@@ -26,7 +44,7 @@ export default function SportFrameRoute({ sportKey, frameSrc }) {
           Back To Hub
         </Link>
       </div>
-      <iframe className="vendor-frame" src={frameSrc} title={config.name} />
+      <iframe className="vendor-frame" src={resolvedFrameSrc} title={config.name} />
     </section>
   );
 

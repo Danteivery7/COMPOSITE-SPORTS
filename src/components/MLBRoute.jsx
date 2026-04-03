@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import SportIntroGate from '@/src/components/SportIntroGate';
 import { getSportConfig } from '@/src/data/sports';
 import MLBApp from '@/src/mlb/App';
@@ -9,6 +10,11 @@ import MLBApp from '@/src/mlb/App';
 export default function MLBRoute() {
   const config = getSportConfig('mlb');
   const [theme, setTheme] = useState('dark');
+  const searchParams = useSearchParams();
+  const initialEntry = {
+    playerId: searchParams.get('player') || null,
+    fromHub: searchParams.get('from') === 'hub',
+  };
 
   useEffect(() => {
     const savedTheme = window.localStorage.getItem('composite-hub-mlb-theme');
@@ -43,7 +49,7 @@ export default function MLBRoute() {
             Back To Hub
           </Link>
         </div>
-        <MLBApp theme={theme} toggleTheme={toggleTheme} />
+        <MLBApp theme={theme} toggleTheme={toggleTheme} initialEntry={initialEntry} />
       </section>
     </SportIntroGate>
   );

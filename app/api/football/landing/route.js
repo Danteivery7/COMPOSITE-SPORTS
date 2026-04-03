@@ -13,6 +13,7 @@ export async function GET() {
         title: 'Composite Football',
         subtitle: 'Football landing board is still syncing.',
         topMatches: [],
+        topPlayers: [],
         leagues: [],
         error: error.message,
         lastUpdated: null,

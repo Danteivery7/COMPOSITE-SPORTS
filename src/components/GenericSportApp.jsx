@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { getSportConfig } from '@/src/data/sports';
 import StoryDetailCard from '@/src/components/StoryDetailCard';
 
@@ -607,12 +607,12 @@ function SportTeamDetailView({ sportKey, config, teamDetail, openPlayer, setPage
   );
 }
 
-function SportPlayerDetailView({ sportKey, config, playerDetail, setPage }) {
+function SportPlayerDetailView({ sportKey, config, playerDetail, setPage, onBack }) {
   const copy = SPORT_VIEW_COPY[sportKey];
 
   return (
     <section className={`sportview-shell sportview-detail-shell sportview-detail-shell-${sportKey}`}>
-      <button className="generic-back-button sportview-back" type="button" onClick={() => setPage('players')}>
+      <button className="generic-back-button sportview-back" type="button" onClick={onBack || (() => setPage('players'))}>
         Back to players
       </button>
       <article className={`generic-card sportview-hero sportview-detail-hero sportview-detail-hero-${sportKey}`}>
@@ -750,7 +750,7 @@ function SportGameDetailView({ sportKey, gameDetail, setPage, predictors }) {
   );
 }
 
-export default function GenericSportApp({ sportKey }) {
+export default function GenericSportApp({ sportKey, initialEntry = null }) {
   const config = getSportConfig(sportKey);
   const apiBase = `/api/${sportKey}`;
   const [page, setPage] = useState('overview');
@@ -764,6 +764,8 @@ export default function GenericSportApp({ sportKey }) {
   const [playersQuery, setPlayersQuery] = useState('');
   const [loadingBootstrap, setLoadingBootstrap] = useState(true);
   const [loadingPlayers, setLoadingPlayers] = useState(false);
+  const [hubOriginPlayer, setHubOriginPlayer] = useState(false);
+  const initialEntryHandledRef = useRef(false);
 
   async function fetchBootstrap() {
     try {
@@ -816,9 +818,10 @@ export default function GenericSportApp({ sportKey }) {
     setMobileNavOpen(false);
   }
 
-  async function openPlayer(playerId) {
+  async function openPlayer(playerId, options = {}) {
     const response = await fetch(`${apiBase}/players/${playerId}`);
     const data = await response.json();
+    setHubOriginPlayer(Boolean(options.fromHub));
     setPlayerDetail(data);
     setPage('player-detail');
     setMobileNavOpen(false);
@@ -840,6 +843,14 @@ export default function GenericSportApp({ sportKey }) {
     setPage('story-detail');
     setMobileNavOpen(false);
   }
+
+  useEffect(() => {
+    if (initialEntryHandledRef.current) return;
+    if (!initialEntry?.playerId) return;
+    if (loadingBootstrap) return;
+    initialEntryHandledRef.current = true;
+    openPlayer(initialEntry.playerId, { fromHub: Boolean(initialEntry.fromHub) });
+  }, [initialEntry, loadingBootstrap]);
 
   const rankings = useMemo(() => bootstrap?.rankings || [], [bootstrap]);
   const teams = useMemo(() => bootstrap?.teams || [], [bootstrap]);
@@ -896,7 +907,19 @@ export default function GenericSportApp({ sportKey }) {
         ) : null;
       case 'player-detail':
         return playerDetail ? (
-          <SportPlayerDetailView sportKey={sportKey} config={config} playerDetail={playerDetail} setPage={setPage} />
+          <SportPlayerDetailView
+            sportKey={sportKey}
+            config={config}
+            playerDetail={playerDetail}
+            setPage={setPage}
+            onBack={() => {
+              if (hubOriginPlayer) {
+                window.location.href = '/';
+                return;
+              }
+              setPage('players');
+            }}
+          />
         ) : null;
       case 'game-detail':
         return gameDetail ? (

@@ -2,12 +2,18 @@
 
 import Link from 'next/link';
 import { useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import SportIntroGate from '@/src/components/SportIntroGate';
 import GenericSportApp from '@/src/components/GenericSportApp';
 import { getSportConfig } from '@/src/data/sports';
 
 export default function GenericSportRoute({ sportKey }) {
   const config = getSportConfig(sportKey);
+  const searchParams = useSearchParams();
+  const initialEntry = {
+    playerId: searchParams.get('player') || null,
+    fromHub: searchParams.get('from') === 'hub',
+  };
 
   useEffect(() => {
     document.body.dataset.compositeRoute = sportKey;
@@ -28,7 +34,7 @@ export default function GenericSportRoute({ sportKey }) {
             Back To Hub
           </Link>
         </div>
-        <GenericSportApp sportKey={sportKey} />
+        <GenericSportApp sportKey={sportKey} initialEntry={initialEntry} />
       </section>
     </SportIntroGate>
   );

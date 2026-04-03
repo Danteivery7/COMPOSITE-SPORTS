@@ -44,7 +44,7 @@ export default function SportHubPage() {
 
   useEffect(() => {
     setStoryIndex(0);
-  }, [hero?.trendingStories?.length]);
+  }, [hero?.heroStories?.length]);
 
   async function openStory(storyRef) {
     const storyId = typeof storyRef === 'string' ? storyRef : storyRef?.storyId;
@@ -56,22 +56,23 @@ export default function SportHubPage() {
   }
 
   const worldPlayers = hero?.worldBoard?.players || [];
-  const stories = hero?.trendingStories || [];
-  const bets = hero?.topBets || [];
+  const heroStories = hero?.heroStories || [];
+  const secondaryStories = hero?.secondaryStories || [];
+  const bets = hero?.betLegs || hero?.topBets || [];
   const cardSpotlights = hero?.cardSpotlights || {};
-  const parlay = hero?.parlay || null;
+  const parlay = hero?.parlaySummary || hero?.parlay || null;
   const liveTicker = hero?.liveTicker || [];
-  const featuredStory = stories[storyIndex] || stories[0] || null;
-  const movingStories = stories.length > 1 ? [...stories, ...stories] : stories;
+  const featuredStory = heroStories[storyIndex] || heroStories[0] || null;
+  const movingStories = secondaryStories.length > 1 ? [...secondaryStories, ...secondaryStories] : secondaryStories;
   const tickerLoop = liveTicker.length > 1 ? [...liveTicker, ...liveTicker] : liveTicker;
 
   useEffect(() => {
-    if (stories.length <= 1) return undefined;
+    if (heroStories.length <= 1) return undefined;
     const timer = window.setInterval(() => {
-      setStoryIndex((current) => (current + 1) % stories.length);
+      setStoryIndex((current) => (current + 1) % heroStories.length);
     }, 5200);
     return () => window.clearInterval(timer);
-  }, [stories.length]);
+  }, [heroStories.length]);
 
   function shiftSportRail(direction) {
     sportRailRef.current?.scrollBy({
@@ -149,7 +150,7 @@ export default function SportHubPage() {
               </div>
               <span>{hero?.nowLabel || 'Syncing'}</span>
             </div>
-            {stories[0] ? (
+            {featuredStory ? (
               <button className="hub-story-feature" type="button" onClick={() => openStory(featuredStory)}>
                 {featuredStory?.image ? <img src={featuredStory.image} alt={featuredStory.headline} className="hub-story-feature-image" /> : null}
                 <div>
@@ -161,9 +162,9 @@ export default function SportHubPage() {
             ) : (
               <div className="hub-story-feature is-loading" />
             )}
-            {stories.length > 1 ? (
+            {heroStories.length > 1 ? (
               <div className="hub-story-dots" aria-label="Story rotation">
-                {stories.map((story, index) => (
+                {heroStories.map((story, index) => (
                   <button
                     key={story.storyId}
                     type="button"
@@ -199,6 +200,11 @@ export default function SportHubPage() {
               </div>
             </div>
             <div className="hub-bet-mini-list">
+              {parlay ? (
+                <div className="hub-parlay-footnote">
+                  Verified {parlay?.verifiedAt ? new Date(parlay.verifiedAt).toLocaleTimeString() : 'just now'}
+                </div>
+              ) : null}
               {bets.length
                 ? bets.map((bet) => (
                     <div className="hub-bet-mini-card" key={`${bet.league}-${bet.gameId}`}>
@@ -292,7 +298,7 @@ export default function SportHubPage() {
           {loading
             ? [...Array(5)].map((_, index) => <div key={index} className="hub-world-card is-loading" />)
             : worldPlayers.map((player) => (
-                <article className="hub-world-card" key={player.id}>
+                <Link className="hub-world-card" key={player.id} href={player.href || '#'}>
                   <div className="hub-world-rank">#{player.worldRank}</div>
                   {player.headshot ? (
                     <img src={player.headshot} alt={player.displayName} className="hub-world-headshot" />
@@ -302,9 +308,9 @@ export default function SportHubPage() {
                   <div className="hub-world-copy">
                     <strong>{player.displayName}</strong>
                     <span>{player.leagueLabel}</span>
-                    <p>{player.position} • {player.overall} OVR</p>
+                    <p>{player.position} • {player.overallLabel || player.overall} OVR</p>
                   </div>
-                </article>
+                </Link>
               ))}
         </div>
       </section>
@@ -318,8 +324,8 @@ export default function SportHubPage() {
           <span>Only stories from the last 24 hours</span>
         </div>
         <div className="hub-story-grid">
-          {stories.length
-            ? stories.map((story) => (
+          {secondaryStories.length
+            ? secondaryStories.map((story) => (
                 <button className="hub-story-card" type="button" key={story.storyId} onClick={() => openStory(story)}>
                   {story.image ? <img src={story.image} alt={story.headline} className="hub-story-card-image" /> : null}
                   <div className="hub-story-card-copy">

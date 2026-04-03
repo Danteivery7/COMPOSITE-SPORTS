@@ -122,6 +122,13 @@ const ui = {
     },
 
     goBack() {
+        const params = new URLSearchParams(window.location.search);
+        const fromHub = params.get('from') === 'hub';
+        const currentPane = document.querySelector('.pane.active')?.id?.replace('pane-', '');
+        if (fromHub && this.navStack.length === 0 && ['player-detail', 'team-detail', 'game-detail', 'story-detail'].includes(currentPane)) {
+            window.top.location.href = '/';
+            return;
+        }
         if (this.navStack.length > 0) {
             const prev = this.navStack.pop();
             this.switchTab(prev, false); // Don't push to stack when going back

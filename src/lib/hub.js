@@ -3,7 +3,7 @@ import { getWorldTopPlayers } from '@/src/lib/world-rankings';
 import { fetchMLBNews } from '@/src/mlb/lib/news';
 import { fetchScoreboard as fetchMlbScoreboard } from '@/src/mlb/lib/espn';
 import { predict as predictMlbGame } from '@/src/mlb/lib/predictor';
-import { computeTopPlayers } from '@/src/mlb/lib/topPlayers';
+import { computeTopPlayers, getCachedTopPlayers, getStaleTopPlayers } from '@/src/mlb/lib/topPlayers';
 import { getNbaNewsFeed, getNbaBootstrapSnapshot } from '@/src/lib/nba-backend';
 import {
   getFootballLeagueSnapshot,
@@ -265,8 +265,17 @@ function buildSpotlightCard(player, fallback = {}) {
     player.position || fallback.position || '',
     player.teamAbbr || player.team?.abbreviation || fallback.teamAbbr || '',
   ].filter(Boolean);
+  const image =
+    player.headshot ||
+    player.image ||
+    player.teamLogo ||
+    player.team?.logo ||
+    player.team?.logos?.[0]?.href ||
+    player.logo ||
+    fallback.image ||
+    '';
   return {
-    image: player.headshot || player.image || fallback.image || '',
+    image,
     league: player.leagueLabel || player.competition || fallback.league || '',
     headline,
     subhead: detailBits.join(' • ') || fallback.subhead || '',
@@ -281,6 +290,7 @@ function parseSiteLeaders(payload, { leagueLabel, sportKey }) {
         id: `${sportKey}-${node.athlete.id}`,
         displayName: node.athlete.displayName || node.athlete.shortName || 'Player',
         headshot: node.athlete.headshot?.href || node.athlete.headshot || '',
+        teamLogo: node.team?.logo || node.team?.logos?.[0]?.href || '',
         position:
           node.athlete.position?.abbreviation ||
           node.athlete.position?.displayName ||
@@ -461,29 +471,45 @@ async function buildTrendingStoriesSnapshot() {
     }
   });
 
-  const stories = diversifyStories(
-    Array.from(bestByCluster.values()).sort((left, right) => scoreStory(right) - scoreStory(left)),
-    4,
-  ).map((story, index) => ({
+  const sortedStories = Array.from(bestByCluster.values()).sort((left, right) => scoreStory(right) - scoreStory(left));
+  const heroStories = diversifyStories(sortedStories, 3).map((story, index) => ({
     ...story,
     heroRank: index + 1,
   }));
-
-  const cardSpotlights = {
-    nhl: stories.find((story) => story.sport === 'nhl') || null,
-    mlb: stories.find((story) => story.sport === 'mlb') || null,
-    nba: stories.find((story) => story.sport === 'nba') || null,
-    cbb: stories.find((story) => story.sport === 'cbb') || null,
-    nfl: stories.find((story) => story.sport === 'nfl') || null,
-    football: stories.find((story) => story.sport === 'football') || null,
-  };
+  const heroIds = new Set(heroStories.map((story) => story.storyId));
+  const secondaryStories = diversifyStories(
+    sortedStories.filter((story) => !heroIds.has(story.storyId)),
+    4,
+  ).map((story, index) => ({
+    ...story,
+    secondaryRank: index + 1,
+  }));
 
   return {
-    stories,
-    cardSpotlights,
+    stories: sortedStories,
+    heroStories,
+    secondaryStories,
     worldBoard,
     lastUpdated: new Date().toISOString(),
   };
+}
+
+async function getMlbSpotlightPlayers() {
+  const snapshot = await getHotSnapshot(
+    'hub-mlb-top-players',
+    async () => {
+      const cached = getCachedTopPlayers(50);
+      if (cached) return cached;
+
+      const stale = getStaleTopPlayers();
+      if (stale) return stale;
+
+      return computeTopPlayers(50);
+    },
+    { ttlMs: 15 * 60 * 1000 },
+  );
+
+  return snapshot?.players ? snapshot : { players: [], totalPlayers: 0, lastUpdated: null };
 }
 
 function buildFootballBetCandidates(board) {
@@ -738,7 +764,7 @@ function buildLiveTickerBundle({ mlbScoreboard, nbaSnapshot, nhlGames, nflBoard,
     .slice(0, 16);
 }
 
-async function buildCardSpotlights(storySpotlights = {}) {
+async function buildCardSpotlights() {
   const footballLeagueKeys = Object.keys(FOOTBALL_LEAGUES);
   const [
     mlbResult,
@@ -748,7 +774,7 @@ async function buildCardSpotlights(storySpotlights = {}) {
     cbbResult,
     footballResults,
   ] = await Promise.allSettled([
-    computeTopPlayers(18),
+    getMlbSpotlightPlayers(),
     getNbaBootstrapSnapshot(),
     getNhlSpotlightPool(),
     getGenericSportSnapshot('nfl'),
@@ -759,6 +785,7 @@ async function buildCardSpotlights(storySpotlights = {}) {
   const mlbPlayers = (settledValue(mlbResult, { players: [] }).players || []).map((player) => ({
     displayName: player.name || player.displayName,
     headshot: player.headshot,
+    teamLogo: player.teamLogo,
     position: player.position || 'MLB',
     teamAbbr: player.teamAbbr || '',
     leagueLabel: 'MLB',
@@ -792,7 +819,7 @@ async function buildCardSpotlights(storySpotlights = {}) {
   return Object.fromEntries(
     Object.entries(pools).map(([sportKey, players]) => {
       const selected = pickRotatingEntry(players.filter((player) => player?.headshot), sportKey) || pickRotatingEntry(players, sportKey);
-      return [sportKey, buildSpotlightCard(selected, storySpotlights[sportKey] || {}) || storySpotlights[sportKey] || null];
+      return [sportKey, buildSpotlightCard(selected) || null];
     }),
   );
 }
@@ -887,8 +914,14 @@ async function buildTopBetsSnapshot() {
   }
 
   const parlay = buildParlayOdds(selected);
+  const verifiedAt = new Date().toISOString();
+  const betLegs = selected.map((bet) => ({
+    ...bet,
+    normalizedOdds: americanToDecimal(bet.americanOdds),
+  }));
   return {
-    bets: selected,
+    bets: betLegs,
+    betLegs,
     parlay: parlay
       ? {
           ...parlay,
@@ -897,6 +930,16 @@ async function buildTopBetsSnapshot() {
           return: calculateReturn(10, parlay.american),
         }
       : null,
+    parlaySummary: parlay
+      ? {
+          ...parlay,
+          americanLabel: formatAmericanOdds(parlay.american),
+          stake: 10,
+          return: calculateReturn(10, parlay.american),
+          verifiedAt,
+        }
+      : null,
+    verifiedAt,
     footballLanding,
     lastUpdated: new Date().toISOString(),
   };
@@ -916,8 +959,8 @@ async function buildHubHeroSnapshot() {
     Promise.allSettled(footballLeagueKeys.map((leagueKey) => getFootballLeagueSnapshot(leagueKey))),
   ]);
 
-  const stories = settledValue(storiesResult, { stories: [], cardSpotlights: {} });
-  const bets = settledValue(betsResult, { bets: [], parlay: null });
+  const stories = settledValue(storiesResult, { stories: [], heroStories: [], secondaryStories: [] });
+  const bets = settledValue(betsResult, { bets: [], betLegs: [], parlay: null, parlaySummary: null, verifiedAt: null });
   const worldBoard = settledValue(worldBoardResult, { players: [], lastUpdated: null });
   const mlbScoreboard = settledValue(mlbScoreboardResult, { games: [] });
   const nbaSnapshot = settledValue(nbaSnapshotResult, { games: [] });
@@ -936,7 +979,7 @@ async function buildHubHeroSnapshot() {
     cbbBoard,
     footballBoards,
   });
-  const cardSpotlights = await buildCardSpotlights(stories.cardSpotlights || {});
+  const cardSpotlights = await buildCardSpotlights();
   const playerFallbacks = Object.fromEntries(
     (worldBoard?.players || []).map((player) => [String(player.leagueLabel || '').toLowerCase(), player]),
   );
@@ -966,8 +1009,13 @@ async function buildHubHeroSnapshot() {
   return {
     worldBoard,
     trendingStories: stories.stories,
-    topBets: bets.bets,
-    parlay: bets.parlay,
+    heroStories: stories.heroStories,
+    secondaryStories: stories.secondaryStories,
+    topBets: bets.betLegs,
+    betLegs: bets.betLegs,
+    parlay: bets.parlaySummary,
+    parlaySummary: bets.parlaySummary,
+    verifiedAt: bets.verifiedAt,
     cardSpotlights,
     liveTicker,
     nowLabel: getEasternNowLabel(),

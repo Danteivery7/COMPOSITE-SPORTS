@@ -14,8 +14,13 @@ export async function GET(request) {
       {
         worldBoard: { players: [], lastUpdated: null },
         trendingStories: [],
+        heroStories: [],
+        secondaryStories: [],
         topBets: [],
+        betLegs: [],
         parlay: null,
+        parlaySummary: null,
+        verifiedAt: null,
         cardSpotlights: {},
         liveTicker: [],
         error: error.message,

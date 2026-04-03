@@ -1,12 +1,18 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import FootballIntroGate from '@/src/components/FootballIntroGate';
 import FootballLeagueApp from '@/src/components/FootballLeagueApp';
 import { getFootballLeagueConfig } from '@/src/lib/football';
 
 export default function FootballLeagueRoute({ leagueKey }) {
   const config = getFootballLeagueConfig(leagueKey);
+  const searchParams = useSearchParams();
+  const initialEntry = {
+    playerId: searchParams.get('player') || null,
+    fromHub: searchParams.get('from') === 'hub',
+  };
 
   useEffect(() => {
     document.body.dataset.compositeRoute = 'football';
@@ -23,7 +29,7 @@ export default function FootballLeagueRoute({ leagueKey }) {
       accent={config.accent}
       accentAlt={config.accentAlt}
     >
-      <FootballLeagueApp leagueKey={leagueKey} />
+      <FootballLeagueApp leagueKey={leagueKey} initialEntry={initialEntry} />
     </FootballIntroGate>
   );
 }

@@ -236,6 +236,262 @@ function getStatValue(stats, keys, fallback = 0) {
   return fallback;
 }
 
+function toFiniteNumber(value, fallback = 0) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function parseRecordSummary(summary = '') {
+  const match = String(summary).match(/(\d+)\s*-\s*(\d+)\s*-\s*(\d+)/);
+  if (!match) {
+    return {
+      wins: 0,
+      ties: 0,
+      losses: 0,
+      gamesPlayed: 0,
+      display: '0-0-0',
+    };
+  }
+
+  const wins = Number(match[1]);
+  const ties = Number(match[2]);
+  const losses = Number(match[3]);
+  return {
+    wins,
+    ties,
+    losses,
+    gamesPlayed: wins + ties + losses,
+    display: `${wins}-${ties}-${losses}`,
+  };
+}
+
+function parseStandingRank(summary = '') {
+  const match = String(summary).match(/(\d+)(?:st|nd|rd|th)/i);
+  return match ? Number(match[1]) : null;
+}
+
+function flattenAthleteStatistics(statistics = null) {
+  const statMap = {};
+  const statFeed = [];
+  const categories = statistics?.splits?.categories || statistics?.categories || [];
+
+  categories.forEach((category) => {
+    (category?.stats || []).forEach((stat) => {
+      const keys = [stat.name, stat.displayName, stat.shortDisplayName, stat.abbreviation].filter(Boolean);
+      keys.forEach((key) => {
+        statMap[normalizeKey(key)] = stat.value ?? stat.displayValue ?? 0;
+        statMap[`${normalizeKey(key)}Display`] = stat.displayValue ?? stat.value ?? '0';
+      });
+      statFeed.push({
+        group: category.displayName || category.name || 'Stats',
+        label: stat.displayName || stat.name || 'Stat',
+        value: stat.displayValue || stat.value || '0',
+      });
+    });
+  });
+
+  return { statMap, statFeed };
+}
+
+function getPlayerStat(stats, keys, fallback = 0) {
+  return getStatValue(stats, keys, fallback);
+}
+
+function getFootballPositionGroup(position = '') {
+  const pos = String(position || '').toUpperCase();
+  if (['G', 'GK'].includes(pos)) return 'GK';
+  if (['D', 'DF', 'CB', 'LB', 'RB', 'LWB', 'RWB', 'WB'].includes(pos)) return 'DEF';
+  if (['M', 'MF', 'CM', 'CDM', 'DM', 'CAM', 'AM', 'LM', 'RM'].includes(pos)) return 'MID';
+  return 'FWD';
+}
+
+function summarizeScheduleResults(payload, teamId) {
+  const competitions = (payload.events || payload.games || [])
+    .map((event) => event?.competitions?.[0] || event)
+    .filter(Boolean)
+    .sort((left, right) => compareByStartTime(left?.date, right?.date));
+
+  let wins = 0;
+  let ties = 0;
+  let losses = 0;
+  let goalsFor = 0;
+  let goalsAgainst = 0;
+  let cleanSheets = 0;
+
+  const completed = [];
+
+  competitions.forEach((competition) => {
+    const statusState = competition?.status?.type?.state;
+    if (statusState !== 'post') return;
+    const competitors = competition?.competitors || [];
+    const team = competitors.find((entry) => String(entry.team?.id || entry.id) === String(teamId));
+    const opponent = competitors.find((entry) => String(entry.team?.id || entry.id) !== String(teamId));
+    if (!team || !opponent) return;
+
+    const teamScore = toFiniteNumber(team.score?.value ?? team.score?.displayValue ?? team.score, 0);
+    const opponentScore = toFiniteNumber(opponent.score?.value ?? opponent.score?.displayValue ?? opponent.score, 0);
+
+    goalsFor += teamScore;
+    goalsAgainst += opponentScore;
+    if (opponentScore === 0) cleanSheets += 1;
+
+    if (teamScore > opponentScore) wins += 1;
+    else if (teamScore === opponentScore) ties += 1;
+    else losses += 1;
+
+    completed.push({
+      date: competition.date,
+      teamScore,
+      opponentScore,
+      opponentAbbr: opponent.team?.abbreviation || opponent.team?.shortDisplayName || 'OPP',
+    });
+  });
+
+  const recent = completed.slice(-5);
+  const recentFormPoints = recent.reduce((total, game) => {
+    if (game.teamScore > game.opponentScore) return total + 3;
+    if (game.teamScore === game.opponentScore) return total + 1;
+    return total;
+  }, 0);
+
+  return {
+    wins,
+    ties,
+    losses,
+    gamesPlayed: wins + ties + losses,
+    standingPoints: wins * 3 + ties,
+    pointsFor: goalsFor,
+    pointsAgainst: goalsAgainst,
+    differential: goalsFor - goalsAgainst,
+    cleanSheets,
+    record: `${wins}-${ties}-${losses}`,
+    recentFormPoints,
+    recentFormLabel: recent.length ? `${recentFormPoints} pts last ${recent.length}` : 'Form pending',
+    recentResults: recent
+      .slice()
+      .reverse()
+      .map((game) => `${game.teamScore}-${game.opponentScore} vs ${game.opponentAbbr}`),
+  };
+}
+
+function buildFootballPlayerRating(player, team, leaderEntries = []) {
+  const stats = player.statistics || {};
+  const positionGroup = getFootballPositionGroup(player.position);
+  const appearances = getPlayerStat(stats, ['appearances', 'app'], 0);
+  const subIns = getPlayerStat(stats, ['subins', 'sub'], 0);
+  const starts = Math.max(0, appearances - subIns);
+  const goals = getPlayerStat(stats, ['totalgoals', 'goals', 'g'], 0);
+  const assists = getPlayerStat(stats, ['goalassists', 'assists', 'a'], 0);
+  const shots = getPlayerStat(stats, ['totalshots', 'shots', 'sh'], 0);
+  const shotsOnTarget = getPlayerStat(stats, ['shotsontarget', 'st'], 0);
+  const offsides = getPlayerStat(stats, ['offsides', 'of'], 0);
+  const saves = getPlayerStat(stats, ['saves', 'sv'], 0);
+  const shotsFaced = getPlayerStat(stats, ['shotsfaced', 'shf'], 0);
+  const goalsConceded = getPlayerStat(stats, ['goalsconceded', 'goalsagainst', 'ga'], 0);
+  const yellowCards = getPlayerStat(stats, ['yellowcards', 'yc'], 0);
+  const redCards = getPlayerStat(stats, ['redcards', 'rc'], 0);
+  const foulsCommitted = getPlayerStat(stats, ['foulscommitted', 'fc'], 0);
+  const foulsSuffered = getPlayerStat(stats, ['foulssuffered', 'fa'], 0);
+
+  const reliability = Math.max(0.18, Math.min(1, appearances / 24));
+  const teamOffBoost = Math.max(0, ((team?.offScore || 50) - 50) * 0.28);
+  const teamDefBoost = Math.max(0, ((team?.defScore || 50) - 50) * 0.3);
+  const teamResultsBoost = Math.max(0, ((team?.resultsScore || 50) - 50) * 0.24);
+  const leaderBoost = leaderEntries
+    .slice(0, 4)
+    .reduce((total, entry) => total + Math.max(0, 16 - Number(entry.rank || 16)) * 0.7, 0);
+  const startsBoost = starts * 0.48;
+  const disciplinePenalty = (yellowCards * 0.18) + (redCards * 1.75) + (foulsCommitted * 0.04);
+  const foulDrawBonus = foulsSuffered * 0.08;
+
+  let rawRating = 58;
+  let summary = `${appearances} apps`;
+
+  if (positionGroup === 'GK') {
+    const saveRate = shotsFaced > 0 ? saves / shotsFaced : 0.68;
+    const goalsAgainstPerMatch = appearances > 0 ? goalsConceded / appearances : 1.4;
+    rawRating =
+      64 +
+      startsBoost +
+      (saveRate * 20) +
+      teamDefBoost +
+      (teamResultsBoost * 0.8) +
+      (leaderBoost * 0.28) -
+      (goalsAgainstPerMatch * 3.2) -
+      (disciplinePenalty * 0.12);
+    summary = `${saves} saves • ${goalsConceded} GA`;
+  } else if (positionGroup === 'DEF') {
+    rawRating =
+      60 +
+      startsBoost +
+      teamDefBoost +
+      (teamResultsBoost * 0.7) +
+      (goals * 4.2) +
+      (assists * 3.9) +
+      (shotsOnTarget * 0.6) +
+      (leaderBoost * 0.34) +
+      foulDrawBonus -
+      disciplinePenalty;
+    summary = `${goals} G • ${assists} A • ${appearances} apps`;
+  } else if (positionGroup === 'MID') {
+    rawRating =
+      61 +
+      startsBoost +
+      (goals * 4.8) +
+      (assists * 5.1) +
+      (shotsOnTarget * 0.82) +
+      (shots * 0.18) +
+      (teamOffBoost * 0.9) +
+      (teamDefBoost * 0.45) +
+      (teamResultsBoost * 0.7) +
+      (leaderBoost * 0.44) +
+      foulDrawBonus -
+      (disciplinePenalty * 0.85);
+    summary = `${goals} G • ${assists} A • ${appearances} apps`;
+  } else {
+    const finishingRate = shots > 0 ? shotsOnTarget / shots : 0;
+    rawRating =
+      62 +
+      (startsBoost * 0.9) +
+      (goals * 5.9) +
+      (assists * 4.1) +
+      (shotsOnTarget * 1.2) +
+      (shots * 0.2) +
+      (finishingRate * 8) +
+      teamOffBoost +
+      (teamResultsBoost * 0.62) +
+      (leaderBoost * 0.58) -
+      (offsides * 0.08) -
+      (disciplinePenalty * 0.7);
+    summary = `${goals} G • ${assists} A • ${shotsOnTarget}/${shots} SOT`;
+  }
+
+  const stabilizedBaseline =
+    positionGroup === 'GK' ? 68 : positionGroup === 'DEF' ? 65 : positionGroup === 'MID' ? 66 : 67;
+  const stabilized = stabilizedBaseline + ((rawRating - stabilizedBaseline) * reliability);
+  const rating = Math.max(42, Math.min(97.5, Math.round(stabilized * 10) / 10));
+
+  return {
+    rating,
+    tier: bucketTier(rating),
+    leaderSummary:
+      leaderEntries[0]
+        ? `${leaderEntries[0].label} #${leaderEntries[0].rank}`
+        : summary,
+    positionGroup,
+    profileSummary: summary,
+    appearances,
+    starts,
+    goals,
+    assists,
+    shots,
+    shotsOnTarget,
+    saves,
+    shotsFaced,
+    goalsConceded,
+  };
+}
+
 async function fetchScoreboardPayload(leagueKey) {
   const key = cacheKey('scoreboard-payload', leagueKey);
   const cached = readCache(key);
@@ -268,125 +524,8 @@ async function getStandings(leagueKey) {
   const key = cacheKey('standings', leagueKey);
   const cached = readCache(key);
   if (cached) return cached;
-  const payload = await fetchJson(`${siteBase(leagueKey)}/standings`, 20 * 60 * 1000);
-  const entries = [];
-  walk(payload, (node) => {
-    if (node?.team?.id && Array.isArray(node?.stats)) {
-      entries.push(node);
-    }
-  });
-
-  const standings = uniqBy(
-    entries.map((entry) => {
-      const stats = flattenStats(entry.stats);
-      const wins = getStatValue(stats, ['wins']);
-      const losses = getStatValue(stats, ['losses']);
-      const ties = getStatValue(stats, ['ties', 'draws']);
-      const gamesPlayed = getStatValue(stats, ['gamesplayed', 'games'], wins + losses + ties);
-      const recordText =
-        stats.recordDisplay ||
-        [wins, losses, ties].filter((value, index) => value || (index < 2)).join('-');
-      const goalsFor = getStatValue(stats, ['goalsfor', 'goalsscored', 'pointsfor'], 0);
-      const goalsAgainst = getStatValue(stats, ['goalsagainst', 'pointsagainst'], 0);
-      const differential = getStatValue(stats, ['goaldifferential', 'differential'], goalsFor - goalsAgainst);
-      const streak = stats.streakDisplay || stats.streak || 'Even';
-      const standingPoints = getStatValue(stats, ['points', 'standingpoints'], wins * 3 + ties);
-      const winPctRaw = getStatValue(stats, ['winpercent', 'winningpercentage']);
-      const winPct =
-        typeof winPctRaw === 'number' && winPctRaw > 0
-          ? winPctRaw > 1
-            ? winPctRaw / 100
-            : winPctRaw
-          : gamesPlayed
-            ? (wins * 3 + ties) / Math.max(1, gamesPlayed * 3)
-            : 0;
-
-      return {
-        teamId: String(entry.team.id),
-        team: parseTeam(entry.team),
-        wins,
-        losses,
-        ties,
-        gamesPlayed,
-        record: recordText,
-        pointsFor: goalsFor,
-        pointsAgainst: goalsAgainst,
-        differential,
-        streak,
-        standingPoints,
-        winPct,
-      };
-    }),
-    (entry) => entry.teamId,
-  );
-
-  return writeCache(key, standings, 20 * 60 * 1000);
-}
-
-function flattenStatisticsPayload(payload) {
-  const stats = {};
-  walk(payload, (node) => {
-    if (Array.isArray(node?.stats)) {
-      Object.assign(stats, flattenStats(node.stats));
-    }
-  });
-  return stats;
-}
-
-async function getTeamStatistics(leagueKey, teamId) {
-  const key = cacheKey('team-stats', leagueKey, teamId);
-  const cached = readCache(key);
-  if (cached) return cached;
-  const payload = await fetchJson(`${siteBase(leagueKey)}/teams/${teamId}/statistics`, 6 * 60 * 60 * 1000);
-  return writeCache(key, flattenStatisticsPayload(payload), 6 * 60 * 60 * 1000);
-}
-
-async function fetchTeamSchedule(leagueKey, teamId) {
-  try {
-    return await fetchJson(`${siteBase(leagueKey)}/teams/${teamId}/schedule`, 60 * 60 * 1000);
-  } catch (_error) {
-    return { events: [] };
-  }
-}
-
-function summarizeRecentForm(payload, teamId) {
-  const events = payload.events || payload.games || [];
-  const completed = events
-    .filter((event) => event.competitions?.[0]?.status?.type?.state === 'post')
-    .slice(-5);
-
-  let points = 0;
-  const notes = completed
-    .map((event) => {
-      const competition = event.competitions?.[0];
-      const competitors = competition?.competitors || [];
-      const team = competitors.find((item) => String(item.team?.id) === String(teamId));
-      const opponent = competitors.find((item) => String(item.team?.id) !== String(teamId));
-      if (!team || !opponent) return null;
-      const teamScore = Number(team.score || 0);
-      const opponentScore = Number(opponent.score || 0);
-      if (teamScore > opponentScore) points += 3;
-      else if (teamScore === opponentScore) points += 1;
-      return `${team.team?.abbreviation || 'CLB'} ${teamScore}-${opponentScore} ${opponent.team?.abbreviation || 'OPP'}`;
-    })
-    .filter(Boolean);
-
-  return {
-    recentFormPoints: points,
-    recentFormLabel: completed.length ? `${points} pts last ${completed.length}` : 'Form pending',
-    recentResults: notes.reverse(),
-  };
-}
-
-async function computeRankings(leagueKey) {
-  const key = cacheKey('rankings', leagueKey);
-  const cached = readCache(key);
-  if (cached) return cached;
-
-  const [teams, standings] = await Promise.all([getTeams(leagueKey), getStandings(leagueKey)]);
-  const standingsMap = Object.fromEntries(standings.map((entry) => [entry.teamId, entry]));
-
-  const [teamStats, schedules] = await Promise.all([
+  const teams = await getTeams(leagueKey);
+  const [teamStatsPayloads, schedules] = await Promise.all([
     mapLimit(
       teams,
       async (team) => ({
@@ -405,28 +544,101 @@ async function computeRankings(leagueKey) {
     ),
   ]);
 
-  const statMap = Object.fromEntries(teamStats.filter(Boolean).map((entry) => [entry.teamId, entry.stats]));
-  const formMap = Object.fromEntries(
-    schedules.filter(Boolean).map((entry) => [entry.teamId, summarizeRecentForm(entry.schedule, entry.teamId)]),
+  const teamStatsMap = Object.fromEntries(teamStatsPayloads.filter(Boolean).map((entry) => [entry.teamId, entry.stats]));
+  const scheduleMap = Object.fromEntries(schedules.filter(Boolean).map((entry) => [entry.teamId, entry.schedule]));
+
+  const standings = teams.map((team) => {
+    const stats = teamStatsMap[team.id] || {};
+    const scheduleSummary = summarizeScheduleResults(scheduleMap[team.id], team.id);
+    const parsedRecord = parseRecordSummary(stats.recordSummary || scheduleSummary.record);
+    const wins = parsedRecord.gamesPlayed ? parsedRecord.wins : scheduleSummary.wins;
+    const ties = parsedRecord.gamesPlayed ? parsedRecord.ties : scheduleSummary.ties;
+    const losses = parsedRecord.gamesPlayed ? parsedRecord.losses : scheduleSummary.losses;
+    const gamesPlayed = parsedRecord.gamesPlayed || scheduleSummary.gamesPlayed;
+    const standingPoints = gamesPlayed ? (wins * 3) + ties : scheduleSummary.standingPoints;
+    const standingRank = parseStandingRank(stats.standingSummary);
+
+    return {
+      teamId: team.id,
+      team,
+      wins,
+      ties,
+      losses,
+      gamesPlayed,
+      record: parsedRecord.gamesPlayed ? parsedRecord.display : scheduleSummary.record,
+      pointsFor: scheduleSummary.pointsFor,
+      pointsAgainst: scheduleSummary.pointsAgainst,
+      differential: scheduleSummary.differential,
+      cleanSheets: scheduleSummary.cleanSheets,
+      streak: scheduleSummary.recentFormLabel,
+      recentFormPoints: scheduleSummary.recentFormPoints,
+      recentFormLabel: scheduleSummary.recentFormLabel,
+      recentResults: scheduleSummary.recentResults,
+      standingPoints,
+      pointsPerMatch: gamesPlayed ? standingPoints / gamesPlayed : 0,
+      winPct: gamesPlayed ? standingPoints / Math.max(1, gamesPlayed * 3) : 0,
+      standingRank,
+      standingSummary: stats.standingSummary || '',
+      recordSummary: stats.recordSummary || '',
+    };
+  });
+
+  standings.sort((left, right) => {
+    const leftRank = left.standingRank || Number.MAX_SAFE_INTEGER;
+    const rightRank = right.standingRank || Number.MAX_SAFE_INTEGER;
+    if (leftRank !== rightRank) return leftRank - rightRank;
+    if (right.standingPoints !== left.standingPoints) return right.standingPoints - left.standingPoints;
+    if (right.differential !== left.differential) return right.differential - left.differential;
+    return right.pointsFor - left.pointsFor;
+  });
+
+  return writeCache(key, standings, 20 * 60 * 1000);
+}
+
+async function getTeamStatistics(leagueKey, teamId) {
+  const key = cacheKey('team-stats', leagueKey, teamId);
+  const cached = readCache(key);
+  if (cached) return cached;
+  const payload = await fetchJson(`${siteBase(leagueKey)}/teams/${teamId}/statistics`, 6 * 60 * 60 * 1000);
+  return writeCache(
+    key,
+    {
+      recordSummary: payload?.team?.recordSummary || '',
+      standingSummary: payload?.team?.standingSummary || '',
+      team: payload?.team || null,
+    },
+    6 * 60 * 60 * 1000,
   );
+}
+
+async function fetchTeamSchedule(leagueKey, teamId) {
+  try {
+    return await fetchJson(`${siteBase(leagueKey)}/teams/${teamId}/schedule`, 60 * 60 * 1000);
+  } catch (_error) {
+    return { events: [] };
+  }
+}
+
+async function computeRankings(leagueKey) {
+  const key = cacheKey('rankings', leagueKey);
+  const cached = readCache(key);
+  if (cached) return cached;
+
+  const [teams, standings] = await Promise.all([getTeams(leagueKey), getStandings(leagueKey)]);
+  const standingsMap = Object.fromEntries(standings.map((entry) => [entry.teamId, entry]));
 
   const base = teams.map((team) => {
     const standing = standingsMap[team.id] || {};
-    const stats = statMap[team.id] || {};
-    const form = formMap[team.id] || { recentFormPoints: 0, recentFormLabel: 'Form pending', recentResults: [] };
     const gamesPlayed = standing.gamesPlayed || 1;
     const goalsForPerMatch = standing.pointsFor ? standing.pointsFor / gamesPlayed : 0;
     const goalsAgainstPerMatch = standing.pointsAgainst ? standing.pointsAgainst / gamesPlayed : 0;
-    const shotsOnTarget = getStatValue(stats, ['shotsontargetpergame', 'shotsontarget', 'shots'], goalsForPerMatch * 2.4);
-    const possession = getStatValue(stats, ['possessionpct', 'averagepossession'], 50);
-    const cleanSheets = getStatValue(stats, ['cleansheets'], 0);
-    const passes = getStatValue(stats, ['passescompleted', 'passes'], 0);
-    const tacklesWon = getStatValue(stats, ['tackleswon', 'tackles'], 0);
+    const cleanSheets = standing.cleanSheets || 0;
+    const standingLift = standing.standingRank ? Math.max(0, teams.length - standing.standingRank + 1) : 0;
 
     return {
       ...team,
       record: standing.record || '0-0-0',
-      streak: standing.streak || form.recentFormLabel,
+      streak: standing.recentFormLabel || 'Form pending',
       wins: standing.wins || 0,
       losses: standing.losses || 0,
       ties: standing.ties || 0,
@@ -437,34 +649,32 @@ async function computeRankings(leagueKey) {
       differential: standing.differential || 0,
       goalsForPerMatch,
       goalsAgainstPerMatch,
-      shotsOnTarget,
-      possession,
       cleanSheets,
-      passes,
-      tacklesWon,
-      recentFormPoints: form.recentFormPoints,
-      recentFormLabel: form.recentFormLabel,
-      recentResults: form.recentResults,
+      standingLift,
+      recentFormPoints: standing.recentFormPoints || 0,
+      recentFormLabel: standing.recentFormLabel || 'Form pending',
+      recentResults: standing.recentResults || [],
+      standingRank: standing.standingRank || null,
     };
   });
 
   const resultsScale = scoreScale(
-    base.map((team) => (team.standingPoints / Math.max(1, team.wins + team.losses + team.ties)) * 22 + team.differential * 3.5 + team.recentFormPoints),
+    base.map((team) => (team.standingPoints / Math.max(1, team.wins + team.losses + team.ties)) * 28 + team.differential * 2.6 + team.recentFormPoints * 1.4 + team.standingLift),
   );
   const offenseScale = scoreScale(
-    base.map((team) => team.goalsForPerMatch * 28 + team.shotsOnTarget * 5 + team.possession * 0.3 + team.passes * 0.004),
+    base.map((team) => team.goalsForPerMatch * 42 + team.differential * 1.8 + team.recentFormPoints * 0.75),
   );
   const defenseScale = scoreScale(
-    base.map((team) => team.goalsAgainstPerMatch * 28 - team.cleanSheets * 3 - team.tacklesWon * 0.2 - team.differential),
+    base.map((team) => team.goalsAgainstPerMatch * 42 - team.cleanSheets * 4.2 - team.differential * 1.7 - team.standingLift * 0.4),
     false,
   );
 
   const ranked = base.map((team) => {
     const resultsScore = resultsScale(
-      (team.standingPoints / Math.max(1, team.wins + team.losses + team.ties)) * 22 + team.differential * 3.5 + team.recentFormPoints,
+      (team.standingPoints / Math.max(1, team.wins + team.losses + team.ties)) * 28 + team.differential * 2.6 + team.recentFormPoints * 1.4 + team.standingLift,
     );
-    const offScore = offenseScale(team.goalsForPerMatch * 28 + team.shotsOnTarget * 5 + team.possession * 0.3 + team.passes * 0.004);
-    const defScore = defenseScale(team.goalsAgainstPerMatch * 28 - team.cleanSheets * 3 - team.tacklesWon * 0.2 - team.differential);
+    const offScore = offenseScale(team.goalsForPerMatch * 42 + team.differential * 1.8 + team.recentFormPoints * 0.75);
+    const defScore = defenseScale(team.goalsAgainstPerMatch * 42 - team.cleanSheets * 4.2 - team.differential * 1.7 - team.standingLift * 0.4);
     const ovrScore = Math.round((resultsScore * 0.46 + offScore * 0.28 + defScore * 0.26) * 10) / 10;
     const globalScore = Math.round(ovrScore * leagueMeta(leagueKey).competitionWeight * 10) / 10;
 
@@ -603,15 +813,6 @@ async function fetchLeaders(leagueKey) {
   }
 }
 
-function positionWeight(position) {
-  const pos = String(position || '').toUpperCase();
-  if (['ST', 'CF', 'RW', 'LW', 'FW', 'F'].includes(pos)) return 8;
-  if (['AM', 'CAM', 'LM', 'RM', 'MF', 'M', 'CM'].includes(pos)) return 6.5;
-  if (['CB', 'LB', 'RB', 'WB', 'DF', 'D'].includes(pos)) return 5.2;
-  if (['GK'].includes(pos)) return 6.2;
-  return 4.5;
-}
-
 function bucketTier(rating) {
   if (rating >= 93) return 'world-class';
   if (rating >= 86) return 'elite';
@@ -632,6 +833,7 @@ function parseRosterPlayers(payload, team) {
   const players = [];
   walk(payload, (node) => {
     if (node?.id && (node.displayName || node.fullName || node.shortName) && node.position) {
+      const flattenedStats = flattenAthleteStatistics(node.statistics);
       players.push({
         id: String(node.id),
         displayName: node.displayName || node.fullName || node.shortName,
@@ -641,6 +843,8 @@ function parseRosterPlayers(payload, team) {
         age: node.age || null,
         headshot: node.headshot?.href || node.headshot || '',
         team,
+        statistics: flattenedStats.statMap,
+        statFeed: flattenedStats.statFeed,
       });
     }
   });
@@ -648,33 +852,11 @@ function parseRosterPlayers(payload, team) {
 }
 
 async function getFeaturedPlayers(leagueKey, rankings = null) {
-  const leagueRankings = rankings || (await computeRankings(leagueKey));
-  const leaders = await fetchLeaders(leagueKey);
-  const rankingMap = Object.fromEntries(leagueRankings.map((team) => [team.id, team]));
-
-  return uniqBy(
-    leaders.map((entry) => {
-      const team = rankingMap[entry.teamId];
-      const base = 84 - (entry.rank - 1) * 1.8 + positionWeight(entry.athlete.position) + ((team?.globalScore || 70) - 70) * 0.12;
-      const rating = Math.max(60, Math.min(98, Math.round(base)));
-      return {
-        id: entry.athleteId,
-        displayName: entry.athlete.displayName,
-        shortName: entry.athlete.shortName,
-        headshot: entry.athlete.headshot,
-        position: entry.athlete.position || 'Player',
-        team: team || { abbreviation: entry.teamId || leagueMeta(leagueKey).shortLabel },
-        rating,
-        leaderSummary: `${entry.label} #${entry.rank}`,
-        tier: bucketTier(rating),
-        competition: leagueMeta(leagueKey).label,
-      };
-    }),
-    (entry) => entry.id,
-  )
-    .sort((left, right) => right.rating - left.rating)
-    .slice(0, 12)
-    .map((entry, index) => ({ ...entry, rank: index + 1 }));
+  const catalog = await getPlayerCatalog(leagueKey);
+  return (catalog.players || []).slice(0, 12).map((entry, index) => ({
+    ...entry,
+    rank: index + 1,
+  }));
 }
 
 async function getPlayerCatalog(leagueKey) {
@@ -705,27 +887,27 @@ async function getPlayerCatalog(leagueKey) {
     .map((player) => {
       const team = rankingMap[player.team.id] || player.team;
       const leaderEntries = (leaderMap.get(player.id) || []).sort((left, right) => left.rank - right.rank);
-      const leaderBoost = leaderEntries
-        .slice(0, 4)
-        .reduce((total, entry) => total + Math.max(0, 22 - Number(entry.rank || 22)) * 1.2, 0);
-      const multiCategoryBonus = uniqBy(leaderEntries, (entry) => normalizeKey(entry.label)).length * 1.8;
-      const teamBoost = Math.max(0, ((team.globalScore || team.ovrScore || 72) - 68) * 0.28);
-      const formBoost = Math.max(0, (team.recentFormPoints || 0) * 0.22);
-      const roleBoost = positionWeight(player.position);
-      const reliabilityBoost = Math.min(8, leaderEntries.length * 2.1);
-      const ageBoost = player.age ? Math.max(0, 3.5 - Math.abs(25 - player.age) * 0.22) : 1.5;
-      const rating = Math.max(
-        42,
-        Math.min(99, Math.round(43 + leaderBoost + multiCategoryBonus + teamBoost + formBoost + roleBoost + reliabilityBoost + ageBoost)),
-      );
+      const ratingCard = buildFootballPlayerRating(player, team, leaderEntries);
 
       return {
         ...player,
         leaders: leaderEntries,
-        leaderSummary:
-          leaderEntries[0] ? `${leaderEntries[0].label} #${leaderEntries[0].rank}` : `${team.abbreviation} first team board`,
-        rating,
-        tier: bucketTier(rating),
+        leaderSummary: ratingCard.leaderSummary,
+        rating: ratingCard.rating,
+        tier: ratingCard.tier,
+        positionGroup: ratingCard.positionGroup,
+        profileSummary: ratingCard.profileSummary,
+        metrics: {
+          appearances: ratingCard.appearances,
+          starts: ratingCard.starts,
+          goals: ratingCard.goals,
+          assists: ratingCard.assists,
+          shots: ratingCard.shots,
+          shotsOnTarget: ratingCard.shotsOnTarget,
+          saves: ratingCard.saves,
+          shotsFaced: ratingCard.shotsFaced,
+          goalsConceded: ratingCard.goalsConceded,
+        },
         competition: leagueMeta(leagueKey).label,
       };
     })
@@ -745,6 +927,12 @@ async function getPlayerCatalog(leagueKey) {
 }
 
 async function fetchAthleteStats(leagueKey, athleteId) {
+  const catalog = await getPlayerCatalog(leagueKey);
+  const catalogPlayer = catalog.players.find((player) => player.id === String(athleteId));
+  if (catalogPlayer?.statFeed?.length) {
+    return catalogPlayer.statFeed.slice(0, 16);
+  }
+
   try {
     const payload = await fetchJson(`${siteBase(leagueKey)}/athletes/${athleteId}/stats`, 30 * 60 * 60 * 1000);
     const statLines = [];
@@ -765,23 +953,38 @@ async function fetchAthleteStats(leagueKey, athleteId) {
   }
 }
 
-function buildPredictors(scoreboard, rankings, leagueKey) {
+function buildPredictors(scoreboard, rankings, leagueKey, players = []) {
   const rankingMap = Object.fromEntries(rankings.map((team) => [team.id, team]));
+  const playerImpactMap = players.reduce((map, player) => {
+    const teamId = String(player.team?.id || '');
+    if (!teamId) return map;
+    const list = map.get(teamId) || [];
+    list.push(Number(player.rating || 0));
+    map.set(teamId, list);
+    return map;
+  }, new Map());
+
   return scoreboard
     .filter((game) => game.home.teamId && game.away.teamId)
     .slice(0, 12)
     .map((game) => {
       const home = rankingMap[game.home.teamId];
       const away = rankingMap[game.away.teamId];
+      const homePlayerImpact = (playerImpactMap.get(String(game.home.teamId)) || []).sort((a, b) => b - a).slice(0, 5);
+      const awayPlayerImpact = (playerImpactMap.get(String(game.away.teamId)) || []).sort((a, b) => b - a).slice(0, 5);
+      const homeImpactBoost = homePlayerImpact.length ? homePlayerImpact.reduce((sum, value) => sum + value, 0) / homePlayerImpact.length : 70;
+      const awayImpactBoost = awayPlayerImpact.length ? awayPlayerImpact.reduce((sum, value) => sum + value, 0) / awayPlayerImpact.length : 70;
       const homeStrength =
         (home?.globalScore || home?.ovrScore || 70) +
         (home?.resultsScore || 50) * 0.18 +
         (home?.recentFormPoints || 0) * 0.9 +
+        (homeImpactBoost - 70) * 0.35 +
         3.1;
       const awayStrength =
         (away?.globalScore || away?.ovrScore || 70) +
         (away?.resultsScore || 50) * 0.18 +
-        (away?.recentFormPoints || 0) * 0.9;
+        (away?.recentFormPoints || 0) * 0.9 +
+        (awayImpactBoost - 70) * 0.35;
       const diff = homeStrength - awayStrength;
       const homeWinProbability = Math.max(8, Math.min(92, Math.round((1 / (1 + Math.exp(-(diff / 14)))) * 100)));
       const projectedHomeScore = Math.max(
@@ -864,13 +1067,15 @@ function buildPredictors(scoreboard, rankings, leagueKey) {
 }
 
 async function getFootballBootstrap(leagueKey) {
-  const [scoreboard, rankings, news, brand, featuredPlayers] = await Promise.all([
+  const [scoreboard, rankings, news, brand, playersCatalog] = await Promise.all([
     fetchScoreboard(leagueKey),
     computeRankings(leagueKey),
     fetchNews(leagueKey),
     getLeagueBrand(leagueKey),
-    getFeaturedPlayers(leagueKey),
+    getPlayerCatalog(leagueKey),
   ]);
+
+  const featuredPlayers = (playersCatalog.players || []).slice(0, 12);
 
   return {
     league: brand,
@@ -880,11 +1085,12 @@ async function getFootballBootstrap(leagueKey) {
     teams: rankings,
     news,
     featuredPlayers,
-    predictors: buildPredictors(scoreboard, rankings, leagueKey),
+    playersCatalog,
+    predictors: buildPredictors(scoreboard, rankings, leagueKey, playersCatalog.players || []),
     meta: {
       liveGames: scoreboard.filter((game) => game.state === 'in').length,
       teamCount: rankings.length,
-      playerCountLabel: `${rankings.length} clubs tracked`,
+      playerCountLabel: `${playersCatalog.players?.length || 0} players tracked`,
     },
     lastUpdated: new Date().toISOString(),
   };
@@ -902,7 +1108,7 @@ async function getPlayerDetail(leagueKey, playerId) {
         .slice(0, 2)
         .map((entry) => `${entry.label} #${entry.rank}`)
         .join(' and ')}.`
-    : `${player.displayName} is currently carried by club strength, role projection, and roster placement inside the ${leagueMeta(leagueKey).label} board.`;
+    : `${player.displayName} grades ${player.rating} OVR in ${leagueMeta(leagueKey).label} with a ${player.positionGroup || 'role'} profile built from ${player.profileSummary || 'current season usage'} and club context.`;
 
   return {
     league: leagueKey,
@@ -926,7 +1132,7 @@ async function getTeamDetail(leagueKey, teamId) {
   }
 
   const roster = playersCatalog.players.filter((player) => player.team.id === String(teamId));
-  const recent = summarizeRecentForm(schedulePayload, teamId);
+  const recent = summarizeScheduleResults(schedulePayload, teamId);
 
   return {
     league: leagueKey,
@@ -1007,12 +1213,13 @@ async function getFootballLanding() {
   const leagueKeys = Object.keys(FOOTBALL_LEAGUES);
   const leagueData = await Promise.all(
     leagueKeys.map(async (leagueKey) => {
-      const [brand, rankings, scoreboard] = await Promise.all([
+      const [brand, rankings, scoreboard, playersCatalog] = await Promise.all([
         getLeagueBrand(leagueKey),
         computeRankings(leagueKey),
         fetchScoreboard(leagueKey),
+        getPlayerCatalog(leagueKey),
       ]);
-      return { leagueKey, brand, rankings, scoreboard };
+      return { leagueKey, brand, rankings, scoreboard, playersCatalog };
     }),
   );
 
@@ -1030,6 +1237,17 @@ async function getFootballLanding() {
     topTeam: rankings[0] || null,
     blurb: brand.cardBlurb,
   }));
+
+  const topPlayers = leagueData
+    .flatMap(({ leagueKey, brand, playersCatalog }) =>
+      (playersCatalog?.players || []).slice(0, 5).map((player) => ({
+        ...player,
+        leagueKey,
+        leagueLabel: brand.label,
+      })),
+    )
+    .sort((left, right) => Number(right.rating || 0) - Number(left.rating || 0))
+    .slice(0, 3);
 
   const topMatches = leagueData
     .flatMap(({ leagueKey, brand, rankings, scoreboard }) => {
@@ -1065,6 +1283,7 @@ async function getFootballLanding() {
     title: 'Composite Football',
     subtitle: 'Step through the tunnel, scan the biggest matches of the day, and drop into any league board from one global football hub.',
     topMatches,
+    topPlayers,
     leagues: leagueCards,
     lastUpdated: new Date().toISOString(),
   };

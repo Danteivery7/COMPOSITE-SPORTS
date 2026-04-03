@@ -13,7 +13,10 @@ export async function GET(request) {
     return NextResponse.json(
       {
         bets: [],
+        betLegs: [],
         parlay: null,
+        parlaySummary: null,
+        verifiedAt: null,
         error: error.message,
         lastUpdated: null,
       },
