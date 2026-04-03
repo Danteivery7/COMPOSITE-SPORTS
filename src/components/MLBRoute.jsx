@@ -1,15 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import SportIntroGate from '@/src/components/SportIntroGate';
+import RouteThemeToggle from '@/src/components/RouteThemeToggle';
+import useCompositeTheme from '@/src/hooks/useCompositeTheme';
 import { getSportConfig } from '@/src/data/sports';
 import MLBApp from '@/src/mlb/App';
 
 export default function MLBRoute() {
   const config = getSportConfig('mlb');
-  const [theme, setTheme] = useState('dark');
+  const { theme, toggleTheme } = useCompositeTheme('mlb');
   const searchParams = useSearchParams();
   const initialEntry = {
     playerId: searchParams.get('player') || null,
@@ -17,24 +19,12 @@ export default function MLBRoute() {
   };
 
   useEffect(() => {
-    const savedTheme = window.localStorage.getItem('composite-hub-mlb-theme');
-    if (savedTheme === 'light' || savedTheme === 'dark') {
-      setTheme(savedTheme);
-    }
     document.documentElement.removeAttribute('data-theme');
     document.body.removeAttribute('data-theme');
     document.body.dataset.compositeRoute = 'mlb';
     return () => {
       delete document.body.dataset.compositeRoute;
     };
-  }, []);
-
-  const toggleTheme = useCallback(() => {
-    setTheme((prev) => {
-      const next = prev === 'dark' ? 'light' : 'dark';
-      window.localStorage.setItem('composite-hub-mlb-theme', next);
-      return next;
-    });
   }, []);
 
   return (
@@ -45,9 +35,12 @@ export default function MLBRoute() {
             <p className="eyebrow">COMPOSITE Sports</p>
             <h1>Composite MLB</h1>
           </div>
-          <Link href="/" className="hub-back-link">
-            Back To Hub
-          </Link>
+          <div className="route-shell-actions">
+            <RouteThemeToggle theme={theme} onToggle={toggleTheme} compact />
+            <Link href="/" className="hub-back-link">
+              Back To Hub
+            </Link>
+          </div>
         </div>
         <MLBApp theme={theme} toggleTheme={toggleTheme} initialEntry={initialEntry} />
       </section>

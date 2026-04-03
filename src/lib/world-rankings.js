@@ -5,8 +5,20 @@ import {
 } from '@/src/mlb/lib/topPlayers';
 import { FOOTBALL_LEAGUES } from '@/src/lib/football';
 import { getFootballLeagueSnapshot, getGenericSportSnapshot } from '@/src/lib/live-sports-backend';
-import { getNbaBootstrapSnapshot } from '@/src/lib/nba-backend';
+import { getExactNbaRatedPlayers } from '@/src/lib/nba-site-ratings';
 import { getHotSnapshot } from '@/src/lib/snapshot-store';
+import {
+  extractSeasonLeaderPlayers as extractNhlSeasonLeaderPlayers,
+  getPlayerBundle as getNhlPlayerBundle,
+  getScoreboardWindow as getNhlScoreboardWindow,
+  getSeasonLeaders as getNhlSeasonLeaders,
+  getTeams as getNhlTeams,
+  pickSeasonYear as pickNhlSeasonYear,
+} from '@/public/vendor/nhl/src/api.js';
+import {
+  buildFeaturedPlayers as buildNhlFeaturedPlayers,
+  buildPlayerCard as buildNhlPlayerCard,
+} from '@/public/vendor/nhl/src/analytics.js';
 
 const CACHE = new Map();
 
@@ -54,82 +66,6 @@ function uniqBy(items, getKey) {
   return Array.from(map.values());
 }
 
-function walk(node, visit, seen = new WeakSet()) {
-  if (!node || typeof node !== 'object') return;
-  if (seen.has(node)) return;
-  seen.add(node);
-  visit(node);
-  if (Array.isArray(node)) {
-    node.forEach((entry) => walk(entry, visit, seen));
-    return;
-  }
-  Object.values(node).forEach((value) => walk(value, visit, seen));
-}
-
-async function fetchJson(url, ttlMs = 30 * 60 * 1000) {
-  const key = cacheKey(url);
-  const cached = readCache(key);
-  if (cached) return cached;
-
-  const response = await fetch(url, {
-    cache: 'no-store',
-    headers: { Accept: 'application/json' },
-  });
-
-  if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}`);
-  }
-
-  return writeCache(key, await response.json(), ttlMs);
-}
-
-function parseStandings(payload) {
-  const entries = [];
-  walk(payload, (node) => {
-    if (node?.team?.id && Array.isArray(node?.stats)) {
-      const statMap = {};
-      node.stats.forEach((stat) => {
-        if (stat.name) statMap[stat.name.toLowerCase()] = stat.value ?? stat.displayValue ?? 0;
-        if (stat.abbreviation) statMap[stat.abbreviation.toLowerCase()] = stat.value ?? stat.displayValue ?? 0;
-      });
-      entries.push({
-        teamId: String(node.team.id),
-        winPct: Number(statMap.winpercent || statMap.winningpercentage || 0),
-      });
-    }
-  });
-  return Object.fromEntries(entries.map((entry) => [entry.teamId, entry]));
-}
-
-async function fetchLeagueLeaders({ site }) {
-  const payload = await fetchJson(`${site}/leaders`, 60 * 60 * 1000);
-  const leaders = [];
-  walk(payload, (node) => {
-    if (node?.athlete?.id && (node.rank || node.displayValue || node.value)) {
-      leaders.push({
-        athleteId: String(node.athlete.id),
-        label: node.name || node.displayName || node.shortDisplayName || 'Leader',
-        rank: Number(node.rank || 1),
-        value: node.displayValue || node.value || '',
-        athlete: {
-          id: String(node.athlete.id),
-          displayName: node.athlete.displayName || node.athlete.shortName || 'Player',
-          shortName: node.athlete.shortName || node.athlete.displayName || 'Player',
-          headshot: node.athlete.headshot?.href || node.athlete.headshot || '',
-          position:
-            node.athlete.position?.abbreviation ||
-            node.athlete.position?.displayName ||
-            node.athlete.position?.name ||
-            '',
-        },
-        teamId: node.team?.id ? String(node.team.id) : '',
-        teamLogo: node.team?.logo || node.team?.logos?.[0]?.href || '',
-      });
-    }
-  });
-  return uniqBy(leaders, (entry) => `${entry.athleteId}:${entry.label}`);
-}
-
 function positionDifficulty(position = '') {
   const pos = String(position).toUpperCase();
   if (['QB', 'PG', 'C', 'GK', 'SP', 'G'].includes(pos)) return 1;
@@ -156,149 +92,88 @@ async function getMlbTopPlayersSnapshot(limit = 50) {
   return snapshot?.players ? snapshot : { players: [], totalPlayers: 0, lastUpdated: null };
 }
 
-function computeNbaSiteOverall(player) {
-  const stats = player?.realStats;
-  if (!stats?.gp) return 69;
-
-  const baseline = stats?.lastSeason?.gp ? stats.lastSeason : (stats?.career?.gp ? stats.career : null);
-  const baselineOverall = baseline
-    ? clamp(
-        64 +
-          (Number(baseline.ppg || 0) * 0.7) +
-          (Number(baseline.apg || 0) * 1.15) +
-          (Number(baseline.rpg || 0) * 0.62) +
-          ((Number(baseline.spg || 0) + Number(baseline.bpg || 0)) * 2.2) +
-          ((Number(baseline.tsPct || 55) - 55) * 0.32),
-        62,
-        93,
-      )
-    : null;
-
-  const creation = (Number(stats.ppg || 0) * 0.86) + (Number(stats.apg || 0) * 1.32) + (Number(stats.rpg || 0) * 0.58);
-  const disruption = (Number(stats.spg || 0) * 3.6) + (Number(stats.bpg || 0) * 3.4);
-  const efficiency = ((Number(stats.tsPct || 55) - 55) * 0.44) + ((Number(stats.efgPct || 52) - 52) * 0.18);
-  const load = Math.min(6.8, (Number(stats.mpg || 0) - 18) * 0.22);
-  const advanced = ((Number(stats.per || 15) - 15) * 0.36) + (Number(stats.vorp || 0) * 1.15);
-  const ballSecurity = (Number(stats.astTovRatio || 0) - 1.5) * 1.6;
-  const currentOverall = 63 + creation + disruption + efficiency + load + advanced + ballSecurity;
-  const trustedOverall = baselineOverall == null
-    ? currentOverall
-    : (currentOverall * 0.74) + (baselineOverall * 0.26);
-
-  return clamp(Math.round(trustedOverall * 10) / 10, 64, 97.6);
-}
-
 async function getNBACandidates() {
-  const snapshot = await getNbaBootstrapSnapshot();
-  return (snapshot?.playerCatalog || [])
-    .filter((player) => player?.displayName && player?.headshot)
+  const snapshot = await getExactNbaRatedPlayers();
+  return (snapshot?.players || [])
+    .filter((player) => player?.id && player?.displayName && player?.rating?.rating && player?.headshot)
     .map((player) => {
-      const overall = computeNbaSiteOverall(player);
-      const trend = clamp(
-        ((Number(player.realStats?.ppg || 0) - Number(player.realStats?.lastSeason?.ppg || 0)) * 0.7) +
-          ((Number(player.realStats?.tsPct || 55) - Number(player.realStats?.lastSeason?.tsPct || 55)) * 0.16),
-        -4,
-        8,
-      );
+      const overall = Number(player.rating?.ratingNum || player.rating?.rating);
+      if (!Number.isFinite(overall)) return null;
+      const hotness = Number(player.rating?.hotnessScore || 0);
       return {
         id: `nba-${player.id}`,
         playerId: String(player.id),
-        displayName: player.displayName,
+        displayName: player.fullName || player.displayName,
         headshot: player.headshot,
-        position: player.position || 'NBA',
+        position: player.rating?.posAbbrev || player.position?.abbreviation || player.position || 'NBA',
         leagueLabel: 'NBA',
         sportKey: 'nba',
         leagueKey: 'nba',
         overall,
-        overallLabel: overall.toFixed(1),
-        signalCount: player.hasOfficialStats ? 3 : 1,
-        contextScore: clamp(62 + trend * 4, 48, 94),
-        formScore: clamp(60 + trend * 5, 48, 96),
+        overallLabel: player.rating?.rating || overall.toFixed(1),
+        signalCount: player.rating?.hasRealStats ? 3 : 1,
+        contextScore: clamp(overall + hotness * 1.8, 48, 97),
+        formScore: clamp(overall + hotness * 2.4, 48, 98),
         teamAbbr: player.teamAbbr || '',
+        teamLogo: player.teamLogo || '',
       };
     })
+    .filter(Boolean)
     .sort((left, right) => right.overall - left.overall)
     .slice(0, 18);
 }
 
 async function getNHLCandidates() {
-  const site = 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl';
-  const [leaders, standingsPayload] = await Promise.all([
-    fetchLeagueLeaders({ site }),
-    fetchJson(`${site}/standings`, 30 * 60 * 1000),
-  ]);
-  const standings = parseStandings(standingsPayload);
-  const categoryWeights = {
-    points: 16,
-    goals: 14,
-    assists: 12,
-    'save percentage': 14,
-    'save pct': 14,
-    'goals against average': 12,
-    gaa: 12,
-    wins: 10,
-    shutouts: 8,
-    'plus minus': 8,
-    hits: 7,
-    'blocked shots': 7,
-    shots: 8,
-  };
+  const cache = readCache(cacheKey('nhl-exact-candidates'));
+  if (cache) return cache;
 
-  const bucket = new Map();
-  leaders.forEach((entry) => {
-    const current = bucket.get(entry.athleteId) || {
-      athleteId: entry.athleteId,
-      displayName: entry.athlete.displayName,
-      headshot: entry.athlete.headshot || '',
-      position: entry.athlete.position || 'NHL',
-      teamId: entry.teamId,
-      teamLogo: entry.teamLogo || '',
-      categories: [],
-      provisionalScore: 0,
-    };
+  const scoreboard = await getNhlScoreboardWindow();
+  const seasonYear = pickNhlSeasonYear(scoreboard);
+  const teams = await getNhlTeams();
+  const teamsById = Object.fromEntries((teams || []).map((team) => [String(team.id), team]));
+  const seasonLeaders = await getNhlSeasonLeaders(seasonYear);
+  const leaderEntries = extractNhlSeasonLeaderPlayers(seasonLeaders);
+  const featured = buildNhlFeaturedPlayers(leaderEntries, teamsById).slice(0, 12);
+  const cards = await Promise.allSettled(
+    featured.map(async (player) => {
+      const bundle = await getNhlPlayerBundle(player.playerId, seasonYear);
+      return buildNhlPlayerCard(bundle, teamsById);
+    }),
+  );
 
-    const weightKey = String(entry.label || '')
-      .toLowerCase()
-      .replace(/[%]/g, ' pct')
-      .replace(/[^a-z0-9]+/g, ' ')
-      .trim();
-    const weight = categoryWeights[weightKey] || 6;
-    current.provisionalScore += Math.max(0, 18 - Number(entry.rank || 18)) * weight;
-    current.categories.push(entry);
-    bucket.set(entry.athleteId, current);
-  });
-
-  return Array.from(bucket.values())
-    .map((entry) => {
-      const teamBoost = (standings[entry.teamId]?.winPct || 0.5) * 10;
-      const overall = clamp(
-        Math.round(58 + entry.provisionalScore / 18 + teamBoost),
-        55,
-        99,
-      );
-      const bestRank = Math.min(...entry.categories.map((category) => Number(category.rank || 18)));
-      return {
-        id: `nhl-${entry.athleteId}`,
-        playerId: entry.athleteId,
-        displayName: entry.displayName,
-        headshot: entry.headshot || entry.teamLogo || '',
-        position: entry.position,
-        leagueLabel: 'NHL',
-        sportKey: 'nhl',
-        leagueKey: 'nhl',
-        overall,
-        overallLabel: String(overall),
-        signalCount: Math.max(1, Math.min(3, entry.categories.length)),
-        contextScore: clamp(56 + teamBoost * 0.9, 46, 92),
-        formScore: clamp(94 - (bestRank - 1) * 3.2, 44, 96),
-        teamLogo: entry.teamLogo || '',
-      };
-    })
-    .sort((left, right) => right.overall - left.overall)
-    .slice(0, 14);
+  return writeCache(
+    cacheKey('nhl-exact-candidates'),
+    cards
+      .filter((result) => result.status === 'fulfilled' && result.value?.playerId && result.value?.overall)
+      .map((result) => {
+        const card = result.value;
+        const overall = Number(card.overall || 0);
+        return {
+          id: `nhl-${card.playerId}`,
+          playerId: String(card.playerId),
+          displayName: card.fullName || card.shortName || 'NHL Player',
+          headshot: card.headshot || card.team?.logo || '',
+          position: card.position || 'NHL',
+          leagueLabel: 'NHL',
+          sportKey: 'nhl',
+          leagueKey: 'nhl',
+          overall,
+          overallLabel: String(overall),
+          signalCount: card.games >= 20 ? 3 : card.games >= 8 ? 2 : 1,
+          contextScore: clamp(overall + (card.sampleTrust || 0.5) * 7, 46, 97),
+          formScore: clamp(overall + Number(card.hotnessScore || 0) * 2.2, 44, 98),
+          teamLogo: card.team?.logo || '',
+          teamAbbr: card.team?.abbreviation || '',
+        };
+      })
+      .sort((left, right) => right.overall - left.overall)
+      .slice(0, 14),
+    15 * 60 * 1000,
+  );
 }
 
 function buildHubHref(candidate) {
+  if (!candidate?.playerId || !candidate?.sportKey) return null;
   if (candidate.sportKey === 'mlb') {
     return `/mlb?player=${encodeURIComponent(candidate.playerId)}&from=hub`;
   }
@@ -340,7 +215,7 @@ function normalizeSourceCandidates(candidates, sourceWeight) {
       normalizedDominance: Math.round(worldScore * 10) / 10,
       href: buildHubHref(candidate),
     };
-  });
+  }).filter((candidate) => candidate?.href && candidate?.overallLabel && Number.isFinite(Number(candidate?.overall)));
 }
 
 function includeDiversityPicks(sorted) {
@@ -411,7 +286,7 @@ async function getHubCandidates() {
   }));
 
   const genericCandidates = (board, sportKey, leagueLabel) =>
-    (board.featuredPlayers || []).slice(0, 12).map((player, index) => ({
+    (board?.playersCatalog?.players || board?.featuredPlayers || []).slice(0, 16).map((player, index) => ({
       id: `${sportKey}-${player.id}`,
       playerId: String(player.id),
       displayName: player.displayName,
@@ -427,11 +302,11 @@ async function getHubCandidates() {
       formScore: clamp(Number(player.rating || 72) + (String(player.tier || '').toLowerCase().includes('elite') ? 4 : 0), 48, 96),
       teamAbbr: player.team?.abbreviation || '',
       teamLogo: player.team?.logo || '',
-    }));
+    })).filter((player) => player.playerId && Number.isFinite(player.overall));
 
   const footballCandidates = footballBoards.flatMap(({ leagueKey, board }) => {
     const league = FOOTBALL_LEAGUES[leagueKey];
-    return (board?.featuredPlayers || []).slice(0, 8).map((player, index) => ({
+    return (board?.playersCatalog?.players || board?.featuredPlayers || []).slice(0, 12).map((player, index) => ({
       id: `${leagueKey}-${player.id}`,
       playerId: String(player.id),
       displayName: player.displayName,
@@ -453,7 +328,7 @@ async function getHubCandidates() {
       formScore: clamp(Number(player.rating || 72) + Math.max(0, 5 - index), 48, 96),
       teamAbbr: player.team?.abbreviation || '',
       teamLogo: player.team?.logo || '',
-    }));
+    })).filter((player) => player.playerId && Number.isFinite(player.overall));
   });
 
   return {

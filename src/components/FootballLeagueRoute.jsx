@@ -4,10 +4,12 @@ import { useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import FootballIntroGate from '@/src/components/FootballIntroGate';
 import FootballLeagueApp from '@/src/components/FootballLeagueApp';
+import useCompositeTheme from '@/src/hooks/useCompositeTheme';
 import { getFootballLeagueConfig } from '@/src/lib/football';
 
 export default function FootballLeagueRoute({ leagueKey }) {
   const config = getFootballLeagueConfig(leagueKey);
+  const { theme, toggleTheme } = useCompositeTheme(`football-${leagueKey}`);
   const searchParams = useSearchParams();
   const initialEntry = {
     playerId: searchParams.get('player') || null,
@@ -29,7 +31,7 @@ export default function FootballLeagueRoute({ leagueKey }) {
       accent={config.accent}
       accentAlt={config.accentAlt}
     >
-      <FootballLeagueApp leagueKey={leagueKey} initialEntry={initialEntry} />
+      <FootballLeagueApp leagueKey={leagueKey} initialEntry={initialEntry} theme={theme} toggleTheme={toggleTheme} />
     </FootballIntroGate>
   );
 }

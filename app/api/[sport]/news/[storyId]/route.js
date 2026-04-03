@@ -5,8 +5,7 @@ import { isGenericSport } from '@/src/lib/generic-sports';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request, { params }) {
-  const sport = params?.sport;
-  const storyId = params?.storyId;
+  const { sport, storyId } = await params;
 
   if (!isGenericSport(sport)) {
     return NextResponse.json({ error: 'Unsupported sport' }, { status: 404 });

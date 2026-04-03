@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import FootballIntroGate from '@/src/components/FootballIntroGate';
+import RouteThemeToggle from '@/src/components/RouteThemeToggle';
+import useCompositeTheme from '@/src/hooks/useCompositeTheme';
 
 function formatKickoff(value) {
   if (!value) return 'Kickoff TBD';
@@ -40,6 +42,7 @@ function FootballRecordLine({ record, fallback }) {
 }
 
 export default function FootballLandingRoute() {
+  const { theme, toggleTheme } = useCompositeTheme('football');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -77,16 +80,19 @@ export default function FootballLandingRoute() {
       accent="#8db1ff"
       accentAlt="#edf3ff"
     >
-      <section className="football-landing-shell">
+      <section className="football-landing-shell" data-theme={theme}>
         <header className="football-landing-hero">
           <div className="football-landing-copy">
             <p className="eyebrow">COMPOSITE Sports</p>
             <h1>Composite Football</h1>
             <p>{data?.subtitle || 'The global football selector is syncing the marquee board and league hubs.'}</p>
           </div>
-          <Link href="/" className="football-hub-link">
-            Back To Hub
-          </Link>
+          <div className="route-shell-actions">
+            <RouteThemeToggle theme={theme} onToggle={toggleTheme} compact />
+            <Link href="/" className="football-hub-link">
+              Back To Hub
+            </Link>
+          </div>
         </header>
 
         <section className="football-marquee-board">

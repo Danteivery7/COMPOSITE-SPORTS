@@ -230,6 +230,31 @@ function toggleTheme() {
   state.settings.theme = state.settings.theme === "dark" ? "light" : "dark";
   saveSettings();
   render();
+  broadcastTheme();
+}
+
+function setTheme(theme) {
+  if (theme !== "dark" && theme !== "light") return;
+  if (state.settings.theme === theme) return;
+  state.settings.theme = theme;
+  saveSettings();
+  render();
+  broadcastTheme();
+}
+
+function broadcastTheme() {
+  try {
+    window.parent.postMessage(
+      {
+        type: "composite-theme-changed",
+        sport: "nhl",
+        theme: state.settings.theme,
+      },
+      window.location.origin,
+    );
+  } catch (_error) {
+    return null;
+  }
 }
 
 async function loadBaseData(force = false) {
@@ -439,6 +464,14 @@ function handleAppClick(event) {
 }
 
 function wireEvents() {
+  window.addEventListener("message", (event) => {
+    if (event.origin !== window.location.origin) return;
+    const data = event.data || {};
+    if (data?.type === "composite-theme" && data?.sport === "nhl" && (data?.theme === "dark" || data?.theme === "light")) {
+      setTheme(data.theme);
+    }
+  });
+
   window.addEventListener("hashchange", () => {
     state.route = parseRoute(location.hash);
     ensureRouteData();

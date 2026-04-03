@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import StoryDetailCard from '@/src/components/StoryDetailCard';
+import RouteThemeToggle from '@/src/components/RouteThemeToggle';
 import { getFootballLeagueConfig } from '@/src/lib/football';
 
 const NAV_ITEMS = [
@@ -591,7 +592,7 @@ function GameDetailView({ detail, predictors, setPage }) {
   );
 }
 
-export default function FootballLeagueApp({ leagueKey, initialEntry = null }) {
+export default function FootballLeagueApp({ leagueKey, initialEntry = null, theme = 'dark', toggleTheme = () => {} }) {
   const leagueConfig = getFootballLeagueConfig(leagueKey);
   const apiBase = `/api/football/${leagueKey}`;
   const [page, setPage] = useState('overview');
@@ -769,6 +770,7 @@ export default function FootballLeagueApp({ leagueKey, initialEntry = null }) {
   return (
     <section
       className="football-league-shell"
+      data-theme={theme}
       style={{
         '--football-league-accent': leagueConfig.accent,
         '--football-league-accent-alt': leagueConfig.accentAlt,
@@ -822,6 +824,7 @@ export default function FootballLeagueApp({ leagueKey, initialEntry = null }) {
             <button className="football-refresh football-menu-button" type="button" onClick={() => setMobileNavOpen((value) => !value)}>
               Menu
             </button>
+            <RouteThemeToggle theme={theme} onToggle={toggleTheme} compact />
             <button className="football-refresh" type="button" onClick={fetchBootstrap}>
               Refresh
             </button>

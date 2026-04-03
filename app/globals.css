@@ -12,6 +12,7 @@
   --radius-lg: 26px;
   --radius-md: 18px;
   --radius-sm: 12px;
+  --hub-marquee-duration: 34s;
 }
 
 *,
@@ -1131,6 +1132,113 @@ body[data-composite-route='hub'] {
 .generic-route-shell,
 .mlb-route-shell {
   min-height: 100vh;
+}
+
+.route-shell-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.route-shell-actions-hub {
+  position: fixed;
+  top: 18px;
+  right: 28px;
+  z-index: 35;
+}
+
+.route-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(10, 16, 28, 0.78);
+  color: #eef4ff;
+  cursor: pointer;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(18px);
+}
+
+.route-theme-toggle.is-compact {
+  padding: 10px 12px;
+}
+
+.route-theme-toggle-label {
+  font-size: 0.76rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.route-theme-toggle-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.9rem;
+}
+
+.hub-page[data-theme='light'],
+.generic-route-shell[data-theme='light'],
+.football-landing-shell[data-theme='light'],
+.football-league-shell[data-theme='light'],
+.vendor-shell[data-theme='light'] {
+  color-scheme: light;
+  --bg: #edf2fa;
+  --surface: rgba(255, 255, 255, 0.88);
+  --surface-strong: rgba(250, 252, 255, 0.96);
+  --border: rgba(15, 23, 42, 0.12);
+  --text: #102038;
+  --muted: #566781;
+  --shadow: 0 18px 46px rgba(15, 23, 42, 0.12);
+}
+
+.hub-page[data-theme='light'] {
+  background:
+    radial-gradient(circle at 16% -8%, rgba(255, 190, 118, 0.18), transparent 28%),
+    radial-gradient(circle at 84% 10%, rgba(96, 164, 255, 0.16), transparent 22%),
+    linear-gradient(180deg, #eef4fb 0%, #dfe8f4 100%);
+}
+
+.hub-page[data-theme='light'] .route-theme-toggle,
+.generic-route-shell[data-theme='light'] .route-theme-toggle,
+.football-landing-shell[data-theme='light'] .route-theme-toggle,
+.football-league-shell[data-theme='light'] .route-theme-toggle,
+.vendor-shell[data-theme='light'] .route-theme-toggle {
+  background: rgba(255, 255, 255, 0.86);
+  color: #13243e;
+  border-color: rgba(17, 24, 39, 0.12);
+}
+
+.generic-route-shell[data-theme='light'] .generic-sidebar,
+.generic-route-shell[data-theme='light'] .generic-stage,
+.generic-route-shell[data-theme='light'] .generic-card,
+.generic-route-shell[data-theme='light'] .generic-loading,
+.football-landing-shell[data-theme='light'] .football-card,
+.football-landing-shell[data-theme='light'] .football-marquee-board,
+.football-landing-shell[data-theme='light'] .football-top-player-board,
+.football-landing-shell[data-theme='light'] .football-league-selector,
+.football-league-shell[data-theme='light'] .football-sidebar,
+.football-league-shell[data-theme='light'] .football-stage,
+.football-league-shell[data-theme='light'] .football-panel,
+.vendor-shell[data-theme='light'] .vendor-topbar {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(15, 23, 42, 0.12);
+  box-shadow: 0 18px 46px rgba(15, 23, 42, 0.1);
+}
+
+.generic-route-shell[data-theme='light'],
+.football-landing-shell[data-theme='light'],
+.football-league-shell[data-theme='light'],
+.vendor-shell[data-theme='light'] {
+  color: var(--text);
 }
 
 .vendor-topbar,
@@ -2291,9 +2399,9 @@ body[data-composite-route='hub'] {
 body[data-composite-route='hub'] {
   color-scheme: dark;
   background:
-    radial-gradient(circle at 16% -8%, rgba(68, 120, 255, 0.24), transparent 28%),
-    radial-gradient(circle at 84% 10%, rgba(255, 116, 66, 0.14), transparent 22%),
-    linear-gradient(180deg, #040711 0%, #07101c 100%);
+    radial-gradient(circle at 16% -8%, rgba(255, 183, 120, 0.14), transparent 28%),
+    radial-gradient(circle at 84% 10%, rgba(80, 183, 255, 0.1), transparent 22%),
+    linear-gradient(180deg, #05070b 0%, #0a0f17 100%);
 }
 
 body[data-composite-route='football'] {
@@ -3676,7 +3784,7 @@ body[data-composite-route='football'] {
   gap: 18px;
   overflow-x: auto;
   padding-bottom: 8px;
-  scroll-snap-type: x proximity;
+  scroll-snap-type: x mandatory;
   scrollbar-width: none;
 }
 
@@ -3719,6 +3827,12 @@ body[data-composite-route='football'] {
   font-size: clamp(1.2rem, 2vw, 1.8rem);
 }
 
+.hub-module-helper {
+  margin: 8px 0 0;
+  color: rgba(229, 237, 255, 0.7);
+  font-size: 0.92rem;
+}
+
 .hub-module-head > span {
   color: rgba(224, 231, 255, 0.8);
   font-size: 0.8rem;
@@ -3747,6 +3861,7 @@ body[data-composite-route='football'] {
   align-items: stretch;
   gap: 16px;
   width: 100%;
+  min-height: 260px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -3760,6 +3875,7 @@ body[data-composite-route='football'] {
 .hub-card-image {
   width: 100%;
   object-fit: cover;
+  display: block;
 }
 
 .hub-story-feature-image {
@@ -3794,6 +3910,10 @@ body[data-composite-route='football'] {
 .hub-story-feature strong {
   margin-top: 10px;
   font-size: clamp(1.35rem, 2.4vw, 2rem);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .hub-story-feature p,
@@ -3871,6 +3991,7 @@ body[data-composite-route='football'] {
 
 .hub-story-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
 }
 
 .hub-story-card {
@@ -3878,10 +3999,12 @@ body[data-composite-route='football'] {
   flex-direction: column;
   gap: 0;
   padding: 0;
+  min-height: 340px;
   overflow: hidden;
   text-align: left;
   color: inherit;
   cursor: pointer;
+  height: 100%;
 }
 
 .hub-story-card-image {
@@ -3889,7 +4012,10 @@ body[data-composite-route='football'] {
 }
 
 .hub-story-card-copy {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
   padding: 14px 14px 16px;
+  min-height: 166px;
 }
 
 .hub-bet-grid {
@@ -3898,6 +4024,38 @@ body[data-composite-route='football'] {
 
 .hub-bet-card {
   padding: 16px;
+  background:
+    linear-gradient(180deg, rgba(9, 33, 22, 0.92), rgba(6, 20, 14, 0.94)),
+    radial-gradient(circle at top right, rgba(92, 255, 166, 0.16), transparent 48%);
+  border-color: rgba(118, 255, 178, 0.16);
+}
+
+.hub-bet-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.hub-bet-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(118, 255, 178, 0.18);
+  background: rgba(12, 54, 31, 0.64);
+  color: #c8ffe0;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hub-bet-chip.is-strong {
+  border-color: rgba(255, 232, 152, 0.26);
+  background: rgba(78, 60, 10, 0.5);
+  color: #ffe8a3;
 }
 
 .hub-story-card.is-loading,
@@ -3944,6 +4102,7 @@ body[data-composite-route='football'] {
 .hub-card-compact {
   min-height: 17rem;
   scroll-snap-align: start;
+  scroll-snap-stop: always;
 }
 
 .hub-card-compact h2 {
@@ -4005,6 +4164,27 @@ body[data-composite-route='football'] {
   align-items: center;
 }
 
+.hub-sport-rail-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.hub-sport-rail-pager button {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+}
+
+.hub-sport-rail-pager button.is-active {
+  width: 26px;
+  background: linear-gradient(90deg, rgba(116, 255, 188, 0.9), rgba(118, 171, 255, 0.92));
+}
+
 .hub-story-dots {
   display: flex;
   align-items: center;
@@ -4037,14 +4217,11 @@ body[data-composite-route='football'] {
   align-items: center;
   gap: 12px;
   width: max-content;
+  animation: hubMarquee var(--hub-marquee-duration) linear infinite;
 }
 
 .hub-story-marquee-track {
-  animation: hubMarquee 26s linear infinite;
-}
-
-.hub-live-ticker-track {
-  animation: hubMarquee 28.6s linear infinite;
+  animation-duration: var(--hub-marquee-duration);
 }
 
 .hub-story-marquee-pill {
@@ -4073,13 +4250,13 @@ body[data-composite-route='football'] {
   width: min(96rem, calc(100vw - 56px));
   transform: translateX(-50%);
   overflow: hidden;
-  padding: 12px 0;
+  padding: 10px 0;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background:
-    linear-gradient(90deg, rgba(17, 17, 22, 0.94), rgba(9, 10, 14, 0.98)),
-    radial-gradient(circle at top, rgba(186, 114, 73, 0.14), transparent 44%);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    linear-gradient(90deg, rgba(13, 16, 23, 0.94), rgba(8, 10, 15, 0.98)),
+    radial-gradient(circle at top, rgba(118, 171, 255, 0.12), transparent 44%);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.24);
 }
 
 .hub-live-ticker-item {
@@ -4107,6 +4284,80 @@ body[data-composite-route='football'] {
   width: 20px;
   height: 20px;
   object-fit: contain;
+}
+
+.hub-story-card strong {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.hub-story-card p {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.hub-bet-card strong {
+  color: #f3fff8;
+}
+
+.hub-bet-card p {
+  color: rgba(215, 255, 229, 0.82);
+}
+
+.hub-bet-card-top span:last-child,
+.hub-bet-card-bottom span:first-child {
+  color: #8ff3b4;
+}
+
+.hub-page[data-theme='light'] .hub-hero-story-card,
+.hub-page[data-theme='light'] .hub-hero-bets-card,
+.hub-page[data-theme='light'] .hub-story-board,
+.hub-page[data-theme='light'] .hub-bet-board,
+.hub-page[data-theme='light'] .hub-world-board {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(246, 249, 253, 0.94)),
+    radial-gradient(circle at top right, rgba(120, 167, 255, 0.1), transparent 48%);
+  border-color: rgba(15, 23, 42, 0.1);
+}
+
+.hub-page[data-theme='light'] .hub-story-card,
+.hub-page[data-theme='light'] .hub-bet-card,
+.hub-page[data-theme='light'] .hub-bet-mini-card,
+.hub-page[data-theme='light'] .hub-parlay-summary > div,
+.hub-page[data-theme='light'] .hub-world-card,
+.hub-page[data-theme='light'] .hub-story-marquee-pill,
+.hub-page[data-theme='light'] .hub-live-ticker,
+.hub-page[data-theme='light'] .hub-bet-chip {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(15, 23, 42, 0.1);
+  color: #13243e;
+}
+
+.hub-page[data-theme='light'] .hub-bet-chip.is-strong {
+  background: rgba(255, 242, 204, 0.94);
+  border-color: rgba(168, 132, 44, 0.18);
+  color: #6a4f10;
+}
+
+.hub-page[data-theme='light'] .hub-live-ticker-item,
+.hub-page[data-theme='light'] .hub-module-helper,
+.hub-page[data-theme='light'] .hub-story-feature p,
+.hub-page[data-theme='light'] .hub-story-card p {
+  color: #51647f;
+}
+
+.story-detail-back-bar {
+  position: sticky;
+  top: 14px;
+  z-index: 8;
+  display: flex;
+  justify-content: flex-start;
+  padding: 8px 0 2px;
+  backdrop-filter: blur(10px);
 }
 
 @keyframes hubMarquee {
@@ -4383,7 +4634,10 @@ body[data-composite-route='football'] {
   }
 
   .hub-sport-rail {
-    grid-auto-columns: 84vw;
+    grid-auto-columns: calc(100vw - 58px);
+    gap: 14px;
+    padding-inline: 10px 18px;
+    scroll-padding-left: 10px;
   }
 
   .hub-card-image {
@@ -4401,6 +4655,19 @@ body[data-composite-route='football'] {
     top: 10px;
     width: calc(100vw - 20px);
     border-radius: 24px;
+  }
+
+  .route-shell-actions-hub {
+    top: 64px;
+    right: 16px;
+  }
+
+  .hub-sport-rail-pager {
+    margin-top: 14px;
+  }
+
+  .story-detail-back-bar {
+    top: 10px;
   }
 
   .sport-intro-baseline,

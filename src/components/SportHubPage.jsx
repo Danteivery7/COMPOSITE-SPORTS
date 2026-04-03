@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getSportCards, SPORT_CONFIGS } from '@/src/data/sports';
 import StoryDetailCard from '@/src/components/StoryDetailCard';
+import RouteThemeToggle from '@/src/components/RouteThemeToggle';
+import useCompositeTheme from '@/src/hooks/useCompositeTheme';
 
 function MoneylineTag({ value }) {
   if (!value) return null;
@@ -14,13 +16,24 @@ function compactSportSubtitle(card) {
   return card.spotlight?.subhead || card.hoverLabel || card.theme?.hoverCue || 'Open board';
 }
 
+function getSportRailStep(rail) {
+  if (!rail) return 320;
+  const card = rail.querySelector('.hub-card-compact');
+  if (!card) return Math.max(320, rail.clientWidth * 0.88);
+  const styles = window.getComputedStyle(rail);
+  const gap = Number.parseFloat(styles.columnGap || styles.gap || '18') || 18;
+  return card.getBoundingClientRect().width + gap;
+}
+
 export default function SportHubPage() {
   const cards = getSportCards();
   const sportRailRef = useRef(null);
+  const { theme, toggleTheme } = useCompositeTheme('hub');
   const [hero, setHero] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeStory, setActiveStory] = useState(null);
   const [storyIndex, setStoryIndex] = useState(0);
+  const [activeSportIndex, setActiveSportIndex] = useState(0);
 
   useEffect(() => {
     document.documentElement.removeAttribute('data-theme');
@@ -78,9 +91,40 @@ export default function SportHubPage() {
     return () => window.clearInterval(timer);
   }, [heroStories.length]);
 
+  useEffect(() => {
+    const rail = sportRailRef.current;
+    if (!rail) return undefined;
+
+    const updateActiveIndex = () => {
+      const step = Math.max(1, getSportRailStep(rail));
+      setActiveSportIndex(Math.max(0, Math.min(cards.length - 1, Math.round(rail.scrollLeft / step))));
+    };
+
+    updateActiveIndex();
+    rail.addEventListener('scroll', updateActiveIndex, { passive: true });
+    window.addEventListener('resize', updateActiveIndex);
+    return () => {
+      rail.removeEventListener('scroll', updateActiveIndex);
+      window.removeEventListener('resize', updateActiveIndex);
+    };
+  }, [cards.length]);
+
   function shiftSportRail(direction) {
-    sportRailRef.current?.scrollBy({
-      left: direction * 320,
+    const rail = sportRailRef.current;
+    if (!rail) return;
+    const step = getSportRailStep(rail);
+    rail.scrollBy({
+      left: direction * step,
+      behavior: 'smooth',
+    });
+  }
+
+  function jumpToSport(index) {
+    const rail = sportRailRef.current;
+    if (!rail) return;
+    const step = getSportRailStep(rail);
+    rail.scrollTo({
+      left: step * index,
       behavior: 'smooth',
     });
   }
@@ -96,9 +140,12 @@ export default function SportHubPage() {
 
   if (activeStory) {
     return (
-      <main className="hub-page hub-story-page">
+      <main className="hub-page hub-story-page" data-theme={theme}>
         <div className="hub-aurora aurora-a" aria-hidden="true" />
         <div className="hub-aurora aurora-b" aria-hidden="true" />
+        <div className="route-shell-actions route-shell-actions-hub">
+          <RouteThemeToggle theme={theme} onToggle={toggleTheme} compact />
+        </div>
         <StoryDetailCard
           story={activeStory}
           backLabel="Back to main menu"
@@ -110,13 +157,17 @@ export default function SportHubPage() {
   }
 
   return (
-    <main className={`hub-page ${tickerLoop.length ? 'hub-page-has-ticker' : ''}`}>
+      <main className={`hub-page ${tickerLoop.length ? 'hub-page-has-ticker' : ''}`} data-theme={theme}>
       <div className="hub-aurora aurora-a" aria-hidden="true" />
       <div className="hub-aurora aurora-b" aria-hidden="true" />
       <div className="hub-aurora aurora-c" aria-hidden="true" />
       <div className="hub-gridline" aria-hidden="true" />
       <div className="hub-orbit orbit-a" aria-hidden="true" />
       <div className="hub-orbit orbit-b" aria-hidden="true" />
+
+      <div className="route-shell-actions route-shell-actions-hub">
+        <RouteThemeToggle theme={theme} onToggle={toggleTheme} compact />
+      </div>
 
       {tickerLoop.length ? (
         <section className="hub-live-ticker" aria-label="Composite Sports live ticker">
@@ -244,8 +295,9 @@ export default function SportHubPage() {
       <section className="hub-sport-rail-section">
         <div className="hub-module-head">
           <div>
-            <p className="eyebrow">All Sports</p>
-            <h2>Jump Straight Into Any Board</h2>
+            <p className="eyebrow">COMPOSITE Sites</p>
+            <h2>Choose A Site To Enter</h2>
+            <p className="hub-module-helper">Swipe or click through the live sport sites below.</p>
           </div>
           <div className="hub-rail-controls">
             <button type="button" onClick={() => shiftSportRail(-1)} aria-label="Previous sports">
@@ -285,6 +337,17 @@ export default function SportHubPage() {
                 <span className="hub-card-cta">Open</span>
               </div>
             </Link>
+          ))}
+        </div>
+        <div className="hub-sport-rail-pager" aria-label="Composite sites pages">
+          {enhancedCards.map((card, index) => (
+            <button
+              key={`${card.key}-pager`}
+              type="button"
+              className={index === activeSportIndex ? 'is-active' : ''}
+              aria-label={`Show ${card.label}`}
+              onClick={() => jumpToSport(index)}
+            />
           ))}
         </div>
       </section>
@@ -363,7 +426,7 @@ export default function SportHubPage() {
           <span>{hero?.lastUpdated ? `Updated ${new Date(hero.lastUpdated).toLocaleTimeString()}` : 'Sync pending'}</span>
         </div>
         <div className="hub-bet-grid">
-          {bets.length
+              {bets.length
             ? bets.map((bet) => (
                 <article className="hub-bet-card" key={`${bet.league}-${bet.gameId}`}>
                   <div className="hub-bet-card-top">
@@ -379,6 +442,10 @@ export default function SportHubPage() {
                       <strong>{bet.selection}</strong>
                       <p>{bet.lineType}</p>
                     </div>
+                  </div>
+                  <div className="hub-bet-chip-row">
+                    {Number.isFinite(Number(bet.winProbability)) ? <span className="hub-bet-chip">Model {Math.round(Number(bet.winProbability))}%</span> : null}
+                    {Number.isFinite(Number(bet.edgeMagnitude)) ? <span className="hub-bet-chip is-strong">Edge {Number(bet.edgeMagnitude).toFixed(1)}</span> : null}
                   </div>
                   <div className="hub-bet-card-bottom">
                     <span>{bet.projectedScore}</span>

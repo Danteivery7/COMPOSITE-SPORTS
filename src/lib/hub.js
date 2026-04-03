@@ -997,11 +997,15 @@ async function buildHubHeroSnapshot() {
   };
 
   Object.entries(fallbackMap).forEach(([sportKey, player]) => {
-    if (!cardSpotlights[sportKey] && player) {
+    const existing = cardSpotlights[sportKey];
+    if (!player) return;
+
+    if (!existing || !existing.image) {
       cardSpotlights[sportKey] = {
-        image: player.headshot || '',
-        league: player.leagueLabel,
-        headline: `${player.displayName} • ${player.position}`,
+        image: existing?.image || player.headshot || player.teamLogo || '',
+        league: existing?.league || player.leagueLabel,
+        headline: existing?.headline || `${player.displayName} • ${player.position}`,
+        subhead: existing?.subhead || player.teamAbbr || '',
       };
     }
   });

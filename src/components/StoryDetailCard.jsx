@@ -3,9 +3,11 @@
 export default function StoryDetailCard({ story, onBack, backLabel = 'Back', onOpenRelated }) {
   return (
     <section className="story-detail-shell">
-      <button className="generic-back-button story-detail-back" type="button" onClick={onBack}>
-        {backLabel}
-      </button>
+      <div className="story-detail-back-bar">
+        <button className="generic-back-button story-detail-back" type="button" onClick={onBack}>
+          ← {backLabel}
+        </button>
+      </div>
 
       <article className="generic-card story-detail-card">
         <div className="story-detail-head">

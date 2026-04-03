@@ -267,6 +267,30 @@ const store = {
         document.body.setAttribute('data-theme', this.state.settings.theme);
         this.saveState();
         this.notify('settings');
+        this.broadcastTheme();
+    },
+
+    setTheme(theme) {
+        if (theme !== 'light' && theme !== 'dark') return;
+        if (this.state.settings.theme === theme) return;
+        this.state.settings.theme = theme;
+        document.body.setAttribute('data-theme', this.state.settings.theme);
+        this.saveState();
+        this.notify('settings');
+        this.broadcastTheme();
+    },
+
+    broadcastTheme() {
+        try {
+            window.parent.postMessage(
+                {
+                    type: 'composite-theme-changed',
+                    sport: 'nba',
+                    theme: this.state.settings.theme,
+                },
+                window.location.origin
+            );
+        } catch (_error) {}
     },
 
     setPreset(preset) {
@@ -291,3 +315,11 @@ const store = {
 
 window.store = store;
 window.store.init();
+
+window.addEventListener('message', (event) => {
+    if (event.origin !== window.location.origin) return;
+    const data = event.data || {};
+    if (data?.type === 'composite-theme' && data?.sport === 'nba' && (data?.theme === 'light' || data?.theme === 'dark')) {
+        window.store.setTheme(data.theme);
+    }
+});

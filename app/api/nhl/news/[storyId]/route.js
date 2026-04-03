@@ -4,7 +4,7 @@ import { fetchEspnStoryDetail } from '@/src/lib/espn-news';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request, { params }) {
-  const storyId = params?.storyId;
+  const { storyId } = await params;
   const apiHref = request.nextUrl.searchParams.get('apiHref') || '';
 
   if (!storyId) {

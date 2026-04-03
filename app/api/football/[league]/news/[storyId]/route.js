@@ -5,8 +5,7 @@ import { isFootballLeague } from '@/src/lib/football';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request, { params }) {
-  const league = params?.league;
-  const storyId = params?.storyId;
+  const { league, storyId } = await params;
 
   if (!isFootballLeague(league)) {
     return NextResponse.json({ error: 'Unsupported league' }, { status: 404 });
