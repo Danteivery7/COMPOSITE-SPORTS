@@ -3,6 +3,7 @@ import { extractEspnOdds, moneylineToProbability } from '@/src/lib/odds';
 import { compareByStartTime, getEasternDateKey, isSameEasternDate } from '@/src/lib/time';
 
 const CACHE = new Map();
+const DEFAULT_HEADSHOT = 'https://a.espncdn.com/i/headshots/nophoto.png';
 
 export const FOOTBALL_LEAGUES = {
   mls: {
@@ -108,6 +109,18 @@ function uniqBy(items, getKey) {
   const map = new Map();
   items.forEach((item) => map.set(getKey(item), item));
   return Array.from(map.values());
+}
+
+function resolveFootballHeadshot(playerId, ...sources) {
+  for (const source of sources) {
+    if (typeof source === 'string' && source.trim()) {
+      return source;
+    }
+  }
+
+  const id = String(playerId || '').trim();
+  if (!id) return DEFAULT_HEADSHOT;
+  return `https://a.espncdn.com/i/headshots/soccer/players/full/${id}.png`;
 }
 
 function walk(node, visit, seen = new WeakSet()) {
@@ -896,7 +909,11 @@ async function fetchLeaders(leagueKey) {
             id: String(node.athlete.id),
             displayName: node.athlete.displayName || node.athlete.shortName || 'Player',
             shortName: node.athlete.shortName || node.athlete.displayName || 'Player',
-            headshot: node.athlete.headshot?.href || node.athlete.headshot || '',
+            headshot: resolveFootballHeadshot(
+              node.athlete.id,
+              node.athlete.headshot?.href,
+              node.athlete.headshot,
+            ),
             position:
               node.athlete.position?.abbreviation ||
               node.athlete.position?.displayName ||
@@ -941,7 +958,11 @@ function parseRosterPlayers(payload, team) {
         position: node.position?.abbreviation || node.position?.displayName || node.position?.name || '',
         jersey: node.jersey || '',
         age: node.age || null,
-        headshot: node.headshot?.href || node.headshot || '',
+        headshot: resolveFootballHeadshot(
+          node.id,
+          node.headshot?.href,
+          node.headshot,
+        ),
         team,
         statistics: flattenedStats.statMap,
         statFeed: flattenedStats.statFeed,
@@ -994,7 +1015,7 @@ async function getPlayerCatalog(leagueKey) {
         displayName: leader.athlete.displayName,
         shortName: leader.athlete.shortName,
         position: leader.athlete.position || 'F',
-        headshot: leader.athlete.headshot || '',
+        headshot: resolveFootballHeadshot(leader.athleteId, leader.athlete.headshot),
         team,
         statistics: {},
         statFeed: [],

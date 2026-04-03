@@ -186,7 +186,16 @@ export default function FootballLandingRoute() {
                   </div>
                   <div className="football-top-player-body">
                     {player.headshot ? (
-                      <img src={player.headshot} alt={player.displayName} className="football-player-headshot is-large" />
+                      <img
+                        src={player.headshot}
+                        alt={player.displayName}
+                        className="football-player-headshot is-large"
+                        onError={(event) => {
+                          if (event.currentTarget.dataset.fallbackApplied === '1') return;
+                          event.currentTarget.dataset.fallbackApplied = '1';
+                          event.currentTarget.src = 'https://a.espncdn.com/i/headshots/nophoto.png';
+                        }}
+                      />
                     ) : (
                       <span className="football-logo-fallback">{player.displayName?.slice(0, 2)?.toUpperCase() || 'PL'}</span>
                     )}

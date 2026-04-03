@@ -53,7 +53,18 @@ function PlayerVisual({ player }) {
   if (!player?.headshot) {
     return <span className="football-logo-fallback">{player?.displayName?.slice(0, 2)?.toUpperCase() || 'PL'}</span>;
   }
-  return <img src={player.headshot} alt={player.displayName} className="football-player-headshot" />;
+  return (
+    <img
+      src={player.headshot}
+      alt={player.displayName}
+      className="football-player-headshot"
+      onError={(event) => {
+        if (event.currentTarget.dataset.fallbackApplied === '1') return;
+        event.currentTarget.dataset.fallbackApplied = '1';
+        event.currentTarget.src = 'https://a.espncdn.com/i/headshots/nophoto.png';
+      }}
+    />
+  );
 }
 
 function GameCard({ game, onOpen }) {
