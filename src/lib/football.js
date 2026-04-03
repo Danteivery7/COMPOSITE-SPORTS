@@ -4,6 +4,8 @@ import { compareByStartTime, getEasternDateKey, isSameEasternDate } from '@/src/
 
 const CACHE = new Map();
 const DEFAULT_HEADSHOT = 'https://a.espncdn.com/i/headshots/nophoto.png';
+const FINAL_VISIBILITY_HOURS = 12;
+const MATCH_DURATION_HOURS = 2.5;
 
 export const FOOTBALL_LEAGUES = {
   mls: {
@@ -256,6 +258,14 @@ function toFiniteNumber(value, fallback = 0) {
 
 function clampNumber(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function isExpiredFinalGame(startTime, state, { durationHours = MATCH_DURATION_HOURS, visibilityHours = FINAL_VISIBILITY_HOURS } = {}) {
+  if (String(state || '').toLowerCase() !== 'post' || !startTime) return false;
+  const startMs = new Date(startTime).getTime();
+  if (!Number.isFinite(startMs)) return false;
+  const expiresAt = startMs + ((durationHours + visibilityHours) * 60 * 60 * 1000);
+  return Date.now() > expiresAt;
 }
 
 function parseRecordSummary(summary = '') {
@@ -869,7 +879,7 @@ async function fetchScoreboard(leagueKey) {
         winner: home?.winner || false,
       },
     };
-  });
+  }).filter((game) => !isExpiredFinalGame(game.startTime, game.state));
   return writeCache(key, games, 45 * 1000);
 }
 

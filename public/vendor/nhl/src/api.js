@@ -9,6 +9,9 @@ import {
   sleep,
 } from "./utils.js";
 
+const FINAL_VISIBILITY_HOURS = 12;
+const GAME_DURATION_HOURS = 3;
+
 async function fetchJson(url, options = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeout ?? 14000);
@@ -136,6 +139,15 @@ async function mapWithConcurrency(items, mapper, concurrency = 6) {
   return results;
 }
 
+function isExpiredFinalEvent(event, { durationHours = GAME_DURATION_HOURS, visibilityHours = FINAL_VISIBILITY_HOURS } = {}) {
+  const state = String(event?.status?.type?.state || event?.competitions?.[0]?.status?.type?.state || "").toLowerCase();
+  if (state !== "post") return false;
+  const startMs = new Date(event?.date || event?.competitions?.[0]?.date || 0).getTime();
+  if (!Number.isFinite(startMs)) return false;
+  const expiresAt = startMs + ((durationHours + visibilityHours) * 60 * 60 * 1000);
+  return Date.now() > expiresAt;
+}
+
 function resolveStandingsUrl(seasonYear) {
   return `${API.core}/seasons/${seasonYear}/types/2/groups/9/standings/0?lang=en&region=us`;
 }
@@ -172,7 +184,9 @@ export async function getScoreboardWindow(force = false) {
   );
 
   const primary = payloads[payloads.length - 1] || {};
-  const events = payloads.flatMap((payload) => payload?.events || []);
+  const events = payloads
+    .flatMap((payload) => payload?.events || [])
+    .filter((event) => !isExpiredFinalEvent(event));
 
   return {
     ...primary,
