@@ -12,7 +12,7 @@
   --radius-lg: 26px;
   --radius-md: 18px;
   --radius-sm: 12px;
-  --hub-marquee-duration: 34s;
+  --hub-marquee-duration: 44s;
 }
 
 *,
@@ -283,17 +283,18 @@ body[data-composite-route='hub'] {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 40px;
   overflow: hidden;
-  background: rgba(15, 16, 20, 0.9);
+  background: linear-gradient(160deg, var(--card-base), var(--card-base-alt));
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 10px;
   isolation: isolate;
   transition:
     transform 180ms ease,
     border-color 180ms ease,
-    box-shadow 180ms ease;
+    box-shadow 180ms ease,
+    background 180ms ease;
 }
 
 .hub-card::before,
@@ -332,6 +333,7 @@ body[data-composite-route='hub'] {
   transform: translateY(-6px);
   border-color: color-mix(in srgb, var(--card-accent) 54%, white 14%);
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.42), 0 0 0 1px color-mix(in srgb, var(--card-accent) 18%, transparent);
+  background: linear-gradient(160deg, var(--card-hover), var(--card-hover-alt));
 }
 
 .hub-card:hover::after {
@@ -340,8 +342,10 @@ body[data-composite-route='hub'] {
 }
 
 .hub-card-surface {
-  background: var(--card-surface);
-  opacity: 0.95;
+  background:
+    radial-gradient(circle at 16% 18%, rgba(255, 255, 255, 0.16), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 42%);
+  opacity: 0.92;
   pointer-events: none;
 }
 
@@ -4223,7 +4227,7 @@ body[data-composite-route='football'] {
 }
 
 .hub-card-compact {
-  min-height: 17rem;
+  min-height: 16.4rem;
   scroll-snap-align: start;
   scroll-snap-stop: always;
 }
@@ -4234,38 +4238,47 @@ body[data-composite-route='football'] {
   letter-spacing: 0.05em;
 }
 
-.hub-card-image {
-  position: absolute;
-  inset: auto -4% 16% auto;
-  width: min(48%, 210px);
-  height: 58%;
-  opacity: 0.62;
-  filter: saturate(1.08) contrast(1.06) drop-shadow(0 24px 28px rgba(0, 0, 0, 0.3));
-  pointer-events: none;
-  mix-blend-mode: screen;
-  mask-image: radial-gradient(circle at 45% 45%, black 0 56%, transparent 84%);
-  -webkit-mask-image: radial-gradient(circle at 45% 45%, black 0 56%, transparent 84%);
+.hub-card-badge-shell {
+  width: 88px;
+  height: 88px;
+  display: grid;
+  place-items: center;
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.06));
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.22);
 }
 
-.hub-card-spotlight {
+.hub-card-badge-image {
+  width: 78%;
+  height: 78%;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.22));
+}
+
+.hub-card-body {
   position: relative;
   z-index: 1;
+  display: grid;
+  gap: 8px;
   margin-top: auto;
-  padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.hub-card-spotlight span {
-  display: block;
-  color: rgba(229, 237, 255, 0.82);
+.hub-card-site-label {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.74);
   font-size: 0.74rem;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  margin-bottom: 6px;
 }
 
-.hub-card-spotlight strong {
-  font-size: 1.15rem;
+.hub-card-subline {
+  margin: 0;
+  max-width: 17rem;
+  color: rgba(245, 248, 255, 0.88);
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 .hub-world-card,
@@ -4351,6 +4364,10 @@ body[data-composite-route='football'] {
 
 .hub-story-marquee-track {
   animation-duration: var(--hub-marquee-duration);
+}
+
+.hub-live-ticker-track {
+  animation-duration: calc(var(--hub-marquee-duration) * 1.65);
 }
 
 .hub-story-marquee-pill {

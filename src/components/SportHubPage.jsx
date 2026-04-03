@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getSportCards, SPORT_CONFIGS } from '@/src/data/sports';
 import StoryDetailCard from '@/src/components/StoryDetailCard';
 import RouteThemeToggle from '@/src/components/RouteThemeToggle';
@@ -10,10 +10,6 @@ import useCompositeTheme from '@/src/hooks/useCompositeTheme';
 function MoneylineTag({ value }) {
   if (!value) return null;
   return <span className="hub-bet-odds">{value}</span>;
-}
-
-function compactSportSubtitle(card) {
-  return card.spotlight?.subhead || card.hoverLabel || card.theme?.hoverCue || 'Open board';
 }
 
 function getSportRailStep(rail) {
@@ -75,7 +71,6 @@ export default function SportHubPage() {
   const worldPlayers = hero?.worldBoard?.players || [];
   const heroStories = hero?.heroStories || [];
   const secondaryStories = hero?.secondaryStories || [];
-  const cardSpotlights = hero?.cardSpotlights || {};
   const parlay = hero?.parlaySummary || hero?.parlay || null;
   const liveTicker = hero?.liveTicker || [];
   const featuredStory = heroStories[storyIndex] || heroStories[0] || null;
@@ -127,15 +122,6 @@ export default function SportHubPage() {
       behavior: 'smooth',
     });
   }
-
-  const enhancedCards = useMemo(
-    () =>
-      cards.map((card) => ({
-        ...card,
-        spotlight: cardSpotlights[card.key] || null,
-      })),
-    [cards, cardSpotlights],
-  );
 
   if (activeStory) {
     return (
@@ -282,7 +268,7 @@ export default function SportHubPage() {
         <div className="hub-module-head">
           <div>
             <p className="eyebrow">COMPOSITE Sites</p>
-            <h2>Choose A Site To Enter</h2>
+            <h2>Choose A COMPOSITE Site To Enter</h2>
             <p className="hub-module-helper">Swipe or click through the live sport sites below.</p>
           </div>
           <div className="hub-rail-controls">
@@ -295,7 +281,7 @@ export default function SportHubPage() {
           </div>
         </div>
         <div className="hub-sport-rail" ref={sportRailRef}>
-          {enhancedCards.map((card) => (
+          {cards.map((card) => (
             <Link
               key={card.key}
               href={card.path}
@@ -305,28 +291,33 @@ export default function SportHubPage() {
               style={{
                 '--card-accent': card.accent,
                 '--card-accent-alt': card.accentAlt,
-                '--card-surface': card.surface,
+                '--card-base': card.hubTile?.base || card.accent,
+                '--card-base-alt': card.hubTile?.baseAlt || card.surface,
+                '--card-hover': card.hubTile?.hover || card.accentAlt,
+                '--card-hover-alt': card.hubTile?.hoverAlt || card.accent,
                 '--card-glow': card.theme?.hub?.glow || card.accent,
               }}
             >
               <div className="hub-card-surface" />
               <div className="hub-card-noise" />
               <div className="hub-card-marking" />
-              {card.spotlight?.image ? <img src={card.spotlight.image} alt={card.spotlight.headline || card.label} className="hub-card-image" /> : null}
-              <p className="eyebrow">{card.label}</p>
-              <div className="hub-card-spotlight">
-                <strong>{card.spotlight?.headline || `Open ${card.label}`}</strong>
-                <span>{compactSportSubtitle(card)}</span>
+              <div className="hub-card-badge-shell" aria-hidden="true">
+                {card.hubTile?.icon ? <img src={card.hubTile.icon} alt="" className="hub-card-badge-image" /> : null}
+              </div>
+              <div className="hub-card-body">
+                <p className="hub-card-site-label">COMPOSITE Site</p>
+                <h2>{card.label}</h2>
+                <p className="hub-card-subline">{card.hubTile?.subline || card.theme?.hoverCue || `Open ${card.label}`}</p>
               </div>
               <div className="hub-card-footer compact">
                 <span className="hub-card-hover-label">{card.hoverLabel || card.theme?.hoverCue}</span>
-                <span className="hub-card-cta">Open</span>
+                <span className="hub-card-cta">Enter</span>
               </div>
             </Link>
           ))}
         </div>
         <div className="hub-sport-rail-pager" aria-label="Composite sites pages">
-          {enhancedCards.map((card, index) => (
+          {cards.map((card, index) => (
             <button
               key={`${card.key}-pager`}
               type="button"

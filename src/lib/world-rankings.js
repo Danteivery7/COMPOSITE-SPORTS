@@ -5,6 +5,7 @@ import {
 } from '@/src/mlb/lib/topPlayers';
 import { FOOTBALL_LEAGUES } from '@/src/lib/football';
 import { getFootballLeagueSnapshot, getGenericSportSnapshot } from '@/src/lib/live-sports-backend';
+import { getNbaBootstrapSnapshot } from '@/src/lib/nba-backend';
 import { getExactNbaRatedPlayers } from '@/src/lib/nba-site-ratings';
 import { getHotSnapshot } from '@/src/lib/snapshot-store';
 import {
@@ -93,11 +94,32 @@ async function getMlbTopPlayersSnapshot(limit = 50) {
 }
 
 async function getNBACandidates() {
-  const snapshot = await getExactNbaRatedPlayers();
+  const [snapshot, bootstrap] = await Promise.all([
+    getExactNbaRatedPlayers(),
+    getNbaBootstrapSnapshot(),
+  ]);
+  const officialCatalog = new Map(
+    (bootstrap?.playerCatalog || [])
+      .filter((player) => player?.id && player?.hasOfficialStats)
+      .map((player) => [String(player.id), player]),
+  );
+
   return (snapshot?.players || [])
-    .filter((player) => player?.id && player?.displayName && player?.rating?.rating && player?.headshot)
+    .filter((player) => {
+      const playerId = String(player?.id || '');
+      const officialPlayer = officialCatalog.get(playerId);
+      const overall = Number(player?.rating?.ratingNum);
+      return Boolean(
+        playerId &&
+        officialPlayer &&
+        player?.displayName &&
+        player?.headshot &&
+        player?.rating?.hasRealStats &&
+        Number.isFinite(overall),
+      );
+    })
     .map((player) => {
-      const overall = Number(player.rating?.ratingNum || player.rating?.rating);
+      const overall = Number(player.rating?.ratingNum);
       if (!Number.isFinite(overall)) return null;
       const hotness = Number(player.rating?.hotnessScore || 0);
       return {
@@ -110,8 +132,8 @@ async function getNBACandidates() {
         sportKey: 'nba',
         leagueKey: 'nba',
         overall,
-        overallLabel: player.rating?.rating || overall.toFixed(1),
-        signalCount: player.rating?.hasRealStats ? 3 : 1,
+        overallLabel: overall.toFixed(1),
+        signalCount: 3,
         contextScore: clamp(overall + hotness * 1.8, 48, 97),
         formScore: clamp(overall + hotness * 2.4, 48, 98),
         teamAbbr: player.teamAbbr || '',
