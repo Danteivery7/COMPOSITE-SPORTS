@@ -1,4 +1,4 @@
-import GenericSportRoute from '@/src/components/GenericSportRoute';
+import CBBRoute from '@/src/components/CBBRoute';
 
 export default async function CBBPage({ searchParams }) {
   const query = await searchParams;
@@ -6,5 +6,5 @@ export default async function CBBPage({ searchParams }) {
     playerId: query?.player || null,
     fromHub: query?.from === 'hub',
   };
-  return <GenericSportRoute sportKey="cbb" initialEntry={initialEntry} />;
+  return <CBBRoute initialEntry={initialEntry} />;
 }

@@ -11,6 +11,10 @@
     {
       "path": "/api/mlb/warm",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cbb/warm",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

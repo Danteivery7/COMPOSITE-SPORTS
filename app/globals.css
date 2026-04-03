@@ -2339,6 +2339,295 @@ body[data-composite-route='hub'] {
   font-size: 1.7rem;
 }
 
+.cbb-route-shell {
+  background:
+    radial-gradient(circle at top, rgba(255, 205, 102, 0.1), transparent 24%),
+    linear-gradient(180deg, rgba(15, 9, 8, 0.98), rgba(12, 10, 13, 0.98));
+}
+
+.cbb-app-shell .generic-sidebar {
+  background:
+    radial-gradient(circle at top, rgba(255, 216, 123, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(25, 16, 10, 0.96), rgba(11, 9, 10, 0.99));
+}
+
+.cbb-brand p {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.cbb-shell {
+  display: grid;
+  gap: 18px;
+}
+
+.cbb-hero,
+.cbb-detail-hero {
+  display: grid;
+  gap: 20px;
+  padding: 26px;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top right, rgba(255, 226, 141, 0.14), transparent 28%),
+    linear-gradient(135deg, rgba(76, 46, 15, 0.45), rgba(18, 13, 12, 0.9));
+}
+
+.cbb-hero::before,
+.cbb-detail-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.46;
+  background:
+    linear-gradient(90deg, transparent 0 17%, rgba(255, 232, 143, 0.08) 17% 17.4%, transparent 17.4% 82.6%, rgba(255, 232, 143, 0.08) 82.6% 83%, transparent 83%),
+    linear-gradient(180deg, transparent 0 28%, rgba(255, 232, 143, 0.08) 28% 28.5%, transparent 28.5% 49.5%, rgba(255, 232, 143, 0.08) 49.5% 50%, transparent 50%);
+}
+
+.cbb-hero-copy,
+.cbb-hero-side,
+.cbb-hero-note {
+  position: relative;
+  z-index: 1;
+}
+
+.cbb-hero {
+  grid-template-columns: 1.2fr 0.8fr;
+}
+
+.cbb-hero-copy h2 {
+  margin: 10px 0;
+  font-size: clamp(2rem, 3vw, 3.4rem);
+  line-height: 0.98;
+}
+
+.cbb-hero-copy p:last-of-type {
+  max-width: 42rem;
+  color: #e8edf8;
+  line-height: 1.75;
+}
+
+.cbb-hero-side {
+  display: grid;
+  gap: 12px;
+}
+
+.cbb-hero-note {
+  text-align: left;
+  padding: 16px 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+
+.cbb-hero-note span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.cbb-hero-note strong {
+  display: block;
+  line-height: 1.45;
+}
+
+.cbb-overview-grid,
+.cbb-lower-grid,
+.cbb-detail-grid,
+.cbb-predictor-layout,
+.cbb-settings-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.cbb-overview-grid {
+  grid-template-columns: 1.2fr 0.9fr 0.95fr;
+}
+
+.cbb-lower-grid,
+.cbb-detail-grid,
+.cbb-predictor-layout {
+  grid-template-columns: 1fr 1fr;
+}
+
+.cbb-settings-grid {
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+
+.cbb-score-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+}
+
+.cbb-score-card {
+  text-align: left;
+  display: grid;
+  gap: 14px;
+}
+
+.cbb-score-card-top,
+.cbb-score-row,
+.cbb-team-card-head,
+.cbb-manual-scoreline {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+}
+
+.cbb-score-card-teams {
+  display: grid;
+  gap: 12px;
+}
+
+.cbb-team-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+}
+
+.cbb-team-card {
+  text-align: left;
+  display: grid;
+  gap: 18px;
+}
+
+.cbb-team-card h3 {
+  margin: 0;
+}
+
+.cbb-team-card p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.cbb-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.cbb-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 0.92rem;
+}
+
+.cbb-pill strong {
+  font-size: 0.76rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.cbb-pill.is-accent {
+  background: linear-gradient(135deg, rgba(245, 166, 35, 0.22), rgba(255, 232, 143, 0.12));
+  border-color: rgba(245, 166, 35, 0.28);
+}
+
+.cbb-player-feature-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.cbb-source-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+}
+
+.cbb-source-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cbb-source-card strong {
+  font-size: 0.82rem;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+
+.cbb-source-card span {
+  font-size: 1.15rem;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--sport-accent-alt);
+}
+
+.cbb-predictor-builder,
+.cbb-manual-result {
+  display: grid;
+  gap: 16px;
+}
+
+.cbb-predictor-form {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.cbb-predictor-form label {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.cbb-predictor-form select {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  padding: 12px 14px;
+}
+
+.cbb-predictor-form button {
+  align-self: end;
+  min-height: 48px;
+  border-radius: 14px;
+  border: 0;
+  background: linear-gradient(135deg, #f5a623, #ffe88f);
+  color: #241503;
+  font-weight: 700;
+}
+
+.cbb-manual-scoreline {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.cbb-manual-scoreline span {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--sport-accent-alt);
+}
+
+.cbb-rankings-table td:nth-child(3),
+.cbb-rankings-table td:nth-child(4),
+.cbb-rankings-table td:nth-child(5),
+.cbb-rankings-table td:nth-child(6),
+.cbb-rankings-table td:nth-child(7) {
+  font-family: 'IBM Plex Mono', monospace;
+}
+
 .mlb-route-shell {
   position: relative;
   min-height: 100vh;
@@ -2396,7 +2685,13 @@ body[data-composite-route='hub'] {
   .sportview-grid-nfl,
   .sportview-grid-mls,
   .sportview-lower,
-  .sportview-detail-grid {
+  .sportview-detail-grid,
+  .cbb-hero,
+  .cbb-overview-grid,
+  .cbb-lower-grid,
+  .cbb-detail-grid,
+  .cbb-predictor-layout,
+  .cbb-predictor-form {
     grid-template-columns: 1fr;
   }
 }
@@ -2506,6 +2801,16 @@ body[data-composite-route='hub'] {
   .sportview-score-grid-nfl,
   .sportview-score-grid-mls,
   .sportview-feature-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cbb-card-footer {
+    align-items: flex-start;
+  }
+
+  .cbb-team-grid,
+  .cbb-source-grid,
+  .cbb-settings-grid {
     grid-template-columns: 1fr;
   }
 }

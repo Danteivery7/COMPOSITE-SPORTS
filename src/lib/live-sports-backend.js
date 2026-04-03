@@ -1,5 +1,6 @@
 import { getHotSnapshot, warmSnapshot } from '@/src/lib/snapshot-store';
 import { getSportBootstrap, getPlayerCatalog, isGenericSport } from '@/src/lib/generic-sports';
+import { getCBBBootstrap, getCBBPlayerCatalog } from '@/src/lib/cbb';
 import {
   getFootballBootstrap,
   getFootballFeaturedPlayers,
@@ -11,6 +12,7 @@ import {
 const SPORT_BOOTSTRAP_TTL = 2 * 60 * 1000;
 const SPORT_PLAYER_TTL = 10 * 60 * 1000;
 const FOOTBALL_LANDING_TTL = 2 * 60 * 1000;
+const CBB_SNAPSHOT_VERSION = 'v1';
 const FOOTBALL_SNAPSHOT_VERSION = 'v6';
 const FOOTBALL_LANDING_VERSION = 'v4';
 
@@ -38,6 +40,9 @@ function isMeaningfulFootballSnapshot(snapshot) {
 }
 
 function makeSportSnapshotKey(sport) {
+  if (sport === 'cbb') {
+    return `cbb-snapshot-${CBB_SNAPSHOT_VERSION}`;
+  }
   return `generic-sport-${sport}`;
 }
 
@@ -46,6 +51,22 @@ function makeFootballSnapshotKey(leagueKey) {
 }
 
 async function buildGenericSportSnapshot(sport) {
+  if (sport === 'cbb') {
+    const snapshot = await getCBBBootstrap({ force: true });
+    const playersCatalog = snapshot?.playersCatalog?.players?.length
+      ? snapshot.playersCatalog
+      : await getCBBPlayerCatalog({ force: true });
+    return {
+      ...snapshot,
+      playersCatalog,
+      playerMeta: {
+        totalPlayers: playersCatalog?.players?.length || 0,
+        lastUpdated: playersCatalog?.lastUpdated || snapshot?.lastUpdated || null,
+      },
+      lastUpdated: snapshot?.lastUpdated || new Date().toISOString(),
+    };
+  }
+
   const [bootstrap, playersCatalog] = await Promise.all([
     getSportBootstrap(sport),
     getPlayerCatalog(sport),
