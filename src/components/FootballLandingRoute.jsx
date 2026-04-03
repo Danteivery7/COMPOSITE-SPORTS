@@ -48,7 +48,7 @@ export default function FootballLandingRoute() {
 
     async function load() {
       try {
-        const response = await fetch('/api/football/landing');
+        const response = await fetch('/api/football/landing', { cache: 'no-store' });
         const json = await response.json();
         setData(json);
       } finally {

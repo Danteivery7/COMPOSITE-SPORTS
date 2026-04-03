@@ -10,7 +10,24 @@ import {
 const SPORT_BOOTSTRAP_TTL = 2 * 60 * 1000;
 const SPORT_PLAYER_TTL = 10 * 60 * 1000;
 const FOOTBALL_LANDING_TTL = 2 * 60 * 1000;
-const FOOTBALL_SNAPSHOT_VERSION = 'v2';
+const FOOTBALL_SNAPSHOT_VERSION = 'v3';
+
+function footballRecordHasGames(record) {
+  const match = String(record || '').match(/(\d+)\s*-\s*(\d+)\s*-\s*(\d+)/);
+  if (!match) return false;
+  return Number(match[1]) + Number(match[2]) + Number(match[3]) > 0;
+}
+
+function isHealthyFootballSnapshot(snapshot) {
+  const rankings = snapshot?.rankings || [];
+  const players = snapshot?.playersCatalog?.players || [];
+  const rankedTeams = Array.isArray(rankings) ? rankings.length : 0;
+  const playerCount = Array.isArray(players) ? players.length : 0;
+  const hasRealRecords = rankings.some(
+    (team) => footballRecordHasGames(team?.record) || Number(team?.gamesPlayed || 0) > 0 || Number(team?.standingPoints || 0) > 0,
+  );
+  return rankedTeams >= 6 && playerCount >= 15 && hasRealRecords;
+}
 
 function makeSportSnapshotKey(sport) {
   return `generic-sport-${sport}`;
@@ -40,8 +57,7 @@ async function buildGenericSportSnapshot(sport) {
 async function buildFootballLeagueSnapshot(leagueKey) {
   const bootstrap = await getFootballBootstrap(leagueKey);
   const playersCatalog = bootstrap?.playersCatalog || (await getFootballPlayerCatalog(leagueKey));
-
-  return {
+  const snapshot = {
     ...bootstrap,
     playersCatalog,
     playerMeta: {
@@ -50,6 +66,17 @@ async function buildFootballLeagueSnapshot(leagueKey) {
     },
     lastUpdated: new Date().toISOString(),
   };
+
+  if (!isHealthyFootballSnapshot(snapshot)) {
+    const rankedTeams = snapshot?.rankings?.length || 0;
+    const playerCount = snapshot?.playersCatalog?.players?.length || 0;
+    const nonZeroTeams = (snapshot?.rankings || []).filter((team) => footballRecordHasGames(team?.record)).length;
+    throw new Error(
+      `Incomplete football snapshot for ${leagueKey}: ${rankedTeams} teams, ${playerCount} players, ${nonZeroTeams} clubs with live records`,
+    );
+  }
+
+  return snapshot;
 }
 
 export async function getGenericSportSnapshot(sport, { force = false } = {}) {
@@ -81,11 +108,25 @@ export async function getFootballLeagueSnapshot(leagueKey, { force = false } = {
     throw new Error(`Unsupported football league "${leagueKey}"`);
   }
 
-  return getHotSnapshot(
+  let snapshot = await getHotSnapshot(
     makeFootballSnapshotKey(leagueKey),
     () => buildFootballLeagueSnapshot(leagueKey),
     { ttlMs: SPORT_BOOTSTRAP_TTL, force },
   );
+
+  if (!isHealthyFootballSnapshot(snapshot)) {
+    snapshot = await getHotSnapshot(
+      makeFootballSnapshotKey(leagueKey),
+      () => buildFootballLeagueSnapshot(leagueKey),
+      { ttlMs: SPORT_BOOTSTRAP_TTL, force: true },
+    );
+  }
+
+  if (!isHealthyFootballSnapshot(snapshot)) {
+    throw new Error(`Football snapshot for ${leagueKey} is still incomplete after forced rebuild`);
+  }
+
+  return snapshot;
 }
 
 export async function warmFootballLeagueSnapshot(leagueKey, force = false) {

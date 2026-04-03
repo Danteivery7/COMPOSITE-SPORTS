@@ -610,7 +610,7 @@ export default function FootballLeagueApp({ leagueKey, initialEntry = null }) {
 
   async function fetchBootstrap() {
     try {
-      const response = await fetch(`${apiBase}/bootstrap`);
+      const response = await fetch(`${apiBase}/bootstrap`, { cache: 'no-store' });
       const data = await response.json();
       setBootstrap(data);
     } finally {
@@ -637,7 +637,7 @@ export default function FootballLeagueApp({ leagueKey, initialEntry = null }) {
       setLoadingPlayers(true);
       try {
         const query = playersQuery.trim() ? `?q=${encodeURIComponent(playersQuery.trim())}` : '';
-        const response = await fetch(`${apiBase}/players${query}`);
+        const response = await fetch(`${apiBase}/players${query}`, { cache: 'no-store' });
         const data = await response.json();
         if (!ignore) setPlayersData(data);
       } finally {
@@ -652,7 +652,7 @@ export default function FootballLeagueApp({ leagueKey, initialEntry = null }) {
   }, [apiBase, page, playersQuery, bootstrap]);
 
   async function openTeam(teamId) {
-    const response = await fetch(`${apiBase}/teams/${teamId}`);
+    const response = await fetch(`${apiBase}/teams/${teamId}`, { cache: 'no-store' });
     const data = await response.json();
     setTeamDetail(data);
     setPage('team-detail');
@@ -660,7 +660,7 @@ export default function FootballLeagueApp({ leagueKey, initialEntry = null }) {
   }
 
   async function openPlayer(playerId, options = {}) {
-    const response = await fetch(`${apiBase}/players/${playerId}`);
+    const response = await fetch(`${apiBase}/players/${playerId}`, { cache: 'no-store' });
     const data = await response.json();
     setHubOriginPlayer(Boolean(options.fromHub));
     setPlayerDetail(data);
@@ -669,7 +669,7 @@ export default function FootballLeagueApp({ leagueKey, initialEntry = null }) {
   }
 
   async function openGame(gameId) {
-    const response = await fetch(`${apiBase}/games/${gameId}`);
+    const response = await fetch(`${apiBase}/games/${gameId}`, { cache: 'no-store' });
     const data = await response.json();
     setGameDetail(data);
     setPage('game-detail');
@@ -678,7 +678,7 @@ export default function FootballLeagueApp({ leagueKey, initialEntry = null }) {
 
   async function openStory(story, fromPage = 'overview') {
     if (!story?.storyId) return;
-    const response = await fetch(`${apiBase}/news/${story.storyId}?apiHref=${encodeURIComponent(story.apiHref || '')}`);
+    const response = await fetch(`${apiBase}/news/${story.storyId}?apiHref=${encodeURIComponent(story.apiHref || '')}`, { cache: 'no-store' });
     const data = await response.json();
     setStoryDetail({ ...data, previousPage: fromPage });
     setPage('story-detail');

@@ -525,32 +525,59 @@ async function getStandings(leagueKey) {
   const cached = readCache(key);
   if (cached) return cached;
   const teams = await getTeams(leagueKey);
-  const [teamStatsPayloads, schedules] = await Promise.all([
-    mapLimit(
-      teams,
-      async (team) => ({
-        teamId: team.id,
-        stats: await getTeamStatistics(leagueKey, team.espnId),
-      }),
-      6,
-    ),
-    mapLimit(
-      teams,
-      async (team) => ({
-        teamId: team.id,
-        schedule: await fetchTeamSchedule(leagueKey, team.espnId),
-      }),
-      4,
-    ),
-  ]);
+  const teamStatsPayloads = await mapLimit(
+    teams,
+    async (team) => ({
+      teamId: team.id,
+      stats: await getTeamStatistics(leagueKey, team.espnId),
+    }),
+    3,
+  );
 
   const teamStatsMap = Object.fromEntries(teamStatsPayloads.filter(Boolean).map((entry) => [entry.teamId, entry.stats]));
-  const scheduleMap = Object.fromEntries(schedules.filter(Boolean).map((entry) => [entry.teamId, entry.schedule]));
+  const scheduleMap = {};
+  const teamsNeedingSchedule = teams.filter((team) => {
+    const stats = teamStatsMap[team.id] || {};
+    const parsedRecord = parseRecordSummary(stats.recordSummary);
+    return !parsedRecord.gamesPlayed || !stats.standingSummary;
+  });
+
+  const schedules = await mapLimit(
+    teamsNeedingSchedule,
+    async (team) => ({
+      teamId: team.id,
+      schedule: await fetchTeamSchedule(leagueKey, team.espnId),
+    }),
+    2,
+  );
+  schedules.filter(Boolean).forEach((entry) => {
+    scheduleMap[entry.teamId] = entry.schedule;
+  });
 
   const standings = teams.map((team) => {
     const stats = teamStatsMap[team.id] || {};
-    const scheduleSummary = summarizeScheduleResults(scheduleMap[team.id], team.id);
-    const parsedRecord = parseRecordSummary(stats.recordSummary || scheduleSummary.record);
+    const parsedRecord = parseRecordSummary(stats.recordSummary);
+    let scheduleSummary = {
+      wins: 0,
+      ties: 0,
+      losses: 0,
+      gamesPlayed: 0,
+      standingPoints: 0,
+      pointsFor: 0,
+      pointsAgainst: 0,
+      differential: 0,
+      cleanSheets: 0,
+      record: '0-0-0',
+      recentFormPoints: 0,
+      recentFormLabel: 'Form pending',
+      recentResults: [],
+    };
+
+    if (!parsedRecord.gamesPlayed || !stats.standingSummary) {
+      const schedulePayload = scheduleMap[team.id];
+      scheduleSummary = summarizeScheduleResults(schedulePayload, team.id);
+    }
+
     const wins = parsedRecord.gamesPlayed ? parsedRecord.wins : scheduleSummary.wins;
     const ties = parsedRecord.gamesPlayed ? parsedRecord.ties : scheduleSummary.ties;
     const losses = parsedRecord.gamesPlayed ? parsedRecord.losses : scheduleSummary.losses;
@@ -591,6 +618,56 @@ async function getStandings(leagueKey) {
     if (right.differential !== left.differential) return right.differential - left.differential;
     return right.pointsFor - left.pointsFor;
   });
+
+  const zeroRecordCount = standings.filter((entry) => entry.record === '0-0-0').length;
+  if (teams.length && zeroRecordCount === teams.length) {
+    const fallbackSchedules = await mapLimit(
+      teams,
+      async (team) => ({
+        teamId: team.id,
+        schedule: await fetchTeamSchedule(leagueKey, team.espnId),
+      }),
+      2,
+    );
+    fallbackSchedules.filter(Boolean).forEach((entry) => {
+      scheduleMap[entry.teamId] = entry.schedule;
+    });
+
+    const rescued = standings.map((entry) => {
+      const scheduleSummary = summarizeScheduleResults(scheduleMap[entry.teamId], entry.teamId);
+      if (!scheduleSummary.gamesPlayed) return entry;
+      return {
+        ...entry,
+        wins: scheduleSummary.wins,
+        ties: scheduleSummary.ties,
+        losses: scheduleSummary.losses,
+        gamesPlayed: scheduleSummary.gamesPlayed,
+        record: scheduleSummary.record,
+        pointsFor: scheduleSummary.pointsFor,
+        pointsAgainst: scheduleSummary.pointsAgainst,
+        differential: scheduleSummary.differential,
+        cleanSheets: scheduleSummary.cleanSheets,
+        streak: scheduleSummary.recentFormLabel,
+        recentFormPoints: scheduleSummary.recentFormPoints,
+        recentFormLabel: scheduleSummary.recentFormLabel,
+        recentResults: scheduleSummary.recentResults,
+        standingPoints: scheduleSummary.standingPoints,
+        pointsPerMatch: scheduleSummary.gamesPlayed ? scheduleSummary.standingPoints / scheduleSummary.gamesPlayed : 0,
+        winPct: scheduleSummary.gamesPlayed ? scheduleSummary.standingPoints / Math.max(1, scheduleSummary.gamesPlayed * 3) : 0,
+      };
+    });
+
+    rescued.sort((left, right) => {
+      const leftRank = left.standingRank || Number.MAX_SAFE_INTEGER;
+      const rightRank = right.standingRank || Number.MAX_SAFE_INTEGER;
+      if (leftRank !== rightRank) return leftRank - rightRank;
+      if (right.standingPoints !== left.standingPoints) return right.standingPoints - left.standingPoints;
+      if (right.differential !== left.differential) return right.differential - left.differential;
+      return right.pointsFor - left.pointsFor;
+    });
+
+    return writeCache(key, rescued, 20 * 60 * 1000);
+  }
 
   return writeCache(key, standings, 20 * 60 * 1000);
 }
@@ -880,12 +957,56 @@ async function getPlayerCatalog(leagueKey) {
       const payload = await fetchRoster(leagueKey, team.espnId);
       return parseRosterPlayers(payload, rankingMap[team.id] || team);
     },
-    6,
+    3,
   );
 
-  const players = uniqBy(rosters.flat().filter(Boolean), (player) => player.id)
+  const rosterPlayers = uniqBy(rosters.flat().filter(Boolean), (player) => player.id);
+
+  const leaderFallbackPlayers = uniqBy(
+    leaders.map((leader) => {
+      const team = rankingMap[leader.teamId] || teams.find((entry) => String(entry.id) === String(leader.teamId)) || null;
+      const leaderEntries = (leaderMap.get(leader.athleteId) || []).sort((left, right) => left.rank - right.rank);
+      const seedPlayer = {
+        id: String(leader.athleteId),
+        displayName: leader.athlete.displayName,
+        shortName: leader.athlete.shortName,
+        position: leader.athlete.position || 'F',
+        headshot: leader.athlete.headshot || '',
+        team,
+        statistics: {},
+        statFeed: [],
+      };
+      const ratingCard = buildFootballPlayerRating(seedPlayer, team, leaderEntries);
+
+      return {
+        ...seedPlayer,
+        leaders: leaderEntries,
+        leaderSummary: ratingCard.leaderSummary,
+        rating: ratingCard.rating,
+        tier: ratingCard.tier,
+        positionGroup: ratingCard.positionGroup,
+        profileSummary: ratingCard.profileSummary,
+        metrics: {
+          appearances: ratingCard.appearances,
+          starts: ratingCard.starts,
+          goals: ratingCard.goals,
+          assists: ratingCard.assists,
+          shots: ratingCard.shots,
+          shotsOnTarget: ratingCard.shotsOnTarget,
+          saves: ratingCard.saves,
+          shotsFaced: ratingCard.shotsFaced,
+          goalsConceded: ratingCard.goalsConceded,
+        },
+        competition: leagueMeta(leagueKey).label,
+      };
+    }),
+    (player) => player.id,
+  );
+
+  const players = uniqBy([...rosterPlayers, ...leaderFallbackPlayers], (player) => player.id)
     .map((player) => {
-      const team = rankingMap[player.team.id] || player.team;
+      const teamId = String(player.team?.id || '');
+      const team = rankingMap[teamId] || player.team || null;
       const leaderEntries = (leaderMap.get(player.id) || []).sort((left, right) => left.rank - right.rank);
       const ratingCard = buildFootballPlayerRating(player, team, leaderEntries);
 
@@ -1067,13 +1188,32 @@ function buildPredictors(scoreboard, rankings, leagueKey, players = []) {
 }
 
 async function getFootballBootstrap(leagueKey) {
-  const [scoreboard, rankings, news, brand, playersCatalog] = await Promise.all([
+  const [scoreboardResult, rankingsResult, newsResult, brandResult, playersCatalogResult] = await Promise.allSettled([
     fetchScoreboard(leagueKey),
     computeRankings(leagueKey),
     fetchNews(leagueKey),
     getLeagueBrand(leagueKey),
     getPlayerCatalog(leagueKey),
   ]);
+
+  const scoreboard = scoreboardResult.status === 'fulfilled' ? scoreboardResult.value : [];
+  const rankings = rankingsResult.status === 'fulfilled' ? rankingsResult.value : [];
+  const news = newsResult.status === 'fulfilled' ? newsResult.value : [];
+  const brand = brandResult.status === 'fulfilled'
+    ? brandResult.value
+    : {
+        ...leagueMeta(leagueKey),
+        logo: '',
+        season: '',
+      };
+  const playersCatalog = playersCatalogResult.status === 'fulfilled'
+    ? playersCatalogResult.value
+    : {
+        league: leagueKey,
+        players: [],
+        lastUpdated: new Date().toISOString(),
+        totalPlayers: 0,
+      };
 
   const featuredPlayers = (playersCatalog.players || []).slice(0, 12);
 
