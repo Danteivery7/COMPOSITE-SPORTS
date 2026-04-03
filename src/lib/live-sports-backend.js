@@ -10,13 +10,14 @@ import {
 const SPORT_BOOTSTRAP_TTL = 2 * 60 * 1000;
 const SPORT_PLAYER_TTL = 10 * 60 * 1000;
 const FOOTBALL_LANDING_TTL = 2 * 60 * 1000;
+const FOOTBALL_SNAPSHOT_VERSION = 'v2';
 
 function makeSportSnapshotKey(sport) {
   return `generic-sport-${sport}`;
 }
 
 function makeFootballSnapshotKey(leagueKey) {
-  return `football-league-${leagueKey}`;
+  return `football-league-${FOOTBALL_SNAPSHOT_VERSION}-${leagueKey}`;
 }
 
 async function buildGenericSportSnapshot(sport) {
@@ -101,7 +102,7 @@ export async function warmFootballLeagueSnapshot(leagueKey, force = false) {
 
 export async function getFootballLandingSnapshot({ force = false } = {}) {
   return getHotSnapshot(
-    'football-landing',
+    `football-landing-${FOOTBALL_SNAPSHOT_VERSION}`,
     async () => ({
       ...(await getFootballLanding()),
       lastUpdated: new Date().toISOString(),
@@ -112,7 +113,7 @@ export async function getFootballLandingSnapshot({ force = false } = {}) {
 
 export async function warmFootballLandingSnapshot(force = false) {
   return warmSnapshot(
-    'football-landing',
+    `football-landing-${FOOTBALL_SNAPSHOT_VERSION}`,
     async () => ({
       ...(await getFootballLanding()),
       lastUpdated: new Date().toISOString(),
