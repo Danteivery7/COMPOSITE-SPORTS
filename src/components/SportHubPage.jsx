@@ -10,6 +10,10 @@ function MoneylineTag({ value }) {
   return <span className="hub-bet-odds">{value}</span>;
 }
 
+function compactSportSubtitle(card) {
+  return card.spotlight?.subhead || card.hoverLabel || card.theme?.hoverCue || 'Open board';
+}
+
 export default function SportHubPage() {
   const cards = getSportCards();
   const sportRailRef = useRef(null);
@@ -272,10 +276,9 @@ export default function SportHubPage() {
               <div className="hub-card-marking" />
               {card.spotlight?.image ? <img src={card.spotlight.image} alt={card.spotlight.headline || card.label} className="hub-card-image" /> : null}
               <p className="eyebrow">{card.label}</p>
-              <h2>{card.label}</h2>
               <div className="hub-card-spotlight">
                 <strong>{card.spotlight?.headline || `Open ${card.label}`}</strong>
-                <span>{card.spotlight?.subhead || card.hoverLabel || card.theme?.hoverCue}</span>
+                <span>{compactSportSubtitle(card)}</span>
               </div>
               <div className="hub-card-footer compact">
                 <span className="hub-card-hover-label">{card.hoverLabel || card.theme?.hoverCue}</span>

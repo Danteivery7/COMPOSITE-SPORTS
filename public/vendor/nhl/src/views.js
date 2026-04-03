@@ -777,7 +777,14 @@ function renderPlayerDetail(state) {
               <p class="detail-meta">Age ${player.age || "--"} • ${escapeHtml(player.profile.birthPlace?.city || "")}${player.profile.birthCountry?.abbreviation ? `, ${escapeHtml(player.profile.birthCountry.abbreviation)}` : ""}</p>
             </div>
           </div>
-          <span class="rank-chip">${player.overall} OVR</span>
+          <div class="inline-list">
+            ${
+              state.openedFromHub
+                ? '<a class="pill-action is-primary" href="/" target="_top">Back to main menu</a>'
+                : routeButton("Back to players", toRouteHash("players"), true)
+            }
+            <span class="rank-chip">${player.overall} OVR</span>
+          </div>
         </div>
         <div class="chip-row">
           <span class="tone-chip ${player.tone.className}">${escapeHtml(player.tone.label)} ${player.hotnessScore}/5</span>

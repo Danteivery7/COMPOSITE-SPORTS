@@ -3035,6 +3035,31 @@ body[data-composite-route='football'] {
   white-space: nowrap;
 }
 
+.football-record-inline {
+  display: inline-flex !important;
+  flex-wrap: wrap;
+  gap: 6px;
+  white-space: normal !important;
+}
+
+.football-record-chip {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+
+.football-record-chip strong {
+  display: inline !important;
+  font-size: 0.65rem;
+  opacity: 0.72;
+}
+
 .football-marquee-center,
 .football-detail-center {
   text-align: center;

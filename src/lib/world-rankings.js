@@ -228,33 +228,72 @@ async function getNHLCandidates() {
     fetchJson(`${site}/standings`, 30 * 60 * 1000),
   ]);
   const standings = parseStandings(standingsPayload);
-  return uniqBy(
-    leaders.map((entry) => {
-      const teamBoost = (standings[entry.teamId]?.winPct || 0.5) * 12;
+  const categoryWeights = {
+    points: 16,
+    goals: 14,
+    assists: 12,
+    'save percentage': 14,
+    'save pct': 14,
+    'goals against average': 12,
+    gaa: 12,
+    wins: 10,
+    shutouts: 8,
+    'plus minus': 8,
+    hits: 7,
+    'blocked shots': 7,
+    shots: 8,
+  };
+
+  const bucket = new Map();
+  leaders.forEach((entry) => {
+    const current = bucket.get(entry.athleteId) || {
+      athleteId: entry.athleteId,
+      displayName: entry.athlete.displayName,
+      headshot: entry.athlete.headshot || '',
+      position: entry.athlete.position || 'NHL',
+      teamId: entry.teamId,
+      teamLogo: entry.teamLogo || '',
+      categories: [],
+      provisionalScore: 0,
+    };
+
+    const weightKey = String(entry.label || '')
+      .toLowerCase()
+      .replace(/[%]/g, ' pct')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+    const weight = categoryWeights[weightKey] || 6;
+    current.provisionalScore += Math.max(0, 18 - Number(entry.rank || 18)) * weight;
+    current.categories.push(entry);
+    bucket.set(entry.athleteId, current);
+  });
+
+  return Array.from(bucket.values())
+    .map((entry) => {
+      const teamBoost = (standings[entry.teamId]?.winPct || 0.5) * 10;
       const overall = clamp(
-        Math.round(79 - (entry.rank - 1) * 1.55 + teamBoost + positionDifficulty(entry.athlete.position) * 5.6),
-        68,
-        97,
+        Math.round(58 + entry.provisionalScore / 18 + teamBoost),
+        55,
+        99,
       );
+      const bestRank = Math.min(...entry.categories.map((category) => Number(category.rank || 18)));
       return {
         id: `nhl-${entry.athleteId}`,
         playerId: entry.athleteId,
-        displayName: entry.athlete.displayName,
-        headshot: entry.athlete.headshot || entry.teamLogo || '',
-        position: entry.athlete.position || 'NHL',
+        displayName: entry.displayName,
+        headshot: entry.headshot || entry.teamLogo || '',
+        position: entry.position,
         leagueLabel: 'NHL',
         sportKey: 'nhl',
         leagueKey: 'nhl',
         overall,
         overallLabel: String(overall),
-        signalCount: 2,
-        contextScore: clamp(56 + teamBoost * 0.8, 46, 92),
-        formScore: clamp(92 - (entry.rank - 1) * 3.4, 44, 96),
+        signalCount: Math.max(1, Math.min(3, entry.categories.length)),
+        contextScore: clamp(56 + teamBoost * 0.9, 46, 92),
+        formScore: clamp(94 - (bestRank - 1) * 3.2, 44, 96),
         teamLogo: entry.teamLogo || '',
       };
-    }),
-    (entry) => entry.id,
-  )
+    })
     .sort((left, right) => right.overall - left.overall)
     .slice(0, 14);
 }

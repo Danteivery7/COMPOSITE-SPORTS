@@ -1084,6 +1084,17 @@ export async function warmHubSnapshots() {
   const leagueKeys = Object.keys(FOOTBALL_LEAGUES);
 
   const results = await Promise.allSettled([
+    warmSnapshot(
+      'hub-mlb-top-players',
+      async () => {
+        const cached = getCachedTopPlayers(50);
+        if (cached) return cached;
+        const stale = getStaleTopPlayers();
+        if (stale) return stale;
+        return computeTopPlayers(50);
+      },
+      { force: true, ttlMs: 15 * 60 * 1000 },
+    ),
     warmSnapshot('hub-trending-stories', () => buildTrendingStoriesSnapshot(), { force: true, ttlMs: STORY_TTL_MS }),
     warmSnapshot('hub-top-bets', () => buildTopBetsSnapshot(), { force: true, ttlMs: BETS_TTL_MS }),
     warmSnapshot('hub-hero', () => buildHubHeroSnapshot(), { force: true, ttlMs: HERO_TTL_MS }),

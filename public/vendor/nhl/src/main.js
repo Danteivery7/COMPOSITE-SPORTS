@@ -58,6 +58,7 @@ const dom = {
 
 const state = {
   route: parseRoute(location.hash),
+  openedFromHub: new URLSearchParams(location.search).get("from") === "hub",
   settings: {
     ...DEFAULT_SETTINGS,
     ...readCachedSettings("settings", {}),

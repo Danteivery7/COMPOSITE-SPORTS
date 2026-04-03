@@ -14,6 +14,31 @@ function formatKickoff(value) {
   });
 }
 
+function recordParts(record) {
+  const match = String(record || '').match(/(\d+)\s*-\s*(\d+)\s*-\s*(\d+)/);
+  if (!match) return null;
+  return [
+    { label: 'W', value: match[1] },
+    { label: 'D', value: match[2] },
+    { label: 'L', value: match[3] },
+  ];
+}
+
+function FootballRecordLine({ record, fallback }) {
+  const parts = recordParts(record);
+  if (!parts) return <span>{fallback || record || 'Record TBD'}</span>;
+  return (
+    <span className="football-record-inline">
+      {parts.map((part) => (
+        <span className="football-record-chip" key={part.label}>
+          <strong>{part.label}</strong>
+          <span>{part.value}</span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export default function FootballLandingRoute() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -95,7 +120,7 @@ export default function FootballLandingRoute() {
                       {match.away?.logo ? <img src={match.away.logo} alt={match.away.displayName} className="football-club-logo" /> : null}
                       <div>
                         <strong>{match.away.displayName}</strong>
-                        <span>{match.away.record || match.away.abbreviation}</span>
+                        <FootballRecordLine record={match.away.record} fallback={match.away.abbreviation} />
                       </div>
                     </div>
                     <div className="football-marquee-center">
@@ -106,7 +131,7 @@ export default function FootballLandingRoute() {
                       {match.home?.logo ? <img src={match.home.logo} alt={match.home.displayName} className="football-club-logo" /> : null}
                       <div>
                         <strong>{match.home.displayName}</strong>
-                        <span>{match.home.record || match.home.abbreviation}</span>
+                        <FootballRecordLine record={match.home.record} fallback={match.home.abbreviation} />
                       </div>
                     </div>
                   </div>

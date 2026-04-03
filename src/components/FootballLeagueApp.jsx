@@ -16,6 +16,31 @@ const NAV_ITEMS = [
   { key: 'settings', label: 'Settings' },
 ];
 
+function recordParts(record) {
+  const match = String(record || '').match(/(\d+)\s*-\s*(\d+)\s*-\s*(\d+)/);
+  if (!match) return null;
+  return [
+    { label: 'W', value: match[1] },
+    { label: 'D', value: match[2] },
+    { label: 'L', value: match[3] },
+  ];
+}
+
+function FootballRecordLine({ record, fallback }) {
+  const parts = recordParts(record);
+  if (!parts) return <span>{fallback || record || 'Record TBD'}</span>;
+  return (
+    <span className="football-record-inline">
+      {parts.map((part) => (
+        <span className="football-record-chip" key={part.label}>
+          <strong>{part.label}</strong>
+          <span>{part.value}</span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
 function TeamLogo({ team }) {
   if (!team?.logo) {
     return <span className="football-logo-fallback">{team?.abbreviation?.slice(0, 3) || 'CLB'}</span>;
@@ -44,7 +69,7 @@ function GameCard({ game, onOpen }) {
               <TeamLogo team={team} />
               <div>
                 <strong>{team?.displayName || team?.abbreviation}</strong>
-                <span>{team?.record || team?.abbreviation}</span>
+                <FootballRecordLine record={team?.record} fallback={team?.abbreviation} />
               </div>
             </div>
             <strong className="football-score-number">{team?.score ?? '-'}</strong>
@@ -123,7 +148,8 @@ function FootballOverview({ bootstrap, openGame, openTeam, openPlayer, openStory
               <TeamLogo team={topTeam} />
               <div>
                 <strong>{topTeam.displayName}</strong>
-                <span>#{topTeam.ovrRank} OVR • {topTeam.record}</span>
+                <span>#{topTeam.ovrRank} OVR</span>
+                <FootballRecordLine record={topTeam.record} fallback={topTeam.abbreviation} />
                 <p>{topTeam.recentFormLabel || topTeam.streak}</p>
               </div>
             </button>
@@ -165,7 +191,8 @@ function FootballOverview({ bootstrap, openGame, openTeam, openPlayer, openStory
                   <TeamLogo team={team} />
                   <div>
                     <strong>#{team.ovrRank} {team.displayName}</strong>
-                    <span>{team.record} • {team.recentFormLabel || team.streak}</span>
+                    <FootballRecordLine record={team.record} fallback={team.abbreviation} />
+                    <span>{team.recentFormLabel || team.streak}</span>
                   </div>
                 </div>
                 <span>{team.ovrScore}</span>
@@ -219,6 +246,7 @@ function RankingsView({ rankings, openTeam }) {
                   <TeamLogo team={team} />
                   <div>
                     <strong>{team.displayName}</strong>
+                    <FootballRecordLine record={team.record} fallback={team.abbreviation} />
                     <span>{team.recentFormLabel || team.streak}</span>
                   </div>
                 </div>
@@ -226,7 +254,7 @@ function RankingsView({ rankings, openTeam }) {
               <td>{team.ovrScore}</td>
               <td>{team.offScore}</td>
               <td>{team.defScore}</td>
-              <td>{team.record}</td>
+              <td><FootballRecordLine record={team.record} fallback={team.abbreviation} /></td>
             </tr>
           ))}
         </tbody>
@@ -244,7 +272,7 @@ function TeamsView({ teams, openTeam }) {
             <TeamLogo team={team} />
             <div>
               <h3>{team.displayName}</h3>
-              <p>{team.record}</p>
+              <FootballRecordLine record={team.record} fallback={team.abbreviation} />
             </div>
           </div>
           <div className="football-chip-row">
@@ -372,7 +400,8 @@ function TeamDetailView({ detail, openPlayer, setPage }) {
           <div>
             <p className="eyebrow">Club Identity</p>
             <h2>{detail.team.displayName}</h2>
-            <p>{detail.team.record} • #{detail.team.ovrRank} OVR</p>
+            <p>#{detail.team.ovrRank} OVR</p>
+            <FootballRecordLine record={detail.team.record} fallback={detail.team.abbreviation} />
           </div>
         </div>
         <div className="football-chip-row">
@@ -476,7 +505,7 @@ function GameDetailView({ detail, predictors, setPage }) {
             <TeamLogo team={detail.game.away} />
             <div>
               <strong>{detail.game.away.displayName}</strong>
-              <span>{detail.game.away.record}</span>
+              <FootballRecordLine record={detail.game.away.record} fallback={detail.game.away.abbreviation} />
             </div>
           </div>
           <div className="football-detail-center">
@@ -487,7 +516,7 @@ function GameDetailView({ detail, predictors, setPage }) {
             <TeamLogo team={detail.game.home} />
             <div>
               <strong>{detail.game.home.displayName}</strong>
-              <span>{detail.game.home.record}</span>
+              <FootballRecordLine record={detail.game.home.record} fallback={detail.game.home.abbreviation} />
             </div>
           </div>
         </div>
