@@ -45,6 +45,11 @@ function IntroScene({ motif }) {
         <div className="sport-intro-spotlight spotlight-b" />
         <div className="sport-intro-scorebug" />
         <div className="sport-intro-baseline" />
+        <div className="sport-intro-outfield" />
+        <div className="sport-intro-batter-box" />
+        <div className="sport-intro-foul-line foul-line-left" />
+        <div className="sport-intro-foul-line foul-line-right" />
+        <div className="sport-intro-hit-trail" />
         <div className="sport-intro-object">
           <span className="sport-intro-detail detail-a" />
           <span className="sport-intro-detail detail-b" />

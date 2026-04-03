@@ -197,7 +197,7 @@ export default function RankingsPage({ favorites, toggleFavorite, onTeamClick })
                                                 </span>
                                             </div>
                                             <div className="last-5-row">
-                                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{team.wins}-{team.losses}</span>
+                                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Record {team.wins}-{team.losses}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -225,9 +225,7 @@ export default function RankingsPage({ favorites, toggleFavorite, onTeamClick })
                                         <span className={`status-pill ${String(team.streak).startsWith('W') ? 'win' : 'loss'}`} style={{ fontWeight: 700, color: String(team.streak).startsWith('W') ? 'var(--accent-green)' : 'var(--accent-red)' }}>
                                             {team.streak}
                                         </span>
-                                    ) : (
-                                        <div style={{ color: 'var(--text-muted)', fontSize: '12px', paddingLeft: '8px' }}>—</div>
-                                    )}
+                                    ) : null}
                                 </td>
                                 <td>
                                     <button

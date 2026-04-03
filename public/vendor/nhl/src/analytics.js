@@ -157,7 +157,7 @@ export function buildTeamRankings(standingsEntries = [], teamStatsById = {}, tea
         scaleMetric(team.pointDiff, metrics.pointDiff) * 0.28 +
         scaleMetric(team.faceoffPct, metrics.faceoffPct) * 0.2;
 
-      const compositeScore =
+      const predictiveScore =
         offenseScore * 0.34 + defenseScore * 0.32 + controlScore * 0.34;
 
       const momentumScore = team.streak * 8 + team.winPct * 42 + team.diffPerGame * 20;
@@ -167,11 +167,25 @@ export function buildTeamRankings(standingsEntries = [], teamStatsById = {}, tea
         offenseScore: round(offenseScore, 1),
         defenseScore: round(defenseScore, 1),
         controlScore: round(controlScore, 1),
-        compositeScore: round(compositeScore, 1),
+        predictiveScore: round(predictiveScore, 1),
+        compositeScore: round(predictiveScore, 1),
         momentumScore: round(momentumScore, 1),
       };
     })
-    .sort(compareByScore);
+    .sort((left, right) => compareByScore(left, right, "predictiveScore"));
+
+  const rawScores = rankings.map((team) => team.predictiveScore);
+  const minRaw = Math.min(...rawScores);
+  const maxRaw = Math.max(...rawScores);
+  const displayScale = (value) => {
+    if (!Number.isFinite(value) || maxRaw === minRaw) return 80;
+    const normalized = (value - minRaw) / (maxRaw - minRaw);
+    return round(74 + normalized * 14, 1);
+  };
+
+  rankings.forEach((team) => {
+    team.compositeScore = displayScale(team.predictiveScore);
+  });
 
   const snapshot = readCachedSettings("rankings-snapshot", null);
   const snapshotFresh =
@@ -180,7 +194,7 @@ export function buildTeamRankings(standingsEntries = [], teamStatsById = {}, tea
 
   rankings.forEach((team, index) => {
     const prior = reference?.[team.id];
-    const delta = Number.isFinite(prior) ? team.compositeScore - prior : team.momentumScore / 35;
+    const delta = Number.isFinite(prior) ? team.compositeScore - prior : team.momentumScore / 45;
     team.rank = index + 1;
     team.tier = team.rank <= 10 ? "gold" : "standard";
     team.trend =
@@ -273,7 +287,7 @@ export function buildGameProjection(event, rankingsById = {}, summary = null) {
   if (!home || !away || !homeRank || !awayRank) return null;
 
   const homeAdvantage = 3.8;
-  const rankGap = (homeRank.compositeScore - awayRank.compositeScore) * 0.72;
+  const rankGap = ((homeRank.predictiveScore ?? homeRank.compositeScore) - (awayRank.predictiveScore ?? awayRank.compositeScore)) * 0.72;
   const momentumGap = (homeRank.momentumScore - awayRank.momentumScore) * 0.1;
   const goalieEdge = deriveGoalieEdge(summary);
   const modelEdge = rankGap + momentumGap + homeAdvantage + goalieEdge;
@@ -517,6 +531,7 @@ export function buildPlayerCard(bundle, teamsById = {}) {
     seasonStats,
     careerStats,
     statisticsLog: bundle.statisticsLog,
+    seasonHistory: bundle.statisticsLog?.seasonHistory || [],
   };
 }
 

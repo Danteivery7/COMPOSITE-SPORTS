@@ -1,4 +1,5 @@
 import {
+  extractIdFromRef,
   formatGameTime,
   formatNumber,
   formatPercent,
@@ -33,6 +34,30 @@ function routeButton(label, hash, primary = false) {
       ${escapeHtml(label)}
     </button>
   `;
+}
+
+function leaderPlayerId(entry = {}) {
+  return (
+    entry?.leaders?.[0]?.athlete?.id ||
+    extractIdFromRef(entry?.leaders?.[0]?.athlete?.$ref) ||
+    null
+  );
+}
+
+function flattenTeamRoster(teamBundle = {}) {
+  return (teamBundle.roster?.athletes || []).flatMap((bucket) =>
+    (bucket.items || []).map((player) => ({
+      id: String(player.id),
+      displayName: player.displayName || player.fullName || player.shortName || "Player",
+      position:
+        player.position?.abbreviation ||
+        player.position?.displayName ||
+        player.position?.name ||
+        "",
+      jersey: player.jersey || "--",
+      headshot: player.headshot?.href || player.headshot || "",
+    })),
+  );
 }
 
 function renderEmptyState(title = "Still syncing", subtitle = "That panel is waiting on the live feeds.") {
@@ -764,7 +789,7 @@ function renderPlayerDetail(state) {
     return renderEmptyState("Player profile is loading", "Open this card again in a moment if the profile bundle is still arriving.");
   }
 
-  const history = player.statisticsLog?.entries || [];
+  const history = player.seasonHistory || [];
   return `
     <section class="detail-grid">
       <article class="detail-card detail-hero">
@@ -819,7 +844,7 @@ function renderPlayerDetail(state) {
         <div class="section-head">
           <div>
             <p class="eyebrow">Career Track</p>
-            <h3 class="section-title">Season log references</h3>
+            <h3 class="section-title">Season history</h3>
           </div>
         </div>
         <div class="timeline-stack">
@@ -829,16 +854,16 @@ function renderPlayerDetail(state) {
                   .map(
                     (entry) => `
                       <div class="timeline-item">
-                        <div class="timeline-time">${escapeHtml(entry.season?.$ref?.match(/seasons\/(\d+)/)?.[1] || "Season")}</div>
+                        <div class="timeline-time">${escapeHtml(entry.seasonLabel || "Season")}</div>
                         <div>
-                          <strong>${escapeHtml(entry.statistics?.[0]?.type || "Total")}</strong>
-                          <p class="small-note">${escapeHtml(entry.statistics?.[0]?.statistics?.$ref || "Career line attached")}</p>
+                          <strong>${escapeHtml(entry.type || "Totals")}</strong>
+                          <p class="small-note">${escapeHtml([entry.team, entry.line].filter(Boolean).join(" • "))}</p>
                         </div>
                       </div>
                     `,
                   )
                   .join("")
-              : '<p class="small-note">Career references are still loading.</p>'
+              : '<p class="small-note">Season history is still syncing.</p>'
           }
         </div>
       </article>
@@ -870,7 +895,8 @@ function renderTeamDetail(state) {
   const team = teamBundle.team;
   const teamStats = teamBundle.statistics?.results?.stats?.categories || [];
   const leaders = teamBundle.leaders?.categories || [];
-  const rosterCount = (teamBundle.roster?.athletes || []).reduce((total, bucket) => total + (bucket.items?.length || 0), 0);
+  const roster = flattenTeamRoster(teamBundle);
+  const rosterCount = roster.length;
 
   return `
     <section class="detail-grid">
@@ -927,15 +953,19 @@ function renderTeamDetail(state) {
               ? leaders
                   .slice(0, 6)
                   .map(
-                    (category) => `
-                      <div class="timeline-item">
+                    (category) => {
+                      const playerId = leaderPlayerId(category);
+                      const inner = `
                         <div class="timeline-time">${escapeHtml(category.displayName)}</div>
                         <div>
                           <strong>${escapeHtml(category.leaders?.[0]?.displayValue || "--")}</strong>
                           <p class="small-note">${escapeHtml(category.leaders?.[0]?.athlete?.displayName || "No leader")}</p>
                         </div>
-                      </div>
-                    `,
+                      `;
+                      return playerId
+                        ? `<button class="timeline-item" data-nav-hash="${toRouteHash("player", playerId)}">${inner}</button>`
+                        : `<div class="timeline-item">${inner}</div>`;
+                    },
                   )
                   .join("")
               : '<p class="small-note">Team leaders are still syncing.</p>'
@@ -943,6 +973,41 @@ function renderTeamDetail(state) {
         </div>
       </article>
 
+      <article class="detail-card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Official Roster</p>
+            <h3 class="section-title">Active player board</h3>
+          </div>
+        </div>
+        <div class="list-stack">
+          ${
+            roster.length
+              ? roster
+                  .map(
+                    (player) => `
+                      <button class="leader-card" data-nav-hash="${toRouteHash("player", player.id)}">
+                        <div class="row-between">
+                          <span class="leader-copy">
+                            ${player.headshot ? `<img src="${escapeHtml(player.headshot)}" alt="${escapeHtml(player.displayName)}" />` : ""}
+                            <span class="leader-meta">
+                              <strong>${escapeHtml(player.displayName)}</strong>
+                              <span>${escapeHtml(`${player.position || "--"} • #${player.jersey}`)}</span>
+                            </span>
+                          </span>
+                          <span class="trend-chip flat">Profile</span>
+                        </div>
+                      </button>
+                    `,
+                  )
+                  .join("")
+              : '<p class="small-note">Roster entries are still syncing.</p>'
+          }
+        </div>
+      </article>
+    </section>
+
+    <section class="detail-grid">
       <article class="detail-card">
         <div class="section-head">
           <div>

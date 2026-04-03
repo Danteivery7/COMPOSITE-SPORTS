@@ -17,7 +17,7 @@ import { fetchStandings, fetchAllTeamStats, fetchScoreboard, fetchTeamSchedule }
 import { ALL_TEAMS } from './teams';
 import { cacheGet, cacheSet, CACHE_TTL } from './cache';
 
-const RANKINGS_CACHE_KEY = 'computed_rankings_v7';
+const RANKINGS_CACHE_KEY = 'computed_rankings_v8';
 
 /* ======================================================================
    COMPOSITE RANKING COMPUTATION
@@ -203,6 +203,7 @@ export async function computeRankings() {
         { id: 'team_slg', name: 'Team SLG', key: 'teamSLG', weight: 5, higher: true, scope: 'offense' },
         { id: 'team_iso', name: 'Team ISO', key: 'teamISO', weight: 3, higher: true, scope: 'offense' },
         { id: 'team_rc27', name: 'Runs Created/27', key: 'teamRC27', weight: 4, higher: true, scope: 'offense' },
+        { id: 'streak_form', name: 'Streak Form', key: 'streakNum', weight: 8, higher: true, scope: 'both' },
         // Defense / pitching sources
         { id: 'team_era', name: 'Team ERA', key: 'teamERA', weight: 10, higher: false, scope: 'defense' },
         { id: 'team_whip', name: 'Team WHIP', key: 'teamWHIP', weight: 8, higher: false, scope: 'defense' },
@@ -271,9 +272,10 @@ export async function computeRankings() {
             if (r) defScore += r.score * (src.weight / defWeight);
         }
 
+        const streakBoost = Math.max(-8, Math.min(8, t.streakNum || 0)) * 0.55;
         return {
             ...t,
-            ovrScore: Math.round(ovrScore * 100) / 100,
+            ovrScore: Math.round((ovrScore + streakBoost) * 100) / 100,
             offScore: Math.round(offScore * 100) / 100,
             defScore: Math.round(defScore * 100) / 100,
             sourceRankings: sr,
@@ -293,7 +295,12 @@ export async function computeRankings() {
     await Promise.all(schedulePromises);
 
     // ── Sort + assign ranks ─────────────────────────────────────────────
-    ranked.sort((a, b) => b.ovrScore - a.ovrScore || a.runDiff - b.runDiff);
+    ranked.sort((a, b) => {
+        if (b.ovrScore !== a.ovrScore) return b.ovrScore - a.ovrScore;
+        if ((b.streakNum || 0) !== (a.streakNum || 0)) return (b.streakNum || 0) - (a.streakNum || 0);
+        if ((b.runDiff || 0) !== (a.runDiff || 0)) return (b.runDiff || 0) - (a.runDiff || 0);
+        return (b.winPct || 0) - (a.winPct || 0);
+    });
     ranked.forEach((t, i) => { t.ovrRank = i + 1; });
 
     const offSorted = [...ranked].sort((a, b) => b.offScore - a.offScore);

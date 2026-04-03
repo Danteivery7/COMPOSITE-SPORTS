@@ -31,6 +31,88 @@ async function fetchJson(url, options = {}) {
   }
 }
 
+function flattenLogSummaryStats(payload) {
+  const map = {};
+  const categories =
+    payload?.splits?.categories ||
+    payload?.results?.stats?.categories ||
+    payload?.categories ||
+    [];
+
+  categories.forEach((category) => {
+    (category.stats || []).forEach((stat) => {
+      if (stat?.name) map[stat.name] = stat;
+      if (stat?.type) map[stat.type] = stat;
+    });
+  });
+
+  return map;
+}
+
+function pickLogDisplay(map, keys, fallback = "--") {
+  for (const key of keys) {
+    const stat = map[key];
+    if (!stat) continue;
+    return stat.displayValue ?? String(stat.value ?? fallback);
+  }
+  return fallback;
+}
+
+function buildSeasonSummaryLine(statsMap = {}) {
+  const isGoalie = Boolean(statsMap.savePct || statsMap.avgGoalsAgainst || statsMap.shutouts);
+  const games = pickLogDisplay(statsMap, ["games", "gamesPlayed"], "--");
+  if (isGoalie) {
+    const wins = pickLogDisplay(statsMap, ["wins"], "--");
+    const savePct = pickLogDisplay(statsMap, ["savePct"], "--");
+    const gaa = pickLogDisplay(statsMap, ["avgGoalsAgainst"], "--");
+    return `GP ${games} • W ${wins} • SV% ${savePct} • GAA ${gaa}`;
+  }
+
+  const goals = pickLogDisplay(statsMap, ["goals"], "--");
+  const assists = pickLogDisplay(statsMap, ["assists"], "--");
+  const points = pickLogDisplay(statsMap, ["points"], "--");
+  const plusMinus = pickLogDisplay(statsMap, ["plusMinus"], "--");
+  return `GP ${games} • G ${goals} • A ${assists} • PTS ${points} • +/- ${plusMinus}`;
+}
+
+async function normalizeStatisticsLog(statisticsLog = {}) {
+  const entries = Array.isArray(statisticsLog?.entries) ? statisticsLog.entries : [];
+  if (!entries.length) {
+    return {
+      ...statisticsLog,
+      seasonHistory: [],
+    };
+  }
+
+  const seasonHistory = await mapWithConcurrency(
+    entries.slice(0, 8),
+    async (entry) => {
+      const statRef = entry?.statistics?.[0]?.statistics?.$ref || null;
+      const statPayload = statRef ? await fetchJson(statRef) : null;
+      const statsMap = flattenLogSummaryStats(statPayload);
+      return {
+        seasonLabel:
+          entry?.season?.displayName ||
+          entry?.season?.shortDisplayName ||
+          entry?.season?.$ref?.match(/seasons\/(\d+)/)?.[1] ||
+          "Season",
+        team:
+          entry?.team?.displayName ||
+          entry?.team?.shortDisplayName ||
+          "",
+        type: statPayload?.displayName || entry?.statistics?.[0]?.type || "Totals",
+        line: buildSeasonSummaryLine(statsMap),
+      };
+    },
+    4,
+  );
+
+  return {
+    ...statisticsLog,
+    seasonHistory: seasonHistory.filter(Boolean),
+  };
+}
+
 async function mapWithConcurrency(items, mapper, concurrency = 6) {
   const results = new Array(items.length);
   let cursor = 0;
@@ -285,7 +367,7 @@ export async function getPlayerBundle(playerId, seasonYear, force = false) {
     getPlayerStatisticsLog(playerId, force),
   ]);
 
-  return { profile, seasonStats, careerStats, statisticsLog };
+  return { profile, seasonStats, careerStats, statisticsLog: await normalizeStatisticsLog(statisticsLog) };
 }
 
 export async function getTeamBundle(teamId, seasonYear, force = false) {

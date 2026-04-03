@@ -748,8 +748,8 @@ body.intro-dismissed .mobile-nav {
 }
 
 .topbar {
-  position: sticky;
-  top: 22px;
+  position: relative;
+  top: auto;
   z-index: 10;
   padding: 18px 20px;
   display: flex;
@@ -1361,6 +1361,12 @@ body.intro-dismissed .mobile-nav {
   gap: 14px;
   padding: 14px 0;
   border-bottom: 1px solid var(--line);
+  width: 100%;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .timeline-item:last-child {
@@ -1449,12 +1455,15 @@ body.intro-dismissed .mobile-nav {
   bottom: 16px;
   z-index: 20;
   display: none;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   padding: 10px;
 }
 
 .mobile-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 12px 8px;
   border-radius: 14px;
   background: transparent;
@@ -1462,6 +1471,16 @@ body.intro-dismissed .mobile-nav {
   text-transform: uppercase;
   font-size: 0.74rem;
   letter-spacing: 0.08em;
+  text-decoration: none;
+  text-align: center;
+}
+
+.mobile-link-hub {
+  color: inherit;
+}
+
+.mobile-link-action {
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .settings-value {
@@ -1563,7 +1582,6 @@ body.intro-dismissed .mobile-nav {
   }
 
   .topbar {
-    top: 16px;
     flex-direction: column;
     align-items: stretch;
   }
@@ -1661,7 +1679,7 @@ body.intro-dismissed .mobile-nav {
   }
 
   .mobile-nav {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .search-results {

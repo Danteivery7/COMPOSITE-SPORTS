@@ -45,6 +45,7 @@ const dom = {
   searchResults: document.querySelector("#search-results"),
   refreshButton: document.querySelector("#refresh-button"),
   themeButton: document.querySelector("#theme-button"),
+  mobileThemeButton: document.querySelector("#mobile-theme-button"),
   menuButton: document.querySelector("#menu-button"),
   navOverlay: document.querySelector("#nav-overlay"),
   routeTitle: document.querySelector("#route-title"),
@@ -351,7 +352,32 @@ async function ensureNewsStory(storyId, force = false) {
   if (!storyId) return;
   if (!force && state.newsStories[storyId]) return;
   const storyMeta = (state.news || []).find((entry) => String(entry.storyId || entry.id) === String(storyId));
-  state.newsStories[storyId] = await getNewsStory(storyId, storyMeta?.apiHref || "", force);
+  try {
+    const story = await getNewsStory(storyId, storyMeta?.apiHref || "", force);
+    state.newsStories[storyId] = story?.headline
+      ? story
+      : {
+          storyId,
+          headline: storyMeta?.headline || "Story",
+          source: storyMeta?.source || "NHL Feed",
+          published: storyMeta?.published || storyMeta?.lastModified || null,
+          image: storyMeta?.image || "",
+          dek: storyMeta?.description || storyMeta?.summary || "",
+          body: `<p>${storyMeta?.description || storyMeta?.summary || "Story details are still syncing inside COMPOSITE NHL."}</p>`,
+          related: [],
+        };
+  } catch (_error) {
+    state.newsStories[storyId] = {
+      storyId,
+      headline: storyMeta?.headline || "Story",
+      source: storyMeta?.source || "NHL Feed",
+      published: storyMeta?.published || storyMeta?.lastModified || null,
+      image: storyMeta?.image || "",
+      dek: storyMeta?.description || storyMeta?.summary || "",
+      body: `<p>${storyMeta?.description || storyMeta?.summary || "Story details are still syncing inside COMPOSITE NHL."}</p>`,
+      related: [],
+    };
+  }
   render();
 }
 
@@ -493,6 +519,7 @@ function wireEvents() {
   });
 
   dom.themeButton.addEventListener("click", toggleTheme);
+  dom.mobileThemeButton?.addEventListener("click", toggleTheme);
 
   dom.menuButton?.addEventListener("click", () => {
     state.mobileNavOpen = !state.mobileNavOpen;

@@ -119,6 +119,38 @@ function sportMeta(sport) {
   return meta;
 }
 
+function easternDateParts(date = new Date()) {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  });
+  const parts = formatter.formatToParts(date);
+  const values = Object.fromEntries(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, Number(part.value)]));
+  return {
+    year: values.year || date.getFullYear(),
+    month: values.month || date.getMonth() + 1,
+    day: values.day || date.getDate(),
+  };
+}
+
+function getNflBaselineSeasonYear(date = new Date()) {
+  const { year, month, day } = easternDateParts(date);
+  const newSeasonActive = month > 7 || (month === 7 && day >= 31);
+  return newSeasonActive ? year : year - 1;
+}
+
+function withQuery(url, params = {}) {
+  const next = new URL(url);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      next.searchParams.set(key, String(value));
+    }
+  });
+  return next.toString();
+}
+
 function parseTeam(rawTeam) {
   return {
     id: String(rawTeam.id),
@@ -171,16 +203,31 @@ function getStatValue(stats, keys, fallback = 0) {
 
 async function getStandings(sport) {
   const meta = sportMeta(sport);
-  const key = cacheKey('standings', sport);
+  const seasonYear = sport === 'nfl' ? getNflBaselineSeasonYear() : '';
+  const key = cacheKey('standings', sport, seasonYear);
   const cached = readCache(key);
   if (cached) return cached;
-  const payload = await fetchJson(`${meta.site}/standings`, 20 * 60 * 1000);
+  let payload = await fetchJson(
+    sport === 'nfl'
+      ? withQuery(`${meta.site}/standings`, { season: seasonYear, seasontype: 2 })
+      : `${meta.site}/standings`,
+    20 * 60 * 1000,
+  );
   const entries = [];
   walk(payload, (node) => {
     if (node?.team?.id && Array.isArray(node?.stats)) {
       entries.push(node);
     }
   });
+
+  if (sport === 'nfl' && !entries.length) {
+    payload = await fetchJson(`${meta.site}/standings`, 20 * 60 * 1000);
+    walk(payload, (node) => {
+      if (node?.team?.id && Array.isArray(node?.stats)) {
+        entries.push(node);
+      }
+    });
+  }
 
   const standings = uniqBy(
     entries.map((entry) => {
@@ -253,10 +300,19 @@ function flattenStatisticsPayload(payload) {
 
 async function getTeamStatistics(sport, teamId) {
   const meta = sportMeta(sport);
-  const key = cacheKey('team-stats', sport, teamId);
+  const seasonYear = sport === 'nfl' ? getNflBaselineSeasonYear() : '';
+  const key = cacheKey('team-stats', sport, `${teamId}:${seasonYear}`);
   const cached = readCache(key);
   if (cached) return cached;
-  const payload = await fetchJson(`${meta.site}/teams/${teamId}/statistics`, 6 * 60 * 60 * 1000);
+  let payload = await fetchJson(
+    sport === 'nfl'
+      ? withQuery(`${meta.site}/teams/${teamId}/statistics`, { season: seasonYear, seasontype: 2 })
+      : `${meta.site}/teams/${teamId}/statistics`,
+    6 * 60 * 60 * 1000,
+  );
+  if (sport === 'nfl' && !Object.keys(flattenStatisticsPayload(payload)).length) {
+    payload = await fetchJson(`${meta.site}/teams/${teamId}/statistics`, 6 * 60 * 60 * 1000);
+  }
   return writeCache(key, flattenStatisticsPayload(payload), 6 * 60 * 60 * 1000);
 }
 
@@ -375,7 +431,8 @@ function metricSetForSport(sport) {
 }
 
 async function computeRankings(sport) {
-  const key = cacheKey('rankings', sport);
+  const seasonYear = sport === 'nfl' ? getNflBaselineSeasonYear() : '';
+  const key = cacheKey('rankings', sport, seasonYear);
   const cached = readCache(key);
   if (cached) return cached;
 
@@ -550,12 +607,21 @@ async function fetchNews(sport) {
 
 async function fetchLeaders(sport) {
   const meta = sportMeta(sport);
-  const key = cacheKey('leaders', sport);
+  const seasonYear = sport === 'nfl' ? getNflBaselineSeasonYear() : '';
+  const key = cacheKey('leaders', sport, seasonYear);
   const cached = readCache(key);
   if (cached) return cached;
 
   try {
-    const payload = await fetchJson(`${meta.site}/leaders`, 60 * 60 * 1000);
+    let payload = await fetchJson(
+      sport === 'nfl'
+        ? withQuery(`${meta.site}/leaders`, { season: seasonYear, seasontype: 2 })
+        : `${meta.site}/leaders`,
+      60 * 60 * 1000,
+    );
+    if (sport === 'nfl' && !(payload?.leaders || payload?.categories || payload?.items)) {
+      payload = await fetchJson(`${meta.site}/leaders`, 60 * 60 * 1000);
+    }
     const leaders = [];
     walk(payload, (node) => {
       if (node?.athlete?.id && (node.rank || node.displayValue || node.value)) {
@@ -593,8 +659,9 @@ async function fetchRoster(sport, teamId) {
   const key = cacheKey('roster', sport, teamId);
   const cached = readCache(key);
   if (cached) return cached;
-  const payload = await fetchJson(`${meta.site}/teams/${teamId}/roster`, 12 * 60 * 60 * 1000);
-  return writeCache(key, payload, 12 * 60 * 60 * 1000);
+  const ttl = sport === 'nfl' ? 2 * 60 * 60 * 1000 : 12 * 60 * 60 * 1000;
+  const payload = await fetchJson(`${meta.site}/teams/${teamId}/roster`, ttl);
+  return writeCache(key, payload, ttl);
 }
 
 function parseRosterPlayers(payload, team) {
@@ -617,7 +684,8 @@ function parseRosterPlayers(payload, team) {
 }
 
 async function getPlayerCatalog(sport) {
-  const key = cacheKey('players', sport);
+  const seasonYear = sport === 'nfl' ? getNflBaselineSeasonYear() : '';
+  const key = cacheKey('players', sport, seasonYear);
   const cached = readCache(key);
   if (cached) return cached;
 

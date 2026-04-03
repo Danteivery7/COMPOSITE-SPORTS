@@ -75,7 +75,6 @@ export default function SportHubPage() {
   const worldPlayers = hero?.worldBoard?.players || [];
   const heroStories = hero?.heroStories || [];
   const secondaryStories = hero?.secondaryStories || [];
-  const bets = hero?.betLegs || hero?.topBets || [];
   const cardSpotlights = hero?.cardSpotlights || {};
   const parlay = hero?.parlaySummary || hero?.parlay || null;
   const liveTicker = hero?.liveTicker || [];
@@ -254,25 +253,12 @@ export default function SportHubPage() {
                 <strong>{parlay?.return ? `$${parlay.return}` : '--'}</strong>
               </div>
             </div>
-            <div className="hub-bet-mini-list">
-              {parlay ? (
-                <div className="hub-parlay-footnote">
-                  Verified {parlay?.verifiedAt ? new Date(parlay.verifiedAt).toLocaleTimeString() : 'just now'}
-                </div>
-              ) : null}
-              {bets.length
-                ? bets.map((bet) => (
-                    <div className="hub-bet-mini-card" key={`${bet.league}-${bet.gameId}`}>
-                      <div className="hub-bet-mini-top">
-                        <span>{bet.league}</span>
-                        <MoneylineTag value={bet.americanOddsLabel} />
-                      </div>
-                      <strong>{bet.selection}</strong>
-                      <p>{bet.lineType}</p>
-                    </div>
-                  ))
-                : [...Array(3)].map((_, index) => <div key={index} className="hub-bet-mini-card is-loading" />)}
+            <div className="hub-parlay-footnote">
+              {parlay?.verifiedAt ? `Verified ${new Date(parlay.verifiedAt).toLocaleTimeString()}` : 'Live parlay board syncing now'}
             </div>
+            <p className="hub-parlay-note">
+              The parlay card is the only betting module on the main menu. It uses verified odds math and today&apos;s strongest cross-sport edge set.
+            </p>
           </article>
         </div>
 
@@ -415,46 +401,6 @@ export default function SportHubPage() {
             </div>
           </div>
         ) : null}
-      </section>
-
-      <section className="hub-bet-board">
-        <div className="hub-module-head">
-          <div>
-            <p className="eyebrow">Best Bets Today</p>
-            <h2>Top 3 Multi-Sport Edges</h2>
-          </div>
-          <span>{hero?.lastUpdated ? `Updated ${new Date(hero.lastUpdated).toLocaleTimeString()}` : 'Sync pending'}</span>
-        </div>
-        <div className="hub-bet-grid">
-              {bets.length
-            ? bets.map((bet) => (
-                <article className="hub-bet-card" key={`${bet.league}-${bet.gameId}`}>
-                  <div className="hub-bet-card-top">
-                    <span>{bet.league}</span>
-                    <MoneylineTag value={bet.americanOddsLabel} />
-                  </div>
-                  <div className="hub-bet-card-mid">
-                    <div className="hub-bet-logos">
-                      {bet.teamLogo ? <img src={bet.teamLogo} alt={bet.selection} className="hub-bet-logo" /> : null}
-                      {bet.opponentLogo ? <img src={bet.opponentLogo} alt="" className="hub-bet-logo is-ghost" /> : null}
-                    </div>
-                    <div>
-                      <strong>{bet.selection}</strong>
-                      <p>{bet.lineType}</p>
-                    </div>
-                  </div>
-                  <div className="hub-bet-chip-row">
-                    {Number.isFinite(Number(bet.winProbability)) ? <span className="hub-bet-chip">Model {Math.round(Number(bet.winProbability))}%</span> : null}
-                    {Number.isFinite(Number(bet.edgeMagnitude)) ? <span className="hub-bet-chip is-strong">Edge {Number(bet.edgeMagnitude).toFixed(1)}</span> : null}
-                  </div>
-                  <div className="hub-bet-card-bottom">
-                    <span>{bet.projectedScore}</span>
-                    <span>{bet.startLabel || ''}</span>
-                  </div>
-                </article>
-              ))
-            : [...Array(3)].map((_, index) => <div key={index} className="hub-bet-card is-loading" />)}
-        </div>
       </section>
 
     </main>

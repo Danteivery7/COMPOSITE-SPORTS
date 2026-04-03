@@ -426,6 +426,17 @@ const ui = {
         const hottestPlayerLabel = hottestPlayer
             ? (hottestPlayer.fullName || hottestPlayer.displayName || hottestPlayer.teamAbbr || '--').split(' ').slice(-1)[0]
             : '--';
+        const heroLogos = topTeams
+            .slice(0, 4)
+            .map((team) => {
+                const logo = team?.team?.logos?.[0]?.href || team?.team?.logo || '';
+                return logo
+                    ? `<img src="${logo}" alt="${team?.team?.displayName || team?.team?.abbreviation || 'Team'}" class="overview-hero-logo" />`
+                    : '';
+            })
+            .join('');
+        const hottestPlayerHeadshot = hottestPlayer?.headshot || hottestPlayer?.athlete?.headshot?.href || '';
+        const pickLabel = pick.hasOfficialPick ? "Today's Official Pick" : "Today's Strongest Lean";
 
         const formatPublished = (isoString) => {
             if (!isoString) return 'Latest';
@@ -441,6 +452,10 @@ const ui = {
             <section class="card overview-panel overview-hero-panel">
                 <div class="overview-hero-copy">
                     <div class="overview-kicker">Pick Of The Day</div>
+                    <div class="overview-pick-banner">
+                        <span class="overview-pick-flag ${pick.hasOfficialPick ? 'success' : 'warning'}">${pickLabel}</span>
+                        <span class="overview-pick-note">${edges.length} tracked model edges</span>
+                    </div>
                     <h3>${pick.title}</h3>
                     <p>${pick.summary}</p>
                     ${pick.edge ? `
@@ -453,6 +468,18 @@ const ui = {
                     ` : ''}
                 </div>
                 <div class="overview-hero-metrics">
+                    <div class="card overview-hero-visual-card">
+                        <div class="overview-hero-logo-strip">
+                            ${heroLogos || '<span class="overview-panel-sub">Team boards syncing</span>'}
+                        </div>
+                        <div class="overview-hero-player">
+                            ${hottestPlayerHeadshot ? `<img src="${hottestPlayerHeadshot}" alt="${hottestPlayer.fullName || hottestPlayer.displayName || 'Player'}" class="overview-hero-headshot" />` : ''}
+                            <div>
+                                <div class="stat-label">Featured Face</div>
+                                <div class="stat-value" style="font-size:20px;">${hottestPlayerLabel}</div>
+                            </div>
+                        </div>
+                    </div>
                     <div class="card stat-card">
                         <div class="stat-label">Live Games</div>
                         <div class="stat-value">${(window.store.state.games || []).filter((game) => game?.status?.type?.state === 'in').length}</div>
