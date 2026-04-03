@@ -168,8 +168,25 @@ async function getTeams() {
   const key = cacheKey('teams');
   const cached = readCache(key);
   if (cached) return cached;
-  const payload = await fetchJson(`${SITE}/teams`, 12 * 60 * 60 * 1000);
-  return writeCache(key, parseTeamsFromPayload(payload), 12 * 60 * 60 * 1000);
+
+  const payloads = await Promise.allSettled([
+    fetchJson(`${SITE}/teams?limit=500`, 12 * 60 * 60 * 1000),
+    fetchJson(`${SITE}/teams`, 12 * 60 * 60 * 1000),
+    fetchJson(`${SITE}/standings`, 20 * 60 * 1000),
+  ]);
+
+  const teams = uniqBy(
+    payloads
+      .filter((result) => result.status === 'fulfilled')
+      .flatMap((result) => parseTeamsFromPayload(result.value)),
+    (team) => team.id,
+  );
+
+  if (!teams.length) {
+    throw new Error('Unable to load CBB team universe');
+  }
+
+  return writeCache(key, teams, 12 * 60 * 60 * 1000);
 }
 
 async function getStandings() {
@@ -351,7 +368,7 @@ function parsePollRankMap(polls) {
 
   const rankMap = new Map();
   if (!poll) {
-    return { label: 'Poll unavailable', rankMap };
+    return { label: 'Poll unavailable', rankMap, isFallback: false, pollAvailable: false };
   }
 
   (poll.ranks || []).forEach((entry) => {
@@ -363,6 +380,8 @@ function parsePollRankMap(polls) {
   return {
     label: poll.displayName || poll.name || 'Poll',
     rankMap,
+    isFallback: /coaches/i.test(poll.displayName || poll.name || ''),
+    pollAvailable: true,
   };
 }
 
@@ -440,6 +459,13 @@ function makeTeamResume(rows) {
 }
 
 function applyPollRanks(rows, pollRankMap) {
+  if (!pollRankMap.size) {
+    rows.forEach((row) => {
+      row.apRank = null;
+    });
+    return;
+  }
+
   const unranked = rows
     .slice()
     .sort((left, right) => right.resumeScore - left.resumeScore);
@@ -458,35 +484,42 @@ function applyPollRanks(rows, pollRankMap) {
 }
 
 function finalizeRanks(rows) {
+  function averageAvailable(values) {
+    const usable = values.filter((value) => Number.isFinite(value));
+    if (!usable.length) return null;
+    return round(usable.reduce((sum, value) => sum + value, 0) / usable.length, 2);
+  }
+
   rows.forEach((row) => {
-    row.avgRank = round(
-      (
-        row.apRank +
-        row.netRank +
-        row.torvikRank +
-        row.kenpomRank +
-        row.haslametricsRank +
-        row.evanmiyaRank
-      ) / 6,
-      2,
-    );
-    row.offRank = round(
-      (row.torvikOffRank + row.kenpomOffRank + row.haslaOffRank + row.evanOffRank) / 4,
-      2,
-    );
-    row.defRank = round(
-      (row.torvikDefRank + row.kenpomDefRank + row.haslaDefRank + row.evanDefRank) / 4,
-      2,
-    );
+    row.avgRank = averageAvailable([
+      row.apRank,
+      row.netRank,
+      row.torvikRank,
+      row.kenpomRank,
+      row.haslametricsRank,
+      row.evanmiyaRank,
+    ]);
+    row.offRank = averageAvailable([
+      row.torvikOffRank,
+      row.kenpomOffRank,
+      row.haslaOffRank,
+      row.evanOffRank,
+    ]);
+    row.defRank = averageAvailable([
+      row.torvikDefRank,
+      row.kenpomDefRank,
+      row.haslaDefRank,
+      row.evanDefRank,
+    ]);
   });
 
   rows
     .slice()
-    .sort((left, right) => left.avgRank - right.avgRank || right.resumeScore - left.resumeScore)
+    .sort((left, right) => (left.avgRank ?? 999) - (right.avgRank ?? 999) || right.resumeScore - left.resumeScore)
     .forEach((row, index) => {
       row.compositeRank = index + 1;
       row.ovrRank = index + 1;
-      row.ovrScore = round(clamp(99 - index * 0.19 - row.avgRank * 0.035 + row.hotness * 0.06, 62, 99), 1);
+      row.ovrScore = round(clamp(97 - index * 0.08 - (row.avgRank ?? 200) * 0.055 + row.hotness * 0.05, 58, 97), 1);
     });
 }
 
@@ -494,7 +527,7 @@ function buildRankingRows(teams, standings, teamStats, schedules, polls) {
   const standingsMap = Object.fromEntries(standings.map((entry) => [entry.teamId, entry]));
   const statsMap = Object.fromEntries(teamStats.filter(Boolean).map((entry) => [entry.teamId, entry.stats]));
   const scheduleMap = Object.fromEntries(schedules.filter(Boolean).map((entry) => [entry.teamId, entry.schedule]));
-  const { rankMap: pollRankMap, label: pollLabel } = parsePollRankMap(polls);
+  const { rankMap: pollRankMap, label: pollLabel, isFallback: pollFallback, pollAvailable } = parsePollRankMap(polls);
 
   const rows = teams.map((team) => {
     const standing = standingsMap[team.id] || {};
@@ -570,6 +603,8 @@ function buildRankingRows(teams, standings, teamStats, schedules, polls) {
       sourceValues: {},
       sourceRanks: {},
       pollLabel,
+      pollFallback,
+      pollAvailable,
       lastUpdated: new Date().toISOString(),
     };
   });
@@ -729,9 +764,11 @@ async function fetchRoster(teamId) {
 
 function parseRosterPlayers(payload, team) {
   const players = [];
+  let rosterOrder = 0;
   walk(payload, (node) => {
     if (node?.id && (node.displayName || node.fullName || node.shortName) && node.position) {
       const statLine = extractPlayerStatsMap(node);
+      rosterOrder += 1;
       players.push({
         id: String(node.id),
         displayName: node.displayName || node.fullName || node.shortName,
@@ -750,6 +787,7 @@ function parseRosterPlayers(payload, team) {
         age: node.age || null,
         classYear: node.experience?.displayValue || node.experience?.abbreviation || '',
         stats: statLine,
+        rosterOrder,
       });
     }
   });
@@ -774,8 +812,8 @@ function playerPositionBucket(position) {
 function buildPlayerRating(player, team) {
   const stats = player.stats || {};
   const bucket = playerPositionBucket(player.position);
-  const teamBoost = clamp(18 - ((team?.compositeRank || 120) / 12), -8, 12);
-  const hotnessBoost = (team?.hotness || 50) * 0.08;
+  const teamBoost = clamp(16 - ((team?.compositeRank || 180) / 16), -6, 10);
+  const hotnessBoost = (team?.hotness || 50) * 0.06;
   const minutes = Number(stats.minutes || 0);
   const points = Number(stats.points || 0);
   const rebounds = Number(stats.rebounds || 0);
@@ -785,6 +823,15 @@ function buildPlayerRating(player, team) {
   const turnovers = Number(stats.turnovers || 0);
   const fgPct = Number(stats.fgPct || 42);
   const threePct = Number(stats.threePct || 31);
+  const rosterSlotBoost = clamp(13 - Number(player.rosterOrder || 14) * 0.72, -6, 12);
+  const classBoost =
+    /sr|senior/i.test(String(player.classYear || ''))
+      ? 2.6
+      : /jr|junior/i.test(String(player.classYear || ''))
+        ? 1.7
+        : /so|sophomore/i.test(String(player.classYear || ''))
+          ? 1
+          : 0.35;
 
   let production = 0;
   if (bucket === 'guard') {
@@ -821,7 +868,26 @@ function buildPlayerRating(player, team) {
     .slice(0, 3)
     .reduce((total, entry) => total + Math.max(0, 16 - Number(entry.rank || 16)), 0);
 
-  const rating = round(clamp(55 + production * 0.36 + leaderBoost * 0.7 + teamBoost + hotnessBoost, 52, 99), 1);
+  const statPresenceBoost =
+    (points > 0 ? 5.4 : 0) +
+    (assists > 0 ? 2.4 : 0) +
+    (rebounds > 0 ? 2.2 : 0) +
+    (minutes > 0 ? 4.1 : 0);
+  const rating = round(
+    clamp(
+      51 +
+        production * 0.52 +
+        leaderBoost * 1.05 +
+        teamBoost +
+        hotnessBoost +
+        rosterSlotBoost +
+        classBoost +
+        statPresenceBoost,
+      48,
+      98,
+    ),
+    1,
+  );
   return rating;
 }
 
@@ -926,7 +992,7 @@ async function buildLocalSnapshot() {
     playersByTeam.set(player.team.id, list);
   });
 
-  const featuredPlayers = players.slice(0, 18);
+  const featuredPlayers = players.slice(0, 12);
   const teamsWithLeaders = rankings.map((team) => ({
     ...team,
     leaders: (playersByTeam.get(team.id) || []).slice(0, 3),
@@ -941,6 +1007,7 @@ async function buildLocalSnapshot() {
     teams: teamsWithLeaders,
     news,
     featuredPlayers,
+    topPlayers: players.slice(0, 3),
     playersCatalog: {
       players,
       totalPlayers: players.length,
@@ -948,12 +1015,16 @@ async function buildLocalSnapshot() {
     },
     predictors,
     sourceState: {
-      apPoll: polls.length ? 'live' : 'fallback',
+      apPoll: polls.length ? 'live-or-coaches' : 'missing',
       net: 'derived-fallback',
       torvik: hasRemoteCBBService() ? 'remote-or-fallback' : 'local-derived',
-      kenpom: 'scaled-from-torvik',
+      kenpom: hasRemoteCBBService() ? 'remote-or-fallback' : 'scaled-from-local',
       haslametrics: hasRemoteCBBService() ? 'remote-or-fallback' : 'local-derived',
-      evanmiya: 'scaled-from-torvik',
+      evanmiya: hasRemoteCBBService() ? 'remote-or-fallback' : 'scaled-from-local',
+    },
+    sourceTimestamps: {
+      snapshot: new Date().toISOString(),
+      apPoll: polls.length ? new Date().toISOString() : null,
     },
     meta: {
       liveGames: scoreboard.filter((game) => game.state === 'in').length,
@@ -969,7 +1040,7 @@ async function buildCBBSnapshot(force = false) {
   if (hasRemoteCBBService()) {
     try {
       const remote = await fetchRemoteCBBBootstrap({ force });
-      if (remote?.rankings?.length && remote?.playersCatalog?.players?.length) {
+      if ((remote?.rankings?.length || 0) >= 300 && (remote?.playersCatalog?.players?.length || 0) >= 500) {
         return remote;
       }
     } catch (_error) {

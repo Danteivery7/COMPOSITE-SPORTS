@@ -716,6 +716,40 @@ body[data-composite-route='hub'] {
     linear-gradient(180deg, rgba(146, 84, 18, 0.16), transparent);
 }
 
+.sport-intro[data-motif='bracket'] .sport-intro-scorebug {
+  top: 11%;
+  background: rgba(94, 52, 18, 0.72);
+  border-color: rgba(255, 230, 176, 0.22);
+}
+
+.sport-intro[data-motif='bracket'] .sport-intro-floor {
+  bottom: 9%;
+  width: min(54rem, 90vw);
+  height: 19rem;
+  background:
+    repeating-linear-gradient(90deg, rgba(193, 129, 68, 0.62) 0 18px, rgba(122, 72, 34, 0.76) 18px 36px),
+    linear-gradient(180deg, rgba(255,255,255,0.08), rgba(0,0,0,0.16));
+  opacity: 0.58;
+}
+
+.sport-intro[data-motif='bracket'] .sport-intro-backboard {
+  top: 24%;
+  right: 20%;
+  opacity: 0.24;
+}
+
+.sport-intro[data-motif='bracket'] .sport-intro-banner {
+  top: 14%;
+  width: min(24rem, 64vw);
+  background: linear-gradient(90deg, rgba(255,255,255,0.08), rgba(255,236,178,0.34), rgba(255,255,255,0.08));
+}
+
+.sport-intro[data-motif='bracket'] .sport-intro-bracket-wall {
+  inset: 18% 13% auto;
+  height: 16rem;
+  opacity: 0.44;
+}
+
 .sport-intro[data-motif='bracket'] .sport-intro-portal {
   border-color: rgba(255, 214, 138, 0.26);
   background:
@@ -2341,14 +2375,15 @@ body[data-composite-route='hub'] {
 
 .cbb-route-shell {
   background:
-    radial-gradient(circle at top, rgba(255, 205, 102, 0.1), transparent 24%),
-    linear-gradient(180deg, rgba(15, 9, 8, 0.98), rgba(12, 10, 13, 0.98));
+    radial-gradient(circle at top, rgba(255, 209, 96, 0.16), transparent 26%),
+    radial-gradient(circle at 84% 12%, rgba(255, 246, 189, 0.08), transparent 20%),
+    linear-gradient(180deg, rgba(36, 20, 10, 0.98), rgba(20, 12, 8, 0.98));
 }
 
 .cbb-app-shell .generic-sidebar {
   background:
-    radial-gradient(circle at top, rgba(255, 216, 123, 0.12), transparent 28%),
-    linear-gradient(180deg, rgba(25, 16, 10, 0.96), rgba(11, 9, 10, 0.99));
+    radial-gradient(circle at top, rgba(255, 224, 140, 0.18), transparent 30%),
+    linear-gradient(180deg, rgba(82, 46, 20, 0.96), rgba(33, 19, 12, 0.99));
 }
 
 .cbb-brand p {
@@ -2370,8 +2405,8 @@ body[data-composite-route='hub'] {
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(circle at top right, rgba(255, 226, 141, 0.14), transparent 28%),
-    linear-gradient(135deg, rgba(76, 46, 15, 0.45), rgba(18, 13, 12, 0.9));
+    radial-gradient(circle at top right, rgba(255, 234, 165, 0.2), transparent 28%),
+    linear-gradient(135deg, rgba(120, 72, 28, 0.52), rgba(43, 26, 17, 0.92));
 }
 
 .cbb-hero::before,
@@ -2419,8 +2454,20 @@ body[data-composite-route='hub'] {
   padding: 16px 18px;
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 246, 225, 0.08);
   color: var(--text);
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+.cbb-hero-note:hover,
+.cbb-news-card:hover,
+.cbb-top-player-card:hover,
+.cbb-team-card:hover,
+.cbb-source-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 214, 108, 0.3);
+  background: rgba(255, 248, 229, 0.12);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
 }
 
 .cbb-hero-note span {
@@ -2493,6 +2540,50 @@ body[data-composite-route='hub'] {
   grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
 }
 
+.cbb-top-player-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.cbb-top-player-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(135deg, rgba(255, 246, 225, 0.08), rgba(255, 255, 255, 0.03));
+  color: var(--text);
+  text-align: left;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.cbb-top-player-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.cbb-top-player-card strong {
+  display: block;
+  margin-top: 2px;
+}
+
+.cbb-top-player-card p {
+  margin: 8px 0 0;
+  color: #e7edf8;
+  font-size: 0.93rem;
+  line-height: 1.5;
+}
+
+.cbb-top-player-card b {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.4rem;
+  color: var(--sport-accent-alt);
+}
+
 .cbb-team-card {
   text-align: left;
   display: grid;
@@ -2542,6 +2633,52 @@ body[data-composite-route='hub'] {
   gap: 12px;
 }
 
+.cbb-news-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+}
+
+.cbb-news-grid.compact {
+  grid-template-columns: 1fr;
+}
+
+.cbb-news-card {
+  overflow: hidden;
+  padding: 0;
+  text-align: left;
+  display: grid;
+  gap: 0;
+}
+
+.cbb-news-image {
+  width: 100%;
+  height: 12rem;
+  object-fit: cover;
+  display: block;
+}
+
+.cbb-news-copy {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+}
+
+.cbb-news-copy span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.cbb-news-copy strong {
+  line-height: 1.35;
+}
+
+.cbb-news-copy p {
+  margin: 0;
+  color: #e7edf8;
+  line-height: 1.55;
+}
+
 .cbb-source-grid {
   display: grid;
   gap: 12px;
@@ -2553,8 +2690,9 @@ body[data-composite-route='hub'] {
   gap: 6px;
   padding: 14px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 248, 229, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
 }
 
 .cbb-source-card strong {
@@ -2605,6 +2743,26 @@ body[data-composite-route='hub'] {
   background: linear-gradient(135deg, #f5a623, #ffe88f);
   color: #241503;
   font-weight: 700;
+}
+
+.sport-shell-cbb .sportview-panel,
+.sport-shell-cbb .sportview-feature-card,
+.sport-shell-cbb .sportview-note-link,
+.sport-shell-cbb .sportview-row,
+.sport-shell-cbb .cbb-score-card,
+.sport-shell-cbb .cbb-top-player-card,
+.sport-shell-cbb .cbb-news-card {
+  background: linear-gradient(180deg, rgba(255, 249, 235, 0.08), rgba(255, 255, 255, 0.03));
+}
+
+.sport-shell-cbb .sportview-panel:hover,
+.sport-shell-cbb .sportview-feature-card:hover,
+.sport-shell-cbb .sportview-note-link:hover,
+.sport-shell-cbb .sportview-row:hover,
+.sport-shell-cbb .cbb-score-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 214, 108, 0.26);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.18);
 }
 
 .cbb-manual-scoreline {

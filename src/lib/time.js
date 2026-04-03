@@ -76,6 +76,32 @@ export function getEasternNowLabel() {
   }).format(new Date());
 }
 
+export function getEasternDateFromKey(dateKey) {
+  const [year, month, day] = String(dateKey || '')
+    .split('-')
+    .map((value) => Number(value));
+  if (!year || !month || !day) return null;
+  return { year, month, day };
+}
+
+export function getEasternCycleWindow({ resetHour = 6, input = new Date() } = {}) {
+  const parts = getEasternParts(input);
+  const beforeReset = parts.hour < resetHour;
+  const referenceDate = new Date(Date.UTC(parts.year, parts.month - 1, parts.day, 12, 0, 0));
+  const nextReferenceDate = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + (beforeReset ? 0 : 1), 12, 0, 0));
+
+  return {
+    beforeReset,
+    cycleDateEt: getEasternDateKey(referenceDate),
+    nextCycleDateEt: getEasternDateKey(nextReferenceDate),
+    resetHour,
+  };
+}
+
+export function isSameEasternDateKey(input, dateKey) {
+  return getEasternDateKey(input) === String(dateKey || '');
+}
+
 export function compareByStartTime(left, right) {
   const leftTime = left ? new Date(left).getTime() : 0;
   const rightTime = right ? new Date(right).getTime() : 0;

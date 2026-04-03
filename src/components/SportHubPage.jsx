@@ -241,7 +241,16 @@ export default function SportHubPage() {
                 <p className="eyebrow">Top 3 Bets Of The Day</p>
                 <h2>Cross-Sport Parlay</h2>
               </div>
-              <span>{parlay?.americanLabel || 'Syncing'}</span>
+              <span>
+                {parlay?.americanLabel ||
+                  (hero?.status === 'closed'
+                    ? 'Slate closed'
+                    : hero?.status === 'building'
+                      ? 'Building'
+                      : hero?.status === 'two-leg'
+                        ? '2-leg live'
+                        : 'Syncing')}
+              </span>
             </div>
             <div className="hub-parlay-summary">
               <div>
@@ -258,10 +267,20 @@ export default function SportHubPage() {
               </div>
             </div>
             <div className="hub-parlay-footnote">
-              {parlay?.verifiedAt ? `Verified ${new Date(parlay.verifiedAt).toLocaleTimeString()}` : 'Live parlay board syncing now'}
+              {hero?.status === 'closed'
+                ? 'Today’s board is closed. Fewer than two live parlay legs remain on the current ET slate.'
+                : hero?.status === 'building'
+                  ? `Building the next board for ${hero?.resetAtEt || '6:00 AM ET'}`
+                  : parlay?.verifiedAt
+                    ? `Verified ${new Date(parlay.verifiedAt).toLocaleTimeString()} • Resets ${hero?.resetAtEt || '6:00 AM ET'}`
+                    : 'Live parlay board syncing now'}
             </div>
             <p className="hub-parlay-note">
-              The parlay card is the only betting module on the main menu. It uses verified odds math and today&apos;s strongest cross-sport edge set.
+              {hero?.status === 'two-leg'
+                ? `Two-leg fallback is active. ${hero?.remainingEligibleGames || 0} same-day games remain in the ET cycle.`
+                : hero?.status === 'closed'
+                  ? 'The parlay card resets at 6:00 AM ET and returns as soon as at least two same-day cross-sport legs are available.'
+                  : 'The parlay card is the only betting module on the main menu. It uses verified odds math and the strongest same-day cross-sport edge set after the 6:00 AM ET reset.'}
             </p>
           </article>
         </div>

@@ -27,13 +27,11 @@ function IntroScene({ motif }) {
       <div className="sport-intro-scene" data-motif={motif} aria-hidden="true">
         <div className="sport-intro-spotlight spotlight-a" />
         <div className="sport-intro-spotlight spotlight-b" />
+        <div className="sport-intro-scorebug" />
         <div className="sport-intro-bracket-wall" />
         <div className="sport-intro-banner" />
-        <div className="sport-intro-object">
-          <span className="sport-intro-detail detail-a" />
-          <span className="sport-intro-detail detail-b" />
-          <span className="sport-intro-detail detail-c" />
-        </div>
+        <div className="sport-intro-floor" />
+        <div className="sport-intro-backboard" />
       </div>
     );
   }

@@ -13,12 +13,20 @@ import {
 import { FOOTBALL_LEAGUES } from '@/src/lib/football';
 import { americanToDecimal, buildParlayOdds, calculateReturn, extractEspnOdds, formatAmericanOdds } from '@/src/lib/odds';
 import { getHotSnapshot, warmSnapshot } from '@/src/lib/snapshot-store';
-import { formatEasternDisplay, getEasternNowLabel, getEasternWeeklyCycleId, isSameEasternDate, isWithinLastHours } from '@/src/lib/time';
+import {
+  formatEasternDisplay,
+  getEasternCycleWindow,
+  getEasternNowLabel,
+  getEasternWeeklyCycleId,
+  isSameEasternDate,
+  isSameEasternDateKey,
+  isWithinLastHours,
+} from '@/src/lib/time';
 
 const STORY_TTL_MS = 5 * 60 * 1000;
 const BETS_TTL_MS = 90 * 1000;
 const HERO_TTL_MS = 60 * 1000;
-const HUB_CACHE_VERSION = 'v8';
+const HUB_CACHE_VERSION = 'v9';
 
 const EXTERNAL_NEWS_SOURCES = [
   {
@@ -882,9 +890,11 @@ async function buildTopBetsSnapshot() {
     })
     .filter(Boolean);
 
+  const cycle = getEasternCycleWindow({ resetHour: 6 });
   const candidates = [...mlbCandidates, ...nflCandidates, ...footballCandidates, ...nbaCandidates, ...nhlCandidates]
     .filter((candidate) => candidate?.americanOdds !== null && candidate?.americanOdds !== undefined)
-    .filter((candidate) => candidate?.startTime && isSameEasternDate(candidate.startTime, new Date()))
+    .filter((candidate) => candidate?.startTime && isSameEasternDateKey(candidate.startTime, cycle.cycleDateEt))
+    .filter((candidate) => ['pre', 'scheduled', 'created'].includes(String(candidate?.state || 'pre')))
     .sort((left, right) => (right.edgeMagnitude || 0) - (left.edgeMagnitude || 0));
 
   const selected = [];
@@ -914,31 +924,49 @@ async function buildTopBetsSnapshot() {
     });
   }
 
-  const parlay = buildParlayOdds(selected);
+  const minimumLegsMet = selected.length >= 2;
+  const parlay = cycle.beforeReset ? null : buildParlayOdds(selected);
   const verifiedAt = new Date().toISOString();
   const betLegs = selected.map((bet) => ({
     ...bet,
     normalizedOdds: americanToDecimal(bet.americanOdds),
   }));
+  const status = cycle.beforeReset
+    ? 'building'
+    : minimumLegsMet
+      ? selected.length >= 3
+        ? 'live'
+        : 'two-leg'
+      : 'closed';
+
   return {
     bets: betLegs,
     betLegs,
+    status,
+    minimumLegsMet,
+    cycleDateEt: cycle.cycleDateEt,
+    resetAtEt: `${cycle.nextCycleDateEt} 6:00 AM ET`,
+    remainingEligibleGames: candidates.length,
     parlay: parlay
-      ? {
+      ? !cycle.beforeReset && minimumLegsMet
+        ? {
           ...parlay,
           americanLabel: formatAmericanOdds(parlay.american),
           stake: 10,
           return: calculateReturn(10, parlay.american),
         }
+        : null
       : null,
     parlaySummary: parlay
-      ? {
+      ? !cycle.beforeReset && minimumLegsMet
+        ? {
           ...parlay,
           americanLabel: formatAmericanOdds(parlay.american),
           stake: 10,
           return: calculateReturn(10, parlay.american),
           verifiedAt,
         }
+        : null
       : null,
     verifiedAt,
     footballLanding,
@@ -1018,6 +1046,11 @@ async function buildHubHeroSnapshot() {
     secondaryStories: stories.secondaryStories,
     topBets: bets.betLegs,
     betLegs: bets.betLegs,
+    status: bets.status,
+    minimumLegsMet: bets.minimumLegsMet,
+    cycleDateEt: bets.cycleDateEt,
+    resetAtEt: bets.resetAtEt,
+    remainingEligibleGames: bets.remainingEligibleGames,
     parlay: bets.parlaySummary,
     parlaySummary: bets.parlaySummary,
     verifiedAt: bets.verifiedAt,

@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { key: 'teams', label: 'Teams' },
   { key: 'players', label: 'Players' },
   { key: 'predictor', label: 'Predictor' },
+  { key: 'news', label: 'News' },
   { key: 'settings', label: 'Settings' },
 ];
 
@@ -39,6 +40,19 @@ function ResumePill({ label, value, accent = false }) {
       <strong>{label}</strong>
       <span>{value}</span>
     </span>
+  );
+}
+
+function NewsCard({ story, onOpen, fromPage = 'news' }) {
+  return (
+    <button className="generic-card cbb-news-card" type="button" onClick={() => onOpen(story, fromPage)}>
+      {story?.image ? <img src={story.image} alt={story.headline} className="cbb-news-image" /> : null}
+      <div className="cbb-news-copy">
+        <span>{story?.source || 'ESPN'} • {story?.published ? new Date(story.published).toLocaleDateString() : 'Live'}</span>
+        <strong>{story.headline}</strong>
+        <p>{story.description || story.summary || 'Open story'}</p>
+      </div>
+    </button>
   );
 }
 
@@ -307,18 +321,14 @@ function Overview({
   const scoreboard = bootstrap.scoreboard || [];
   const predictions = bootstrap.predictors || [];
   const predictionMap = Object.fromEntries(predictions.map((entry) => [entry.gameId, entry]));
-  const leadStory = bootstrap.news?.[0] || null;
+  const topPlayers = bootstrap.topPlayers || bootstrap.featuredPlayers?.slice(0, 3) || [];
 
   return (
     <section className="cbb-shell">
       <article className="generic-card cbb-hero">
         <div className="cbb-hero-copy">
-          <p className="eyebrow">Selection Sunday Energy</p>
-          <h2>Composite CBB turns the full season into one live resume room.</h2>
-          <p>
-            Six ranking inputs, campus pulse, upset pressure, roster movers, and the Ivery-Simmons predictor all sit
-            inside one college board.
-          </p>
+          <p className="eyebrow">Campus Pulse</p>
+          <h2>Live college basketball boards, resume pressure, and tournament-level player movement.</h2>
           <div className="cbb-card-footer">
             <ResumePill label="Teams" value={bootstrap.meta?.teamCount || 0} accent />
             <ResumePill label="Players" value={bootstrap.playersCatalog?.players?.length || 0} />
@@ -328,18 +338,41 @@ function Overview({
         <div className="cbb-hero-side">
           <button className="cbb-hero-note" type="button" onClick={() => setPage('rankings')}>
             <span>Resume Board</span>
-            <strong>Avg rank blends AP, NET, Torvik, KenPom, Haslametrics, and EvanMiya.</strong>
+            <strong>Full composite average across AP, NET, Torvik, KenPom, Haslametrics, and EvanMiya.</strong>
           </button>
           <button className="cbb-hero-note" type="button" onClick={() => setPage('predictor')}>
             <span>Upset Watch</span>
-            <strong>Ivery-Simmons weighs PPG, defense, AP, NET, and the full composite board.</strong>
+            <strong>The Ivery-Simmons model leans on scoring, defensive suppression, and full resume context.</strong>
           </button>
-          {leadStory ? (
-            <button className="cbb-hero-note" type="button" onClick={() => openStory(leadStory, 'overview')}>
-              <span>Latest Story</span>
-              <strong>{leadStory.headline}</strong>
+          <button className="cbb-hero-note" type="button" onClick={() => setPage('news')}>
+            <span>News Desk</span>
+            <strong>Open the biggest stories on players, teams, coaches, and tournament movement.</strong>
+          </button>
+        </div>
+      </article>
+
+      <article className="generic-card sportview-panel">
+        <div className="sportview-panel-head">
+          <div>
+            <h3>Top 3 Players In The Sport Right Now</h3>
+            <p>Live board leaders based on the current CBB overall model.</p>
+          </div>
+          <button type="button" onClick={() => setPage('players')}>
+            Full player board
+          </button>
+        </div>
+        <div className="cbb-top-player-grid">
+          {topPlayers.map((player) => (
+            <button className="cbb-top-player-card" key={player.id} type="button" onClick={() => openPlayer(player.id)}>
+              <PlayerHeadshot player={player} />
+              <div>
+                <span>{player.team?.abbreviation || 'CBB'} • {player.position || 'Player'}</span>
+                <strong>{player.displayName}</strong>
+                <p>{player.usageSummary}</p>
+              </div>
+              <b>{player.rating}</b>
             </button>
-          ) : null}
+          ))}
         </div>
       </article>
 
@@ -387,25 +420,16 @@ function Overview({
         <article className="generic-card sportview-panel">
           <div className="sportview-panel-head">
             <div>
-              <h3>Tournament Risers</h3>
-              <p>The player board blends roster stats, team strength, and role context.</p>
+              <h3>News Desk</h3>
+              <p>The biggest live CBB stories, with art and in-site reading.</p>
             </div>
-            <button type="button" onClick={() => setPage('players')}>
-              Players
+            <button type="button" onClick={() => setPage('news')}>
+              News
             </button>
           </div>
-          <div className="cbb-player-feature-grid">
-            {bootstrap.featuredPlayers.slice(0, 6).map((player) => (
-              <button className="sportview-feature-card" key={player.id} type="button" onClick={() => openPlayer(player.id)}>
-                <div className="generic-player-cell">
-                  <PlayerHeadshot player={player} />
-                  <div>
-                    <strong>{player.displayName}</strong>
-                    <span>{player.team?.abbreviation} • {player.position || 'Player'}</span>
-                  </div>
-                </div>
-                <p>{player.rating} OVR • {player.usageSummary}</p>
-              </button>
+          <div className="cbb-news-grid compact">
+            {(bootstrap.news || []).slice(0, 2).map((story) => (
+              <NewsCard key={story.id} story={story} onOpen={openStory} fromPage="overview" />
             ))}
           </div>
         </article>
@@ -434,15 +458,21 @@ function Overview({
         <article className="generic-card sportview-panel">
           <div className="sportview-panel-head">
             <div>
-              <h3>Trending News</h3>
-              <p>Latest college basketball stories.</p>
+              <h3>Tournament Risers</h3>
+              <p>The board’s best player movers right now.</p>
             </div>
           </div>
-          <div className="sportview-note-list">
-            {(bootstrap.news || []).slice(0, 4).map((story) => (
-              <button className="sportview-note-link" key={story.id} type="button" onClick={() => openStory(story, 'overview')}>
-                <strong>{story.headline}</strong>
-                <span>{story.description || 'Open story'}</span>
+          <div className="cbb-player-feature-grid">
+            {bootstrap.featuredPlayers.slice(0, 4).map((player) => (
+              <button className="sportview-feature-card" key={player.id} type="button" onClick={() => openPlayer(player.id)}>
+                <div className="generic-player-cell">
+                  <PlayerHeadshot player={player} />
+                  <div>
+                    <strong>{player.displayName}</strong>
+                    <span>{player.team?.abbreviation} • {player.position || 'Player'}</span>
+                  </div>
+                </div>
+                <p>{player.rating} OVR • {player.usageSummary}</p>
               </button>
             ))}
           </div>
@@ -832,6 +862,7 @@ export default function CBBApp({ initialEntry = null }) {
   const teams = useMemo(() => bootstrap?.teams || [], [bootstrap]);
   const predictors = useMemo(() => bootstrap?.predictors || [], [bootstrap]);
   const scoreboard = useMemo(() => bootstrap?.scoreboard || [], [bootstrap]);
+  const news = useMemo(() => bootstrap?.news || [], [bootstrap]);
 
   function renderPage() {
     if (loadingBootstrap) {
@@ -880,12 +911,20 @@ export default function CBBApp({ initialEntry = null }) {
             onRun={runManualPredictor}
           />
         );
+      case 'news':
+        return (
+          <section className="cbb-news-grid">
+            {news.map((story) => (
+              <NewsCard key={story.id} story={story} onOpen={openStory} fromPage="news" />
+            ))}
+          </section>
+        );
       case 'settings':
         return (
           <section className="cbb-settings-grid">
             <article className="generic-card">
               <h3>Ranking inputs</h3>
-              <p>AP, NET, Torvik, KenPom-derived, Haslametrics, and EvanMiya-derived all feed the composite Avg board.</p>
+              <p>AP, NET, Torvik, KenPom, Haslametrics, and EvanMiya all feed the composite Avg board, with fallback handling per source.</p>
             </article>
             <article className="generic-card">
               <h3>Refresh model</h3>
@@ -893,7 +932,13 @@ export default function CBBApp({ initialEntry = null }) {
             </article>
             <article className="generic-card">
               <h3>Current status</h3>
-              <p>{formatUpdateTime(bootstrap?.lastUpdated)} • {bootstrap?.playersCatalog?.players?.length || 0} players in the board.</p>
+              <p>{formatUpdateTime(bootstrap?.lastUpdated)} • {bootstrap?.playersCatalog?.players?.length || 0} players • {bootstrap?.rankings?.length || 0} teams.</p>
+            </article>
+            <article className="generic-card">
+              <h3>Source health</h3>
+              <p>
+                AP {bootstrap?.sourceState?.apPoll || 'unknown'} • NET {bootstrap?.sourceState?.net || 'unknown'} • Torvik {bootstrap?.sourceState?.torvik || 'unknown'}
+              </p>
             </article>
           </section>
         );
