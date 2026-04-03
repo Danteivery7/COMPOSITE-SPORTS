@@ -2,17 +2,15 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useRef } from 'react';
-import { useSearchParams } from 'next/navigation';
 import SportIntroGate from '@/src/components/SportIntroGate';
 import RouteThemeToggle from '@/src/components/RouteThemeToggle';
 import useCompositeTheme from '@/src/hooks/useCompositeTheme';
 import { getSportConfig } from '@/src/data/sports';
 
-export default function SportFrameRoute({ sportKey, frameSrc }) {
+export default function SportFrameRoute({ sportKey, frameSrc, deepLink = null }) {
   const config = getSportConfig(sportKey);
   const iframeRef = useRef(null);
   const { theme, toggleTheme, setTheme } = useCompositeTheme(sportKey);
-  const searchParams = useSearchParams();
 
   useEffect(() => {
     document.body.dataset.compositeRoute = sportKey;
@@ -56,9 +54,9 @@ export default function SportFrameRoute({ sportKey, frameSrc }) {
   }, [setTheme, sportKey]);
 
   const frameParams = new URLSearchParams();
-  const deepLinkId = searchParams.get('id');
-  const deepLinkView = searchParams.get('view');
-  if (searchParams.get('from') === 'hub') {
+  const deepLinkId = deepLink?.id || null;
+  const deepLinkView = deepLink?.view || null;
+  if (deepLink?.fromHub) {
     frameParams.set('from', 'hub');
   }
   if (sportKey === 'nba' && deepLinkView === 'player' && deepLinkId) {

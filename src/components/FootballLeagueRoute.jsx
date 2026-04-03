@@ -1,20 +1,14 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
 import FootballIntroGate from '@/src/components/FootballIntroGate';
 import FootballLeagueApp from '@/src/components/FootballLeagueApp';
 import useCompositeTheme from '@/src/hooks/useCompositeTheme';
 import { getFootballLeagueConfig } from '@/src/lib/football';
 
-export default function FootballLeagueRoute({ leagueKey }) {
+export default function FootballLeagueRoute({ leagueKey, initialEntry = null }) {
   const config = getFootballLeagueConfig(leagueKey);
   const { theme, toggleTheme } = useCompositeTheme(`football-${leagueKey}`);
-  const searchParams = useSearchParams();
-  const initialEntry = {
-    playerId: searchParams.get('player') || null,
-    fromHub: searchParams.get('from') === 'hub',
-  };
 
   useEffect(() => {
     document.body.dataset.compositeRoute = 'football';

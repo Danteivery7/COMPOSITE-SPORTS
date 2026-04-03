@@ -2,21 +2,15 @@
 
 import Link from 'next/link';
 import { useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
 import SportIntroGate from '@/src/components/SportIntroGate';
 import GenericSportApp from '@/src/components/GenericSportApp';
 import RouteThemeToggle from '@/src/components/RouteThemeToggle';
 import useCompositeTheme from '@/src/hooks/useCompositeTheme';
 import { getSportConfig } from '@/src/data/sports';
 
-export default function GenericSportRoute({ sportKey }) {
+export default function GenericSportRoute({ sportKey, initialEntry = null }) {
   const config = getSportConfig(sportKey);
   const { theme, toggleTheme } = useCompositeTheme(sportKey);
-  const searchParams = useSearchParams();
-  const initialEntry = {
-    playerId: searchParams.get('player') || null,
-    fromHub: searchParams.get('from') === 'hub',
-  };
 
   useEffect(() => {
     document.body.dataset.compositeRoute = sportKey;

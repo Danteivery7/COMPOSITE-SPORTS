@@ -2,21 +2,15 @@
 
 import Link from 'next/link';
 import { useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
 import SportIntroGate from '@/src/components/SportIntroGate';
 import RouteThemeToggle from '@/src/components/RouteThemeToggle';
 import useCompositeTheme from '@/src/hooks/useCompositeTheme';
 import { getSportConfig } from '@/src/data/sports';
 import MLBApp from '@/src/mlb/App';
 
-export default function MLBRoute() {
+export default function MLBRoute({ initialEntry = null }) {
   const config = getSportConfig('mlb');
   const { theme, toggleTheme } = useCompositeTheme('mlb');
-  const searchParams = useSearchParams();
-  const initialEntry = {
-    playerId: searchParams.get('player') || null,
-    fromHub: searchParams.get('from') === 'hub',
-  };
 
   useEffect(() => {
     document.documentElement.removeAttribute('data-theme');
