@@ -1,6 +1,7 @@
 import { DEFAULT_SETTINGS } from "./config.js";
 import { readCachedSettings, writeCachedSettings } from "./cache.js";
 import {
+  getAdvancedLeagueSnapshot,
   extractSeasonLeaderPlayers,
   getAllRosters,
   getAllTeamStatistics,
@@ -18,11 +19,12 @@ import {
 import {
   buildFeaturedPlayers,
   buildFilteredSearchIndex,
-  buildGameProjection,
+  buildPlayerDirectory,
   buildPlayerCard,
   buildPredictorCards,
   buildRankingsLookup,
   buildSpotlightCards,
+  buildTeamNewsMap,
   buildTeamRankings,
   getGameLifecycle,
   suggestedPollInterval,
@@ -43,9 +45,8 @@ const dom = {
   navLinks: Array.from(document.querySelectorAll("[data-route]")),
   searchInput: document.querySelector("#global-search"),
   searchResults: document.querySelector("#search-results"),
-  refreshButton: document.querySelector("#refresh-button"),
   themeButton: document.querySelector("#theme-button"),
-  mobileThemeButton: document.querySelector("#mobile-theme-button"),
+  sidebarThemeButton: document.querySelector("#sidebar-theme-button"),
   menuButton: document.querySelector("#menu-button"),
   navOverlay: document.querySelector("#nav-overlay"),
   routeTitle: document.querySelector("#route-title"),
@@ -71,10 +72,14 @@ const state = {
   seasonLeaders: [],
   teamStatsById: {},
   rosters: {},
+  advancedSnapshot: null,
   teamRankings: [],
   rankingsById: {},
   featuredPlayers: [],
+  playerDirectory: [],
+  playerDirectoryById: {},
   predictorCards: [],
+  teamNewsById: {},
   news: [],
   newsStories: {},
   teamBundles: {},
@@ -84,6 +89,11 @@ const state = {
   spotlights: [],
   searchIndex: [],
   searchQuery: "",
+  playerFilter: "",
+  predictorSelection: {
+    homeTeamId: "",
+    awayTeamId: "",
+  },
   seasonYear: null,
   todayLabel: getLocalTodayLabel(),
   lastSync: {},
@@ -155,14 +165,40 @@ function syncMobileNav() {
 }
 
 function recomputeDerivedState() {
-  if (state.standings.length && Object.keys(state.teamStatsById).length && state.teams.length) {
-    state.teamRankings = buildTeamRankings(state.standings, state.teamStatsById, state.teamsById);
+  if (state.advancedSnapshot && state.teams.length) {
+    state.playerDirectory = buildPlayerDirectory(
+      state.advancedSnapshot,
+      state.rosters,
+      state.teamsById,
+      state.standings,
+    );
+    state.playerDirectoryById = Object.fromEntries(
+      state.playerDirectory.map((player) => [player.playerId, player]),
+    );
+  }
+
+  if (state.standings.length && state.teams.length) {
+    state.teamRankings = buildTeamRankings(
+      state.standings,
+      state.teamStatsById,
+      state.teamsById,
+      state.advancedSnapshot,
+      state.playerDirectory,
+    );
     state.rankingsById = buildRankingsLookup(state.teamRankings);
   }
 
-  if (state.seasonLeaders.length) {
+  if (state.playerDirectory.length) {
+    state.featuredPlayers = state.playerDirectory.slice(0, 30);
+  } else if (state.seasonLeaders.length) {
     const leaderEntries = extractSeasonLeaderPlayers(state.seasonLeaders);
-    state.featuredPlayers = buildFeaturedPlayers(leaderEntries, state.teamsById)
+    state.featuredPlayers = buildFeaturedPlayers(
+      leaderEntries,
+      state.teamsById,
+      state.advancedSnapshot,
+      state.rosters,
+      state.standings,
+    )
       .map((player) => {
         const fullCard = state.playerCards[player.playerId];
         return fullCard
@@ -183,6 +219,8 @@ function recomputeDerivedState() {
     state.predictorCards = buildPredictorCards(state.scoreboard, state.teamRankings);
   }
 
+  state.teamNewsById = buildTeamNewsMap(state.news, state.teams);
+
   state.leaguePulse = summarizeLeaguePulse(
     state.scoreboard,
     state.teamRankings,
@@ -191,12 +229,19 @@ function recomputeDerivedState() {
 
   state.spotlights = buildSpotlightCards(
     state.teamRankings,
-    state.featuredPlayers,
+    state.playerDirectory.length ? state.playerDirectory : state.featuredPlayers,
     state.predictorCards,
     state.scoreboard,
   );
 
-  state.searchIndex = buildFilteredSearchIndex(state.teams, state.rosters, state.featuredPlayers);
+  state.searchIndex = buildFilteredSearchIndex(state.teams, state.rosters, state.playerDirectory);
+
+  if ((!state.predictorSelection.homeTeamId || !state.predictorSelection.awayTeamId) && state.teamRankings.length >= 2) {
+    state.predictorSelection = {
+      homeTeamId: state.teamRankings[0].id,
+      awayTeamId: state.teamRankings[1].id,
+    };
+  }
 }
 
 function prefetchFeaturedPlayerCards(limit = 6) {
@@ -280,13 +325,17 @@ async function loadBaseData(force = false) {
   state.loading.bootstrap = false;
   render();
 
-  const [standings, seasonLeaders] = await Promise.all([
+  const [standings, seasonLeaders, rosters, advancedSnapshot] = await Promise.all([
     getLeagueStandings(state.seasonYear, force),
     getSeasonLeaders(state.seasonYear, force),
+    getAllRosters(teams.map((team) => team.id), force),
+    getAdvancedLeagueSnapshot(state.seasonYear, teams, force),
   ]);
 
   state.standings = standings;
   state.seasonLeaders = seasonLeaders;
+  state.rosters = rosters;
+  state.advancedSnapshot = advancedSnapshot;
   state.lastSync.rankings = Date.now();
   state.lastSync.players = Date.now();
   recomputeDerivedState();
@@ -343,7 +392,10 @@ async function ensurePlayerCard(playerId, force = false) {
   if (!playerId || !state.seasonYear) return;
   if (!force && state.playerCards[playerId]) return;
   const bundle = await getPlayerBundle(playerId, state.seasonYear, force);
-  state.playerCards[playerId] = buildPlayerCard(bundle, state.teamsById);
+  state.playerCards[playerId] = buildPlayerCard(bundle, state.teamsById, {
+    playerDirectoryById: state.playerDirectoryById,
+    rankingsById: state.rankingsById,
+  });
   recomputeDerivedState();
   render();
 }
@@ -398,7 +450,7 @@ async function ensureRouteData(force = false) {
     void ensureNewsStory(state.route.id, force);
   }
 
-  if (state.route.view === "players" || state.searchQuery.length >= 2) {
+  if (state.route.view === "players" || state.route.view === "teams" || state.searchQuery.length >= 2) {
     prefetchFeaturedPlayerCards(30);
     void ensureRosters();
   }
@@ -511,15 +563,8 @@ function wireEvents() {
     }
   });
 
-  dom.refreshButton.addEventListener("click", async () => {
-    await loadBaseData(true);
-    await refreshScoreboard(true);
-    ensureRouteData(true);
-    schedulePolling();
-  });
-
   dom.themeButton.addEventListener("click", toggleTheme);
-  dom.mobileThemeButton?.addEventListener("click", toggleTheme);
+  dom.sidebarThemeButton?.addEventListener("click", toggleTheme);
 
   dom.menuButton?.addEventListener("click", () => {
     state.mobileNavOpen = !state.mobileNavOpen;
@@ -541,6 +586,29 @@ function wireEvents() {
 
   dom.searchInput.addEventListener("focus", () => {
     updateSearchResults();
+  });
+
+  document.addEventListener("input", (event) => {
+    const filterTarget = event.target.closest("[data-player-filter]");
+    if (filterTarget) {
+      state.playerFilter = filterTarget.value || "";
+      render();
+      return;
+    }
+  });
+
+  document.addEventListener("change", (event) => {
+    const homeSelect = event.target.closest("[data-predictor-home]");
+    if (homeSelect) {
+      state.predictorSelection.homeTeamId = homeSelect.value || "";
+      render();
+      return;
+    }
+    const awaySelect = event.target.closest("[data-predictor-away]");
+    if (awaySelect) {
+      state.predictorSelection.awayTeamId = awaySelect.value || "";
+      render();
+    }
   });
 }
 

@@ -1,16 +1,21 @@
 import { API, TTL } from "./config.js";
 import { loadWithCache } from "./cache.js";
 import {
+  buildEasternDateKey,
   extractIdFromRef,
-  formatEspnDate,
+  getEasternResetDate,
+  getNextEasternResetTimestamp,
   inferSeasonYear,
-  isMorningCarryoverWindow,
   normalizeApiUrl,
+  normalizeNhlPosition,
+  resolveNhlHeadshot,
   sleep,
 } from "./utils.js";
 
 const FINAL_VISIBILITY_HOURS = 12;
 const GAME_DURATION_HOURS = 3;
+const EASTERN_RESET_HOUR = 6;
+const PREVIOUS_SEASON_OFFSET = 10001;
 
 async function fetchJson(url, options = {}) {
   const controller = new AbortController();
@@ -50,6 +55,102 @@ function flattenLogSummaryStats(payload) {
   });
 
   return map;
+}
+
+function previousSeasonId(seasonYear) {
+  const numeric = Number(seasonYear || 0);
+  if (!Number.isFinite(numeric) || numeric <= PREVIOUS_SEASON_OFFSET) return numeric;
+  return numeric - PREVIOUS_SEASON_OFFSET;
+}
+
+function buildStatsRestUrl(report, seasonYear, options = {}) {
+  const params = new URLSearchParams({
+    isAggregate: "false",
+    isGame: "false",
+    start: "0",
+    limit: String(options.limit || 2000),
+  });
+
+  const clauses = [`seasonId=${seasonYear}`, `gameTypeId=${options.gameTypeId || 2}`];
+  if (options.extraFilter) clauses.push(options.extraFilter);
+  params.set("cayenneExp", clauses.join(" and "));
+
+  if (options.sortProperty) {
+    params.set(
+      "sort",
+      JSON.stringify([{ property: options.sortProperty, direction: options.sortDirection || "DESC" }]),
+    );
+  }
+
+  return `https://api.nhle.com/stats/rest/en/${report}?${params.toString()}`;
+}
+
+async function getStatsRestReport(report, seasonYear, force = false, options = {}) {
+  const key = `stats-rest:${report}:${seasonYear}:${options.gameTypeId || 2}:${options.extraFilter || "all"}`;
+  const ttl = options.ttl || TTL.ADVANCED;
+  const resource = await loadWithCache(
+    key,
+    ttl,
+    () => fetchJson(buildStatsRestUrl(report, seasonYear, options)),
+    { force },
+  );
+
+  return resource.data?.data || [];
+}
+
+function getTeamScheduleDateKey(game) {
+  return game?.gameDate || game?.date || "";
+}
+
+function computeRecentTeamForm(games = [], teamAbbrev = "") {
+  const recent = games
+    .filter((game) => Number(game?.gameType) === 2 && String(game?.gameState || "").toUpperCase() === "OFF")
+    .slice(-10);
+
+  if (!recent.length) {
+    return {
+      last10PointsPct: 0.5,
+      last10GoalDiffRate: 0,
+      otFinalCount: 0,
+    };
+  }
+
+  let points = 0;
+  let goalDiff = 0;
+  let otFinalCount = 0;
+
+  recent.forEach((game) => {
+    const isHome = game?.homeTeam?.abbrev === teamAbbrev;
+    const team = isHome ? game?.homeTeam : game?.awayTeam;
+    const opponent = isHome ? game?.awayTeam : game?.homeTeam;
+    const teamScore = Number(team?.score ?? 0);
+    const opponentScore = Number(opponent?.score ?? 0);
+    const resultType = String(game?.gameOutcome?.lastPeriodType || game?.periodDescriptor?.periodType || "").toUpperCase();
+    goalDiff += teamScore - opponentScore;
+    if (teamScore > opponentScore) {
+      points += 2;
+    } else if (resultType === "OT" || resultType === "SO") {
+      points += 1;
+      otFinalCount += 1;
+    }
+  });
+
+  return {
+    last10PointsPct: points / Math.max(1, recent.length * 2),
+    last10GoalDiffRate: goalDiff / Math.max(1, recent.length),
+    otFinalCount,
+  };
+}
+
+async function getTeamScheduleSeason(teamAbbrev, seasonYear, force = false) {
+  if (!teamAbbrev) return [];
+  const resource = await loadWithCache(
+    `club-schedule:${teamAbbrev}:${seasonYear}`,
+    TTL.RANKINGS,
+    () => fetchJson(`https://api-web.nhle.com/v1/club-schedule-season/${teamAbbrev}/${seasonYear}`),
+    { force },
+  );
+  return resource.data?.games || [];
 }
 
 function pickLogDisplay(map, keys, fallback = "--") {
@@ -144,7 +245,9 @@ function isExpiredFinalEvent(event, { durationHours = GAME_DURATION_HOURS, visib
   if (state !== "post") return false;
   const startMs = new Date(event?.date || event?.competitions?.[0]?.date || 0).getTime();
   if (!Number.isFinite(startMs)) return false;
-  const expiresAt = startMs + ((durationHours + visibilityHours) * 60 * 60 * 1000);
+  const visibilityExpiry = startMs + ((durationHours + visibilityHours) * 60 * 60 * 1000);
+  const slateResetExpiry = getNextEasternResetTimestamp(new Date(startMs), EASTERN_RESET_HOUR);
+  const expiresAt = Math.min(visibilityExpiry, slateResetExpiry);
   return Date.now() > expiresAt;
 }
 
@@ -161,13 +264,10 @@ export async function fetchScoreboardForDate(dateKey) {
 }
 
 export async function getScoreboardWindow(force = false) {
-  const today = new Date();
-  const dateKeys = [formatEspnDate(today)];
-  if (isMorningCarryoverWindow(today)) {
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
-    dateKeys.unshift(formatEspnDate(yesterday));
-  }
+  const cycleStart = getEasternResetDate(new Date(), EASTERN_RESET_HOUR);
+  const nextCycle = new Date(cycleStart.getTime());
+  nextCycle.setUTCDate(nextCycle.getUTCDate() + 1);
+  const dateKeys = [buildEasternDateKey(cycleStart), buildEasternDateKey(nextCycle)];
 
   const payloads = await mapWithConcurrency(
     dateKeys,
@@ -184,9 +284,15 @@ export async function getScoreboardWindow(force = false) {
   );
 
   const primary = payloads[payloads.length - 1] || {};
+  const seen = new Set();
   const events = payloads
     .flatMap((payload) => payload?.events || [])
-    .filter((event) => !isExpiredFinalEvent(event));
+    .filter((event) => {
+      const id = String(event?.id || "");
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return !isExpiredFinalEvent(event);
+    });
 
   return {
     ...primary,
@@ -326,6 +432,89 @@ export async function getAllRosters(teamIds, force = false) {
   );
 }
 
+export async function getAdvancedLeagueSnapshot(seasonYear, teams = [], force = false) {
+  const teamAbbrevs = teams
+    .map((team) => String(team?.abbreviation || "").trim())
+    .filter(Boolean);
+  const priorSeason = previousSeasonId(seasonYear);
+
+  const [
+    teamSummary,
+    teamPercentages,
+    skaterSummary,
+    skaterRealtime,
+    skaterPercentages,
+    skaterTimeOnIce,
+    goalieSummary,
+    goalieAdvanced,
+    priorSkaterSummary,
+    priorSkaterRealtime,
+    priorSkaterPercentages,
+    priorSkaterTimeOnIce,
+    priorGoalieSummary,
+    priorGoalieAdvanced,
+    teamRecentFormEntries,
+  ] = await Promise.all([
+    getStatsRestReport("team/summary", seasonYear, force, { limit: 100 }),
+    getStatsRestReport("team/percentages", seasonYear, force, { limit: 100 }),
+    getStatsRestReport("skater/summary", seasonYear, force),
+    getStatsRestReport("skater/realtime", seasonYear, force),
+    getStatsRestReport("skater/percentages", seasonYear, force),
+    getStatsRestReport("skater/timeonice", seasonYear, force),
+    getStatsRestReport("goalie/summary", seasonYear, force, { limit: 500 }),
+    getStatsRestReport("goalie/advanced", seasonYear, force, { limit: 500 }),
+    getStatsRestReport("skater/summary", priorSeason, force),
+    getStatsRestReport("skater/realtime", priorSeason, force),
+    getStatsRestReport("skater/percentages", priorSeason, force),
+    getStatsRestReport("skater/timeonice", priorSeason, force),
+    getStatsRestReport("goalie/summary", priorSeason, force, { limit: 500 }),
+    getStatsRestReport("goalie/advanced", priorSeason, force, { limit: 500 }),
+    mapWithConcurrency(
+      teamAbbrevs,
+      async (teamAbbrev) => ({
+        teamAbbrev,
+        recent: computeRecentTeamForm(await getTeamScheduleSeason(teamAbbrev, seasonYear, force), teamAbbrev),
+      }),
+      6,
+    ),
+  ]);
+
+  return {
+    seasonYear,
+    priorSeason,
+    fetchedAt: Date.now(),
+    teams: {
+      summary: teamSummary,
+      percentages: teamPercentages,
+      recentFormByAbbrev: Object.fromEntries(teamRecentFormEntries.map((entry) => [entry.teamAbbrev, entry.recent])),
+    },
+    skaters: {
+      current: {
+        summary: skaterSummary,
+        realtime: skaterRealtime,
+        percentages: skaterPercentages,
+        timeOnIce: skaterTimeOnIce,
+      },
+      prior: {
+        summary: priorSkaterSummary,
+        realtime: priorSkaterRealtime,
+        percentages: priorSkaterPercentages,
+        timeOnIce: priorSkaterTimeOnIce,
+      },
+    },
+    goalies: {
+      current: {
+        summary: goalieSummary,
+        advanced: goalieAdvanced,
+      },
+      prior: {
+        summary: priorGoalieSummary,
+        advanced: priorGoalieAdvanced,
+      },
+    },
+  };
+}
+
 export async function getPlayerProfile(playerId, force = false) {
   const resource = await loadWithCache(
     `player-profile:${playerId}`,
@@ -416,6 +605,8 @@ export function flattenRosterPayload(rosterPayload = {}) {
     (bucket.items || []).map((player) => ({
       ...player,
       id: String(player.id),
+      resolvedPosition: normalizeNhlPosition(player.position?.abbreviation || player.position?.name || ""),
+      headshot: player.headshot?.href || player.headshot || resolveNhlHeadshot(player.id),
       teamId: extractIdFromRef(player?.teams?.[0]?.$ref) || null,
     })),
   );
@@ -441,6 +632,7 @@ export function extractSeasonLeaderPlayers(categories = []) {
         fullName: athlete.displayName || athlete.fullName || null,
         shortName: athlete.shortName || athlete.displayName || null,
         headshot: athlete.headshot?.href || null,
+        resolvedPosition: normalizeNhlPosition(athlete.position?.abbreviation || leader.positionCode || ""),
       });
     });
   });

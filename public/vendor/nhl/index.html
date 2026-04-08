@@ -72,6 +72,7 @@
           <button class="nav-link is-active" data-route="overview">Overview</button>
           <button class="nav-link" data-route="scores">Live Scores</button>
           <button class="nav-link" data-route="rankings">Rankings</button>
+          <button class="nav-link" data-route="teams">Teams</button>
           <button class="nav-link" data-route="players">Players</button>
           <button class="nav-link" data-route="predictor">Predictor</button>
           <button class="nav-link" data-route="news">News</button>
@@ -84,6 +85,7 @@
             <span class="status-pill">Booting data engine</span>
           </div>
           <p class="sidebar-meta" id="last-updated">Awaiting first sync</p>
+          <button class="nav-link sidebar-theme-button" id="sidebar-theme-button" type="button">Dark / Light</button>
           <a class="sidebar-hub-link" href="/" target="_top">Back To Hub</a>
         </section>
       </aside>
@@ -107,7 +109,6 @@
                 autocomplete="off"
               />
             </label>
-            <button class="ghost-button" id="refresh-button" type="button">Refresh</button>
             <button class="ghost-button" id="theme-button" type="button">Theme</button>
           </div>
 
@@ -127,22 +128,11 @@
       </div>
     </div>
 
-    <nav class="mobile-nav glass-panel" id="mobile-nav">
-      <button class="mobile-link is-active" data-route="overview">Home</button>
-      <button class="mobile-link" data-route="scores">Scores</button>
-      <button class="mobile-link" data-route="rankings">Ranks</button>
-      <button class="mobile-link" data-route="players">Players</button>
-      <button class="mobile-link" data-route="predictor">Odds</button>
-      <button class="mobile-link mobile-link-action" id="mobile-theme-button" type="button">Theme</button>
-      <a class="mobile-link mobile-link-hub" href="/" target="_top">Hub</a>
-      <button class="mobile-link" data-route="settings">Prefs</button>
-    </nav>
-
     <template id="empty-state-template">
       <section class="glass-panel empty-state">
         <p class="eyebrow">No Data Yet</p>
         <h3>That panel is still syncing.</h3>
-        <p>Give the live feeds a moment or tap refresh to force a new pull.</p>
+        <p>Give the live feeds a moment while the NHL data engine finishes its next pass.</p>
       </section>
     </template>
 

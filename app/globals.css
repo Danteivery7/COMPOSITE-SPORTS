@@ -5881,6 +5881,10 @@ body[data-composite-route='football'] {
 }
 
 @media (max-width: 980px) {
+  .vendor-shell[data-sport='nhl'] .route-shell-actions {
+    display: none;
+  }
+
   .route-site-menu {
     display: inline-flex;
     align-items: center;

@@ -9,6 +9,7 @@ export const TTL = {
   NEWS: 45 * 60 * 1000,
   ROSTERS: 12 * 60 * 60 * 1000,
   TEAM_DETAILS: 4 * 60 * 60 * 1000,
+  ADVANCED: 6 * 60 * 60 * 1000,
 };
 
 export const API = {
@@ -20,6 +21,7 @@ export const ROUTES = [
   { key: "overview", title: "Overview", eyebrow: "League Intelligence" },
   { key: "scores", title: "Live Scores", eyebrow: "Real-Time Scoreboard" },
   { key: "rankings", title: "Rankings", eyebrow: "Composite Power Model" },
+  { key: "teams", title: "Teams", eyebrow: "Club Directory" },
   { key: "players", title: "Players", eyebrow: "Player Ratings" },
   { key: "predictor", title: "Predictor", eyebrow: "Model vs Market" },
   { key: "news", title: "News", eyebrow: "ESPN Wire" },
