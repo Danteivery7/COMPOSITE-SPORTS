@@ -179,7 +179,61 @@ function scalePlayerPercentileToOverall(percentileValue, options = {}) {
   });
 
   if (options.allow99) return 99;
-  return clamp(round(overall, 1), 60, 98);
+  return clamp(round(overall, 0), 60, 97);
+}
+
+function playerNameMatches(player, pattern) {
+  return pattern.test(String(player?.fullName || player?.shortName || ""));
+}
+
+function applyElitePlayerTierRules(players = []) {
+  const sorted = players
+    .map((player) => ({
+      ...player,
+      overall: clamp(round(Number(player?.overall || 0), 0), 60, 97),
+    }))
+    .sort((left, right) => {
+      if ((right.overallPercentile || 0) !== (left.overallPercentile || 0)) {
+        return (right.overallPercentile || 0) - (left.overallPercentile || 0);
+      }
+      return (right.overall || 0) - (left.overall || 0);
+    });
+
+  const mcdavidIndex = sorted.findIndex((player) => playerNameMatches(player, /\bconnor\b.*\bmcdavid\b/i));
+  const macKinnonIndex = sorted.findIndex((player) => playerNameMatches(player, /\bnathan\b.*\bmac?kinnon\b/i));
+  const lockedIds = new Set();
+
+  if (mcdavidIndex >= 0) {
+    sorted[mcdavidIndex] = {
+      ...sorted[mcdavidIndex],
+      overall: 99,
+    };
+    lockedIds.add(sorted[mcdavidIndex].playerId);
+  }
+
+  if (macKinnonIndex >= 0) {
+    sorted[macKinnonIndex] = {
+      ...sorted[macKinnonIndex],
+      overall: 98,
+    };
+    lockedIds.add(sorted[macKinnonIndex].playerId);
+  }
+
+  let nextEliteOverall = 97;
+  return sorted
+    .map((player) => {
+      if (lockedIds.has(player.playerId)) return player;
+      const nextPlayer = { ...player, overall: clamp(round(Number(player.overall || 0), 0), 60, 97) };
+      if (nextPlayer.overall >= 95) {
+        nextPlayer.overall = Math.min(nextPlayer.overall, nextEliteOverall);
+        nextEliteOverall = Math.max(85, nextPlayer.overall - 1);
+      }
+      return nextPlayer;
+    })
+    .sort((left, right) => {
+      if ((right.overall || 0) !== (left.overall || 0)) return (right.overall || 0) - (left.overall || 0);
+      return (right.overallPercentile || 0) - (left.overallPercentile || 0);
+    });
 }
 
 function sliceAverage(players = []) {
@@ -870,12 +924,14 @@ function buildTeamPredictionSignals(team) {
 
 export function buildPlayerDirectory(advancedSnapshot = null, rosters = {}, teamsById = {}, standingsEntries = []) {
   if (!advancedSnapshot) return [];
-  return buildPlayerProfiles(advancedSnapshot, rosters, teamsById, standingsEntries)
+  return applyElitePlayerTierRules(
+    buildPlayerProfiles(advancedSnapshot, rosters, teamsById, standingsEntries)
     .filter((player) => player.teamId && Number.isFinite(player.overall))
     .sort((left, right) => {
       if (right.overall !== left.overall) return right.overall - left.overall;
       return (right.overallPercentile || 0) - (left.overallPercentile || 0);
-    });
+    })
+  );
 }
 
 export function buildTeamRankings(standingsEntries = [], teamStatsById = {}, teamsById = {}, advancedSnapshot = null, playerDirectory = []) {
@@ -1255,7 +1311,7 @@ export function buildFeaturedPlayers(leaderEntries = [], teamsById = {}, advance
     bucket.set(entry.playerId, current);
   });
 
-  return Array.from(bucket.values())
+  return applyElitePlayerTierRules(Array.from(bucket.values())
     .map((player) => ({
       ...player,
       team: teamsById[player.teamId] || null,
@@ -1267,7 +1323,7 @@ export function buildFeaturedPlayers(leaderEntries = [], teamsById = {}, advance
       tone: { label: "Steady", className: "tone-steady" },
       statLine: {},
     }))
-    .sort((a, b) => b.provisionalOvr - a.provisionalOvr);
+    .sort((a, b) => b.provisionalOvr - a.provisionalOvr));
 }
 
 function mapStats(payload) {
@@ -1289,13 +1345,13 @@ function fallbackPlayerOverall(profile, seasonStats, careerStats, resolvedPositi
   if (resolvedPosition === "G") {
     const winRate = wins / gp;
     const raw = 70 + ((savePct - 0.89) * 300) + ((2.9 - gaa) * 8) + (winRate * 8);
-    return clamp(round(raw, 1), 60, 95);
+    return clamp(round(raw, 0), 60, 95);
   }
 
   let raw = 68 + (seasonPointsPerGame * 12) + (seasonGoalsPerGame * 8) + (seasonAssistsPerGame * 5) + (shootingPct * 0.1);
   raw += clamp((seasonPointsPerGame - careerPointsPerGame) * 5, -2, 2.5);
   if (resolvedPosition === "C") raw += clamp(((Number(seasonStats.faceoffPercent?.value || 50) - 50) * 0.06), -1.2, 1.2);
-  return clamp(round(raw, 1), 60, 96);
+  return clamp(round(raw, 0), 60, 96);
 }
 
 export function buildPlayerCard(bundle, teamsById = {}, context = {}) {
