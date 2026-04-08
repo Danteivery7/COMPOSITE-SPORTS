@@ -527,7 +527,7 @@ function renderTeams(state) {
 }
 
 function renderPlayers(state) {
-  const players = state.playerDirectory?.length ? state.playerDirectory : state.featuredPlayers || [];
+  const players = state.playerDirectory || [];
   if (!players.length) {
     return renderEmptyState("Players are still syncing", "The full NHL player directory is still filling from official roster and advanced stat data.");
   }

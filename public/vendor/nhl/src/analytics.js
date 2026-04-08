@@ -810,7 +810,18 @@ function buildLegacyTeamRankings(standingsEntries = [], teamStatsById = {}, team
     .sort((left, right) => right.predictiveScore - left.predictiveScore);
 
   ranked.forEach((team, index) => {
+    const teamPercentile = percentile(team.predictiveScore, ranked.map((entry) => entry.predictiveScore));
+    const compositeScore = scalePercentileToOverall(teamPercentile / 100, {
+      allow99:
+        teamPercentile >= 99.7 &&
+        team.forwardCore >= 95 &&
+        team.defenseCore >= 95 &&
+        team.goaltending >= 95 &&
+        team.underlyingScore >= 92,
+    });
     team.rank = index + 1;
+    team.teamPercentile = round(teamPercentile, 2);
+    team.compositeScore = round(clamp(compositeScore, 60, 99), 2);
     team.trend = "flat";
     team.trendLabel = "Holding";
   });
@@ -1247,13 +1258,13 @@ function fallbackPlayerOverall(profile, seasonStats, careerStats, resolvedPositi
 
   if (resolvedPosition === "G") {
     const raw = 62 + ((savePct - 0.87) * 160) + ((3.4 - gaa) * 7.5);
-    return clamp(round(raw, 1), 60, 95);
+    return clamp(round(raw, 1), 60, 98);
   }
 
   let raw = 64 + (seasonPointsPerGame * 16) + (seasonGoalsPerGame * 12) + (seasonAssistsPerGame * 8) + (shootingPct * 0.18);
   raw += clamp((seasonPointsPerGame - careerPointsPerGame) * 6, -2.5, 2.5);
   if (resolvedPosition === "C") raw += clamp(((Number(seasonStats.faceoffPercent?.value || 50) - 50) * 0.08), -2, 2);
-  return clamp(round(raw, 1), 60, 95);
+  return clamp(round(raw, 1), 60, 98);
 }
 
 export function buildPlayerCard(bundle, teamsById = {}, context = {}) {

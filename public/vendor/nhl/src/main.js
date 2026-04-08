@@ -101,6 +101,7 @@ const state = {
     bootstrap: false,
     teamStats: false,
     rosters: false,
+    advanced: false,
   },
   mobileNavOpen: false,
 };
@@ -182,6 +183,31 @@ function recomputeDerivedState() {
         state.playerDirectory.map((player) => [player.playerId, player]),
       );
     }
+  }
+
+  if (state.playerDirectory.length && Object.keys(state.playerCards).length) {
+    Object.keys(state.playerCards).forEach((playerId) => {
+      const livePlayer = state.playerDirectoryById[playerId];
+      const existingCard = state.playerCards[playerId];
+      if (!livePlayer || !existingCard) return;
+      state.playerCards[playerId] = {
+        ...existingCard,
+        fullName: livePlayer.fullName || existingCard.fullName,
+        shortName: livePlayer.shortName || existingCard.shortName,
+        jersey: livePlayer.jersey || existingCard.jersey,
+        team: livePlayer.team || existingCard.team,
+        teamId: livePlayer.teamId || existingCard.teamId,
+        position: livePlayer.resolvedPosition || existingCard.position,
+        resolvedPosition: livePlayer.resolvedPosition || existingCard.resolvedPosition,
+        headshot: livePlayer.headshot || existingCard.headshot,
+        overall: livePlayer.overall,
+        overallPercentile: livePlayer.overallPercentile,
+        hotnessScore: livePlayer.hotnessScore,
+        tone: livePlayer.tone || existingCard.tone,
+        sampleTrust: livePlayer.reliability ?? existingCard.sampleTrust,
+        modelReasons: livePlayer.modelReasons || existingCard.modelReasons,
+      };
+    });
   }
 
   if (state.standings.length && state.teams.length) {
@@ -363,7 +389,8 @@ async function loadBaseData(force = false) {
 }
 
 async function loadAdvancedSnapshot(force = false) {
-  if (!state.seasonYear || !state.teams.length) return;
+  if (state.loading.advanced || !state.seasonYear || !state.teams.length) return;
+  state.loading.advanced = true;
   try {
     const advancedSnapshot = await getAdvancedLeagueSnapshot(state.seasonYear, state.teams, force);
     if (!advancedSnapshot) return;
@@ -375,6 +402,8 @@ async function loadAdvancedSnapshot(force = false) {
     prefetchFeaturedPlayerCards();
   } catch (_error) {
     return null;
+  } finally {
+    state.loading.advanced = false;
   }
 }
 
@@ -478,6 +507,15 @@ async function ensureNewsStory(storyId, force = false) {
 }
 
 async function ensureRouteData(force = false) {
+  if (
+    ["players", "player", "teams", "rankings"].includes(state.route.view) &&
+    state.seasonYear &&
+    state.teams.length &&
+    !state.advancedSnapshot
+  ) {
+    void loadAdvancedSnapshot(true);
+  }
+
   if (state.route.view === "game" && state.route.id) {
     void ensureGameSummary(state.route.id, force);
   }
