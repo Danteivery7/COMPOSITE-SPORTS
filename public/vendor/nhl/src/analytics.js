@@ -711,6 +711,8 @@ function buildLegacyTeamRankings(standingsEntries = [], teamStatsById = {}, team
       const streakDisplay = recordStats.streak?.displayValue || "-";
       const streak = streakValue(streakDisplay);
       const gamesPlayed = Number(recordStats.gamesPlayed?.value || 1);
+      const points = Number(recordStats.points?.value || 0);
+      const pointPct = points > 0 ? (points / Math.max(1, gamesPlayed * 2)) * 100 : (winPct * 100);
       const diffPerGame = pointDiff / Math.max(1, gamesPlayed);
 
       return {
@@ -720,6 +722,8 @@ function buildLegacyTeamRankings(standingsEntries = [], teamStatsById = {}, team
         recordDisplay: overall.displayValue,
         streakDisplay,
         winPct,
+        points,
+        pointPct,
         goalsForPerGame,
         goalsAgainstPerGame,
         powerPlayPct,
@@ -727,29 +731,91 @@ function buildLegacyTeamRankings(standingsEntries = [], teamStatsById = {}, team
         faceoffPct,
         shotsFor,
         shotsAgainst,
-        compositeScore: round(76 + (winPct * 16) + (diffPerGame * 2.2) + streak, 1),
-        predictiveScore: round(76 + (winPct * 16) + (diffPerGame * 2.2) + streak, 1),
-        offenseScore: round(goalsForPerGame * 8, 1),
-        defenseScore: round((4 - goalsAgainstPerGame) * 20, 1),
-        forwardCore: 50,
-        defenseCore: 50,
-        goaltending: savePct * 100,
-        specialTeams: average([powerPlayPct, penaltyKillPct]),
-        underlyingScore: 50,
-        recentScore: clamp(50 + (streak * 6), 0, 100),
-        depthScore: 50,
+        shootingPct,
+        savePct,
+        diffPerGame,
       };
     })
-    .filter(Boolean)
+    .filter(Boolean);
+
+  const goalsForValues = base.map((team) => team.goalsForPerGame);
+  const goalsAgainstValues = base.map((team) => team.goalsAgainstPerGame);
+  const shotsForValues = base.map((team) => team.shotsFor);
+  const shotsAgainstValues = base.map((team) => team.shotsAgainst);
+  const powerPlayValues = base.map((team) => team.powerPlayPct);
+  const penaltyKillValues = base.map((team) => team.penaltyKillPct);
+  const savePctValues = base.map((team) => team.savePct);
+  const faceoffValues = base.map((team) => team.faceoffPct);
+  const pointPctValues = base.map((team) => team.pointPct);
+  const diffValues = base.map((team) => team.diffPerGame);
+  const shootingValues = base.map((team) => team.shootingPct);
+  const shotDiffValues = base.map((team) => team.shotsFor - team.shotsAgainst);
+
+  const ranked = base
+    .map((team) => {
+      const forwardCore =
+        (percentile(team.goalsForPerGame, goalsForValues) * 0.42) +
+        (percentile(team.shotsFor, shotsForValues) * 0.18) +
+        (percentile(team.powerPlayPct, powerPlayValues) * 0.14) +
+        (percentile(team.shootingPct, shootingValues) * 0.1) +
+        (percentile(team.pointPct, pointPctValues) * 0.16);
+      const defenseCore =
+        (percentile(team.goalsAgainstPerGame, goalsAgainstValues, true) * 0.34) +
+        (percentile(team.shotsAgainst, shotsAgainstValues, true) * 0.2) +
+        (percentile(team.penaltyKillPct, penaltyKillValues) * 0.18) +
+        (percentile(team.faceoffPct, faceoffValues) * 0.08) +
+        (percentile(team.diffPerGame, diffValues) * 0.2);
+      const goaltending =
+        (percentile(team.savePct, savePctValues) * 0.62) +
+        (percentile(team.goalsAgainstPerGame, goalsAgainstValues, true) * 0.38);
+      const specialTeams = average([
+        percentile(team.powerPlayPct, powerPlayValues),
+        percentile(team.penaltyKillPct, penaltyKillValues),
+      ]);
+      const underlyingScore =
+        (percentile(team.diffPerGame, diffValues) * 0.46) +
+        (percentile(team.shotsFor - team.shotsAgainst, shotDiffValues) * 0.3) +
+        (percentile(team.pointPct, pointPctValues) * 0.24);
+      const depthScore =
+        (percentile(team.pointPct, pointPctValues) * 0.44) +
+        (percentile(team.faceoffPct, faceoffValues) * 0.16) +
+        (percentile(team.shotsFor, shotsForValues) * 0.2) +
+        (percentile(team.shotsAgainst, shotsAgainstValues, true) * 0.2);
+      const recentScore = clamp(50 + (streakValue(team.streakDisplay) * 4.2), 0, 100);
+      const predictiveScore =
+        72 +
+        (team.pointPct * 0.13) +
+        (team.diffPerGame * 4.4) +
+        (forwardCore * 0.06) +
+        (defenseCore * 0.06) +
+        (goaltending * 0.05) +
+        (specialTeams * 0.03) +
+        (recentScore * 0.015);
+
+      return {
+        ...team,
+        compositeScore: round(predictiveScore, 2),
+        predictiveScore: round(predictiveScore, 2),
+        offenseScore: round((forwardCore * 0.78) + (specialTeams * 0.22), 2),
+        defenseScore: round((defenseCore * 0.62) + (goaltending * 0.38), 2),
+        forwardCore: round(forwardCore, 2),
+        defenseCore: round(defenseCore, 2),
+        goaltending: round(goaltending, 2),
+        specialTeams: round(specialTeams, 2),
+        underlyingScore: round(underlyingScore, 2),
+        recentScore: round(recentScore, 2),
+        depthScore: round(depthScore, 2),
+      };
+    })
     .sort((left, right) => right.predictiveScore - left.predictiveScore);
 
-  base.forEach((team, index) => {
+  ranked.forEach((team, index) => {
     team.rank = index + 1;
     team.trend = "flat";
     team.trendLabel = "Holding";
   });
 
-  return base;
+  return ranked;
 }
 
 function buildTeamPredictionSignals(team) {
@@ -1106,7 +1172,10 @@ export function buildPredictorCards(scoreboard, rankings) {
 
 export function buildFeaturedPlayers(leaderEntries = [], teamsById = {}, advancedSnapshot = null, rosters = {}, standingsEntries = []) {
   if (advancedSnapshot) {
-    return buildPlayerDirectory(advancedSnapshot, rosters, teamsById, standingsEntries).slice(0, 30);
+    const liveBoard = buildPlayerDirectory(advancedSnapshot, rosters, teamsById, standingsEntries);
+    if (liveBoard.length) {
+      return liveBoard.slice(0, 30);
+    }
   }
 
   const categoryWeights = {

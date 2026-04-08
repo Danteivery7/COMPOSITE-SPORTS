@@ -28,7 +28,6 @@ function ensureHeadshotFallback(event) {
   event.currentTarget.src = 'https://a.espncdn.com/i/headshots/nophoto.png';
 }
 
-const HERO_CACHE_KEY = 'composite-hub-hero-v3';
 const ET_TIME_FORMATTER = new Intl.DateTimeFormat('en-US', {
   timeZone: 'America/New_York',
   hour: 'numeric',
@@ -69,27 +68,6 @@ export default function SportHubPage({ initialHero = null }) {
     document.body.removeAttribute('data-theme');
     document.body.dataset.compositeRoute = 'hub';
 
-    if (hasRenderableHero(initialHero)) {
-      try {
-        window.sessionStorage.setItem(HERO_CACHE_KEY, JSON.stringify(initialHero));
-      } catch (_error) {
-        // ignore storage issues
-      }
-    } else {
-      try {
-        const cached = window.sessionStorage.getItem(HERO_CACHE_KEY);
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (hasRenderableHero(parsed)) {
-            setHero(parsed);
-            setLoading(false);
-          }
-        }
-      } catch (_error) {
-        // ignore storage issues
-      }
-    }
-
     async function loadHero() {
       try {
         const response = await fetch('/api/hub/hero', { cache: 'no-store' });
@@ -104,11 +82,6 @@ export default function SportHubPage({ initialHero = null }) {
 
         if (response.ok && hasMeaningfulContent) {
           setHero(json);
-          try {
-            window.sessionStorage.setItem(HERO_CACHE_KEY, JSON.stringify(json));
-          } catch (_error) {
-            // ignore storage issues
-          }
         }
 
         setLoading(false);
@@ -118,11 +91,6 @@ export default function SportHubPage({ initialHero = null }) {
           const refreshJson = await refreshResponse.json();
           if (refreshResponse.ok) {
             setHero(refreshJson);
-            try {
-              window.sessionStorage.setItem(HERO_CACHE_KEY, JSON.stringify(refreshJson));
-            } catch (_error) {
-              // ignore storage issues
-            }
           }
         }
       } finally {
