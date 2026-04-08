@@ -17,7 +17,7 @@ import { fetchStandings, fetchAllTeamStats, fetchScoreboard, fetchTeamSchedule }
 import { ALL_TEAMS } from './teams';
 import { cacheGet, cacheSet, CACHE_TTL } from './cache';
 
-const RANKINGS_CACHE_KEY = 'computed_rankings_v10';
+const RANKINGS_CACHE_KEY = 'computed_rankings_v11';
 
 function parseStreakNumber(streak) {
     if (!streak || streak === '—') return 0;

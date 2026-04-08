@@ -10,6 +10,15 @@ import { getTeamByEspnId, ALL_TEAMS } from './teams';
 const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb';
 const ESPN_WEB = 'https://site.web.api.espn.com/apis/common/v3/sports/baseball/mlb';
 
+function readStat(stats = {}, keys = []) {
+    for (const key of keys) {
+        if (stats?.[key] != null && stats[key] !== '') {
+            return stats[key];
+        }
+    }
+    return null;
+}
+
 /* ======================================================================
    SCOREBOARD
    ====================================================================== */
@@ -144,7 +153,7 @@ export async function fetchScoreboard() {
    STANDINGS
    ====================================================================== */
 export async function fetchStandings() {
-    const cached = cacheGet('espn_standings_v8');
+    const cached = cacheGet('espn_standings_v9');
     if (cached) return cached;
 
     try {
@@ -184,9 +193,10 @@ export async function fetchStandings() {
 
                     // Precise Pre-Season detection: Look at team group name
                     const groupName = division.name || '';
-                    const rawWins = parseInt(stats.wins) || 0;
-                    const rawLosses = parseInt(stats.losses) || 0;
-                    const gp = rawWins + rawLosses;
+                    const rawWins = parseInt(readStat(stats, ['wins', 'W'])) || 0;
+                    const rawLosses = parseInt(readStat(stats, ['losses', 'L'])) || 0;
+                    const statGamesPlayed = parseInt(readStat(stats, ['gamesPlayed', 'games', 'gp', 'GP'])) || 0;
+                    const gp = rawWins + rawLosses || statGamesPlayed;
 
                     // Final Streak Sanitization: Ensure we have W1/L1 even if API just gives a number
                     let streakVal = String(stats.streak || '—');
@@ -197,7 +207,7 @@ export async function fetchStandings() {
                         const num = parseInt(streakVal);
                         // Heuristic: If they are hot, it's a Win streak. If not, it's a Loss streak.
                         // But better yet, we can check the 'last10' string which usually ends in W1/L1.
-                        const l10 = String(stats.record || stats.last10 || '');
+                        const l10 = String(readStat(stats, ['record', 'last10', 'lastTen']) || '');
                         if (l10.includes('W')) { streakVal = `W${num}`; streakNum = num; }
                         else if (l10.includes('L')) { streakVal = `L${num}`; streakNum = -num; }
                         else { streakVal = `W${num}`; streakNum = num; } // Default to Win for 0-0 cases
@@ -215,13 +225,13 @@ export async function fetchStandings() {
                         espnId,
                         wins: forceZero ? 0 : rawWins,
                         losses: forceZero ? 0 : rawLosses,
-                        winPct: forceZero ? 0 : parseFloat(stats.winPercent) || 0,
-                        gamesBack: forceZero ? '-' : stats.gamesBehind || '-',
-                        runsScored: forceZero ? 0 : parseFloat(stats.pointsFor) || 0,
-                        runsAllowed: forceZero ? 0 : parseFloat(stats.pointsAgainst) || 0,
-                        runDiff: forceZero ? 0 : parseFloat(stats.differential) || 0,
+                        winPct: forceZero ? 0 : parseFloat(readStat(stats, ['winPercent', 'winPct', 'pct'])) || 0,
+                        gamesBack: forceZero ? '-' : readStat(stats, ['gamesBehind', 'GB']) || '-',
+                        runsScored: forceZero ? 0 : parseFloat(readStat(stats, ['pointsFor', 'runsFor', 'runsScored', 'runs'])) || 0,
+                        runsAllowed: forceZero ? 0 : parseFloat(readStat(stats, ['pointsAgainst', 'runsAgainst', 'runsAllowed', 'oppRuns'])) || 0,
+                        runDiff: forceZero ? 0 : (parseFloat(readStat(stats, ['differential', 'runDifferential', 'pointDifferential'])) || ((parseFloat(readStat(stats, ['pointsFor', 'runsFor', 'runsScored', 'runs'])) || 0) - (parseFloat(readStat(stats, ['pointsAgainst', 'runsAgainst', 'runsAllowed', 'oppRuns'])) || 0))),
                         streak: forceZero ? '—' : streakVal,
-                        last10: forceZero ? '0-0' : (stats.record || stats.last10 || '0-0'),
+                        last10: forceZero ? '0-0' : (readStat(stats, ['record', 'last10', 'lastTen']) || '0-0'),
                         gamesPlayed: forceZero ? 0 : gp,
                     };
                 }
@@ -229,12 +239,12 @@ export async function fetchStandings() {
         }
 
         const result = { teams, lastUpdated: new Date().toISOString() };
-        cacheSet('espn_standings_v8', result, CACHE_TTL.STATS);
-        cacheSet('espn_standings_stale_v8', result, CACHE_TTL.STATS * 10);
+        cacheSet('espn_standings_v9', result, CACHE_TTL.STATS);
+        cacheSet('espn_standings_stale_v9', result, CACHE_TTL.STATS * 10);
         return result;
     } catch (err) {
         console.error('ESPN standings fetch error:', err.message);
-        const stale = cacheGet('espn_standings_stale_v8');
+        const stale = cacheGet('espn_standings_stale_v9');
         if (stale) return { ...stale, stale: true };
         return { teams: {}, lastUpdated: null, error: err.message };
     }
@@ -244,7 +254,7 @@ export async function fetchStandings() {
    TEAM STATISTICS  (batting + pitching – deep analytics)
    ====================================================================== */
 export async function fetchTeamStats(espnId) {
-    const cacheKey = `team_stats_v8_${espnId}`;
+    const cacheKey = `team_stats_v9_${espnId}`;
     const cached = cacheGet(cacheKey);
     if (cached) return cached;
 
@@ -257,12 +267,9 @@ export async function fetchTeamStats(espnId) {
         if (!res.ok) throw new Error(`ESPN team stats ${espnId}: ${res.status}`);
         const data = await res.json();
 
-        // Detect if these stats are stale (from Spring Training)
-        // Heuristic: If games played is high, it's preseason data.
         const stats = data.results?.stats || {};
-        const gp = stats.categories?.find(c => c.name === 'batting')?.stats?.find(s => s.name === 'gamesPlayed')?.value || 0;
-        const isStale = gp > 10;
-        const isPre = data.season?.type === 1 || isStale;
+        const seasonLabel = `${data?.displayName || ''} ${stats?.displayName || ''} ${data?.season?.displayName || ''}`.toLowerCase();
+        const isPre = data.season?.type === 1 || seasonLabel.includes('spring') || seasonLabel.includes('preseason');
 
         const categories = stats.categories || [];
         const batting = {};
@@ -287,7 +294,7 @@ export async function fetchTeamStats(espnId) {
 
 /** Fetch stats for ALL 30 teams in parallel */
 export async function fetchAllTeamStats() {
-    const cached = cacheGet('all_team_stats_v8');
+    const cached = cacheGet('all_team_stats_v9');
     if (cached) return cached;
 
     const teams = {};
@@ -298,7 +305,7 @@ export async function fetchAllTeamStats() {
 
     await Promise.all(promises);
     const result = { teams, lastUpdated: new Date().toISOString() };
-    cacheSet('all_team_stats_v8', result, CACHE_TTL.STATS);
+    cacheSet('all_team_stats_v9', result, CACHE_TTL.STATS);
     return result;
 }
 
