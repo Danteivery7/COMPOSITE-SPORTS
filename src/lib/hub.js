@@ -27,6 +27,7 @@ const STORY_TTL_MS = 5 * 60 * 1000;
 const BETS_TTL_MS = 90 * 1000;
 const HERO_TTL_MS = 2 * 60 * 1000;
 const HUB_CACHE_VERSION = 'v14';
+export const HUB_HERO_SNAPSHOT_KEY = `hub-hero-${HUB_CACHE_VERSION}`;
 
 const EXTERNAL_NEWS_SOURCES = [
   {
@@ -1141,7 +1142,7 @@ export async function getHubTopBets({ force = false } = {}) {
 }
 
 export async function getHubHero({ force = false } = {}) {
-  return getHotSnapshot(`hub-hero-${HUB_CACHE_VERSION}`, () => buildHubHeroSnapshot(), {
+  return getHotSnapshot(HUB_HERO_SNAPSHOT_KEY, () => buildHubHeroSnapshot(), {
     ttlMs: HERO_TTL_MS,
     force,
   });
@@ -1164,7 +1165,7 @@ export async function warmHubSnapshots() {
     ),
     warmSnapshot(`hub-trending-stories-${HUB_CACHE_VERSION}`, () => buildTrendingStoriesSnapshot(), { force: true, ttlMs: STORY_TTL_MS }),
     warmSnapshot(`hub-top-bets-${HUB_CACHE_VERSION}`, () => buildTopBetsSnapshot(), { force: true, ttlMs: BETS_TTL_MS }),
-    warmSnapshot(`hub-hero-${HUB_CACHE_VERSION}`, () => buildHubHeroSnapshot(), { force: true, ttlMs: HERO_TTL_MS }),
+    warmSnapshot(HUB_HERO_SNAPSHOT_KEY, () => buildHubHeroSnapshot(), { force: true, ttlMs: HERO_TTL_MS }),
     getGenericSportSnapshot('nfl', { force: true }),
     getGenericSportSnapshot('cbb', { force: true }),
     getFootballLandingSnapshot({ force: true }),

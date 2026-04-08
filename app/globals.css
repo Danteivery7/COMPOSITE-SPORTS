@@ -86,6 +86,8 @@ body[data-composite-route='hub'] {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
 }
 
 .hub-page::before {
@@ -113,15 +115,18 @@ body[data-composite-route='hub'] {
 .hub-orbit {
   position: fixed;
   pointer-events: none;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 .hub-aurora {
   inset: auto;
-  width: 42rem;
-  height: 42rem;
+  width: 34rem;
+  height: 34rem;
   border-radius: 999px;
-  filter: blur(88px);
-  opacity: 0.4;
+  filter: blur(72px);
+  opacity: 0.34;
   animation: hubDrift 18s ease-in-out infinite;
 }
 
@@ -156,14 +161,14 @@ body[data-composite-route='hub'] {
   mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.5), transparent 84%);
   transform: perspective(1000px) rotateX(68deg) scale(1.42) translateY(14%);
   transform-origin: center top;
-  opacity: 0.26;
+  opacity: 0.2;
   animation: hubGridShift 34s linear infinite;
 }
 
 .hub-orbit {
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  opacity: 0.38;
+  opacity: 0.26;
   box-shadow: inset 0 0 24px rgba(255, 255, 255, 0.04);
 }
 
@@ -5521,6 +5526,9 @@ body[data-composite-route='football'] {
   gap: 12px;
   width: max-content;
   animation: hubMarquee var(--hub-marquee-duration) linear infinite;
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .hub-story-marquee-track {
@@ -5529,6 +5537,13 @@ body[data-composite-route='football'] {
 
 .hub-live-ticker-track {
   animation-duration: calc(var(--hub-marquee-duration) * 1.1);
+}
+
+.hub-sport-rail-section,
+.hub-world-board,
+.hub-story-board {
+  content-visibility: auto;
+  contain-intrinsic-size: 720px;
 }
 
 .hub-story-marquee-pill {

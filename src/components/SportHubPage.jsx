@@ -98,12 +98,14 @@ export default function SportHubPage({ initialHero = null }) {
       }
     }
 
-    if (!hasRenderableHero(initialHero)) {
-      loadHero();
-    }
+    const bootstrapTimer = window.setTimeout(
+      loadHero,
+      hasRenderableHero(initialHero) ? 1200 : 0,
+    );
     const timer = window.setInterval(loadHero, 60_000);
 
     return () => {
+      window.clearTimeout(bootstrapTimer);
       window.clearInterval(timer);
       delete document.body.dataset.compositeRoute;
     };
