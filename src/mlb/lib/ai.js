@@ -7,7 +7,7 @@
 
 const LEAGUE_AVG = {
     HR: 18, RBI: 60, AVG: 0.248, OPS: 0.720, SB: 10,
-    ERA: 4.20, WHIP: 1.30, 'K/9': 8.5, SO: 100, W: 7,
+    ERA: 4.20, WHIP: 1.30, 'K/9': 8.5, 'H/9': 8.6, 'HR/9': 1.2, SO: 100, W: 7,
 };
 
 export function generatePlayerAnalysis(player, current, career, gameLogs = [], statusLabel = '', bStats = {}, pStats = '', accoladeText = '', teamGP = 0) {
@@ -46,6 +46,13 @@ export function generatePlayerAnalysis(player, current, career, gameLogs = [], s
         return currentRate * seasonWeight + careerRate * careerWeight + leagueAvg * leagueWeight;
     }
 
+    const getNum = (obj, ...keys) => {
+        for (const key of keys) {
+            if (obj?.[key] != null) return parseFloat(obj[key]) || 0;
+        }
+        return 0;
+    };
+
     // ── Consensus Assessment Logic ──────────────────────────────────────
     let consensusScore = 0;
     let consensusLabel = 'Steady';
@@ -59,19 +66,30 @@ export function generatePlayerAnalysis(player, current, career, gameLogs = [], s
             const tER = r.reduce((s, l) => s + (parseFloat(l.stats?.[3]) || 0), 0);
             const tBB = r.reduce((s, l) => s + (parseFloat(l.stats?.[4]) || 0), 0);
             const tK = r.reduce((s, l) => s + (parseFloat(l.stats?.[5]) || 0), 0);
+            const tHR = r.reduce((s, l) => s + (parseFloat(l.stats?.[6]) || 0), 0);
+            const currentIP = getNum(current, 'IP', 'innings', 'inningsPitched') || tIP;
+            const currentHitsAllowed = getNum(current, 'H', 'hits') || tH;
+            const currentHRAllowed = getNum(current, 'HR', 'homeRuns') || tHR;
 
-            const curERA = tIP > 0 ? (tER / tIP) * 9 : (current.ERA || 4.20);
-            const curWHIP = tIP > 0 ? (tH + tBB) / tIP : (current.WHIP || 1.30);
-            const curK9 = tIP > 0 ? (tK / tIP) * 9 : (current['K/9'] || 8.5);
+            const curERA = getNum(current, 'ERA', 'earnedRunAverage') || (tIP > 0 ? (tER / tIP) * 9 : 4.20);
+            const curWHIP = getNum(current, 'WHIP') || (tIP > 0 ? (tH + tBB) / tIP : 1.30);
+            const curK9 = getNum(current, 'K/9', 'strikeoutsPerNineInnings') || (tIP > 0 ? (tK / tIP) * 9 : 8.5);
+            const curH9 = currentIP > 0 ? (currentHitsAllowed / currentIP) * 9 : (getNum(current, 'hitsPerNine', 'H/9') || LEAGUE_AVG['H/9']);
+            const curHR9 = currentIP > 0 ? (currentHRAllowed / currentIP) * 9 : (getNum(current, 'homeRunsPerNine', 'HR/9') || LEAGUE_AVG['HR/9']);
             const bERA = isRookie ? 4.20 : (career?.ERA || 4.20);
             const bWHIP = isRookie ? 1.35 : (career?.WHIP || 1.30);
             const bK9 = isRookie ? 8.0 : (career?.['K/9'] || 8.5);
+            const careerIP = getNum(career, 'IP', 'innings', 'inningsPitched');
+            const careerHits = getNum(career, 'H', 'hits');
+            const careerHR = getNum(career, 'HR', 'homeRuns');
+            const bH9 = isRookie ? LEAGUE_AVG['H/9'] : (careerIP > 0 ? (careerHits / careerIP) * 9 : LEAGUE_AVG['H/9']);
+            const bHR9 = isRookie ? LEAGUE_AVG['HR/9'] : (careerIP > 0 ? (careerHR / careerIP) * 9 : LEAGUE_AVG['HR/9']);
 
             if (curERA < bERA) consensusScore++;
             if (curWHIP < bWHIP) consensusScore++;
             if (curK9 > bK9) consensusScore++;
-            if (tIP / r.length > 5.0) consensusScore++; // Efficiency check
-            if (tK / Math.max(1, tBB) > 3.0) consensusScore++; // K/BB check
+            if (curH9 < bH9) consensusScore++;
+            if (curHR9 < bHR9) consensusScore++;
 
             if (consensusScore >= 4) { consensusLabel = 'Sizzling'; streakNote = ` He is currently sizzling on the mound, with his 5-point consensus profile outperforming his established benchmarks.`; }
             else if (consensusScore === 3) { consensusLabel = 'Steady'; streakNote = ` He is delivering a remarkably steady performance of late, tracking right in line with the high expectations of his career profile.`; }
@@ -88,17 +106,25 @@ export function generatePlayerAnalysis(player, current, career, gameLogs = [], s
             const curOPS = (current.OPS || 0);
             const curSLG = (current.SLG || 0);
             const curOBP = (current.OBP || 0);
+            const currentGames = getNum(current, 'GP', 'gamesPlayed');
+            const currentHits = getNum(current, 'H', 'hits');
 
             const bAVG = isRookie ? 0.248 : (career?.AVG || 0.248);
             const bOPS = isRookie ? 0.720 : (career?.OPS || 0.720);
             const bSLG = isRookie ? 0.405 : (career?.SLG || 0.400);
             const bOBP = isRookie ? 0.315 : (career?.OBP || 0.310);
+            const careerGames = getNum(career, 'GP', 'gamesPlayed');
+            const careerHits = getNum(career, 'H', 'hits');
+            const curH9 = currentGames > 0 ? (currentHits / currentGames) * 9 : (tH / Math.max(1, r.length)) * 9;
+            const bH9 = isRookie
+                ? ((112 / 130) * 9)
+                : (careerGames > 0 ? (careerHits / careerGames) * 9 : ((112 / 130) * 9));
 
             if (curAVG > bAVG) consensusScore++;
             if (curOPS > bOPS) consensusScore++;
             if (curSLG > bSLG) consensusScore++;
             if (curOBP > bOBP) consensusScore++;
-            if (tH / Math.max(1, r.length) >= 1.0) consensusScore++; // Hits/Game Consistency
+            if (curH9 > bH9) consensusScore++;
 
             if (consensusScore >= 4) { consensusLabel = 'Sizzling'; streakNote = ` He is currently sizzling at the plate, with his 5-point consensus profile outperforming his established career benchmarks.`; }
             else if (consensusScore === 3) { consensusLabel = 'Steady'; streakNote = ` He is delivering a remarkably steady performance of late, tracking right in line with the high expectations of his career profile.`; }

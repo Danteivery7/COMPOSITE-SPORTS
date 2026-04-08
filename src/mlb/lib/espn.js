@@ -10,6 +10,14 @@ import { getTeamByEspnId, ALL_TEAMS } from './teams';
 const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb';
 const ESPN_WEB = 'https://site.web.api.espn.com/apis/common/v3/sports/baseball/mlb';
 
+function isCanceledOrPostponedStatus(statusText = '') {
+    const text = String(statusText).toLowerCase();
+    return text.includes('postponed') ||
+        text.includes('ppd') ||
+        text.includes('canceled') ||
+        text.includes('cancelled');
+}
+
 /* ======================================================================
    SCOREBOARD
    ====================================================================== */
@@ -373,6 +381,7 @@ export async function fetchTeamSchedule(espnId, season = null) {
             const comp = ev.competitions?.[0];
             const comps = comp?.competitors || [];
             const status = comp?.status?.type;
+            const statusText = `${status?.state || ''} ${status?.detail || ''} ${status?.shortDetail || ''}`.toLowerCase();
 
             const home = comps.find(c => c.homeAway === 'home');
             const away = comps.find(c => c.homeAway === 'away');
@@ -397,11 +406,12 @@ export async function fetchTeamSchedule(espnId, season = null) {
                 result: status?.state === 'post' ? (teamScore > oppScore ? 'W' : teamScore < oppScore ? 'L' : 'T') : null,
                 state: status?.state || 'pre',
                 statusDetail: status?.detail || '',
+                isCanceledOrPostponed: isCanceledOrPostponedStatus(statusText),
             };
         });
 
         // Only completed games
-        const completed = games.filter(g => g.state === 'post' && g.result);
+        const completed = games.filter(g => g.state === 'post' && g.result && !g.isCanceledOrPostponed);
 
         const result = { games: completed, lastUpdated: new Date().toISOString() };
         cacheSet(cacheKey, result, CACHE_TTL.SCHEDULE);
@@ -674,8 +684,7 @@ export async function fetchPostGameSummary(gameId, winningAbbr) {
         const competitors = header?.competitors || [];
         const statusText = `${header?.status?.type?.state || ''} ${header?.status?.type?.detail || ''} ${header?.status?.type?.shortDetail || ''}`.toLowerCase();
         const isInterruptedGame =
-            statusText.includes('postponed') ||
-            statusText.includes('ppd') ||
+            isCanceledOrPostponedStatus(statusText) ||
             statusText.includes('delayed') ||
             statusText.includes('suspended');
         const isCompletedFinal = header?.status?.type?.completed === true || header?.status?.type?.state === 'post';
@@ -872,7 +881,77 @@ export async function fetchPostGameSummary(gameId, winningAbbr) {
             }
         }
 
-        return { winningPitcher, losingPitcher, savingPitcher, pog, rareEvents };
+        const playTexts = (summary.plays || [])
+            .map((play) => play?.text || play?.shortText || '')
+            .filter(Boolean);
+        const articleTexts = (summary.articles || [])
+            .flatMap((article) => [article?.headline, article?.description])
+            .filter(Boolean);
+        const textPool = [...playTexts, ...articleTexts];
+
+        const cleanSummaryText = (text = '') => {
+            const trimmed = String(text).replace(/\s+/g, ' ').trim();
+            if (!trimmed) return '';
+            return trimmed.split('. ')[0].replace(/\.$/, '');
+        };
+
+        const findMilestone = () => {
+            const patterns = [
+                { type: 'career-hit', regex: /(\d+)(?:st|nd|rd|th)?\s+career\s+hit/i },
+                { type: 'career-home-run', regex: /(\d+)(?:st|nd|rd|th)?\s+career\s+(?:home run|homer)/i },
+                { type: 'career-strikeout', regex: /(\d+)(?:st|nd|rd|th)?\s+career\s+strikeout/i },
+                { type: 'career-win', regex: /(\d+)(?:st|nd|rd|th)?\s+career\s+win/i },
+            ];
+
+            for (const text of textPool) {
+                for (const pattern of patterns) {
+                    const match = text.match(pattern.regex);
+                    if (match) {
+                        return {
+                            type: pattern.type,
+                            value: parseInt(match[1], 10) || null,
+                            text: cleanSummaryText(text),
+                        };
+                    }
+                }
+            }
+            return null;
+        };
+
+        const walkoffPlay = playTexts.find((text) => /walk[\s-]?off/i.test(text));
+        const walkoffHomerPlay = playTexts.find((text) => /walk[\s-]?off/i.test(text) && /home run|homered/i.test(text));
+        const milestone = findMilestone();
+        let finalEventType = null;
+        let finalEventSummary = null;
+
+        if (rareEvents.some((event) => event.type === 'perfect-game')) {
+            finalEventType = 'perfect-game';
+            finalEventSummary = `Perfect game completed for ${winningAbbr}.`;
+        } else if (rareEvents.some((event) => event.type === 'no-hitter')) {
+            finalEventType = 'no-hitter';
+            finalEventSummary = `No-hitter sealed the win for ${winningAbbr}.`;
+        } else if (rareEvents.some((event) => event.kind === 'cgso')) {
+            finalEventType = 'cgso';
+            finalEventSummary = cleanSummaryText(rareEvents.find((event) => event.kind === 'cgso')?.label || '') || 'Complete-game shutout anchored the final.';
+        } else if (walkoffHomerPlay) {
+            finalEventType = 'walkoff-homer';
+            finalEventSummary = cleanSummaryText(walkoffHomerPlay);
+        } else if (walkoffPlay) {
+            finalEventType = 'walkoff';
+            finalEventSummary = cleanSummaryText(walkoffPlay);
+        } else if (rareEvents.some((event) => event.type === 'shutout')) {
+            finalEventType = 'shutout';
+            finalEventSummary = `${winningAbbr} closed it out with a shutout.`;
+        } else if (milestone?.text) {
+            finalEventType = milestone.type;
+            finalEventSummary = milestone.text;
+        } else {
+            const notableEvent = rareEvents.find((event) => event.type === 'milestone' || event.type === 'cycle');
+            finalEventType = notableEvent?.kind || notableEvent?.type || null;
+            finalEventSummary = notableEvent?.label ? cleanSummaryText(notableEvent.label.replace(/^[^\w]+/, '')) : null;
+        }
+
+        return { winningPitcher, losingPitcher, savingPitcher, pog, rareEvents, finalEventType, finalEventSummary, milestone };
     } catch(e) { 
         console.error('Post Game Summary Error:', e.message);
         return null; 

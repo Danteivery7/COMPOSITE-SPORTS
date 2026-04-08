@@ -41,8 +41,11 @@ export default function TeamDetailPage({ teamId, onBack, favorites, toggleFavori
                 <div className="team-hero-info">
                     <h1 className="page-title">{team.fullName}</h1>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px' }}>
-                        <p className="page-subtitle" style={{ margin: 0 }}>{team.league} {team.division} · {team.wins || 0}-{team.losses || 0}</p>
-                        {team.streak && (
+                        <p className="page-subtitle" style={{ margin: 0 }}>
+                            {team.league} {team.division} · {team.wins || 0}-{team.losses || 0}
+                            {team.streak && team.streak !== '—' ? ` · ${team.streak}` : ''}
+                        </p>
+                        {team.streak && team.streak !== '—' && (
                             <span style={{ 
                                 fontSize: '11px', 
                                 fontWeight: 900, 
@@ -54,7 +57,7 @@ export default function TeamDetailPage({ teamId, onBack, favorites, toggleFavori
                                 textTransform: 'uppercase',
                                 letterSpacing: '0.5px'
                             }}>
-                                {team.streak} Streak
+                                {team.streak}
                             </span>
                         )}
                     </div>

@@ -47,6 +47,30 @@ export default function Navbar({ currentPage, onNavigate, theme, toggleTheme }) 
                     ))}
                 </ul>
 
+                <div className={`nav-mobile-panel ${mobileOpen ? 'open' : ''}`}>
+                    <ul className="nav-mobile-links">
+                        {navItems.map(item => (
+                            <li key={`mobile-${item.id}`}>
+                                <a
+                                    className={currentPage === item.id ? 'active' : ''}
+                                    onClick={() => handleNav(item.id)}
+                                    style={{ cursor: 'pointer' }}
+                                >
+                                    <span>{item.label}</span>
+                                </a>
+                            </li>
+                        ))}
+                    </ul>
+                    <div className="nav-mobile-utilities">
+                        <button className="theme-toggle mobile-theme-toggle" onClick={() => { toggleTheme(); setMobileOpen(false); }} title="Toggle theme">
+                            {theme === 'dark' ? 'Light' : 'Dark'}
+                        </button>
+                        <Link href="/" className="nav-hub-link mobile-nav-hub-link" onClick={() => setMobileOpen(false)}>
+                            Back To Hub
+                        </Link>
+                    </div>
+                </div>
+
                 <div className="navbar-controls">
                     <Link href="/" className="nav-hub-link">
                         Back To Hub

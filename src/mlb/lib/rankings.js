@@ -17,7 +17,54 @@ import { fetchStandings, fetchAllTeamStats, fetchScoreboard, fetchTeamSchedule }
 import { ALL_TEAMS } from './teams';
 import { cacheGet, cacheSet, CACHE_TTL } from './cache';
 
-const RANKINGS_CACHE_KEY = 'computed_rankings_v8';
+const RANKINGS_CACHE_KEY = 'computed_rankings_v9';
+
+function isNonPlayedStatus(game) {
+    const statusText = `${game?.state || ''} ${game?.statusDetail || ''} ${game?.shortDetail || ''}`.toLowerCase();
+    return statusText.includes('postponed') ||
+        statusText.includes('ppd') ||
+        statusText.includes('canceled') ||
+        statusText.includes('cancelled');
+}
+
+function parseStreakNumber(streak) {
+    if (!streak || streak === '—') return 0;
+    const raw = String(streak).trim().toUpperCase();
+    if (raw.startsWith('W')) return parseInt(raw.slice(1), 10) || 0;
+    if (raw.startsWith('L')) return -(parseInt(raw.slice(1), 10) || 0);
+    return 0;
+}
+
+function resolveScheduleStreak(games = [], fallback = '—') {
+    const completed = (games || []).filter((game) => game?.result === 'W' || game?.result === 'L');
+    if (!completed.length) {
+        return {
+            streak: fallback,
+            streakNum: parseStreakNumber(fallback),
+        };
+    }
+
+    const recent = [...completed].slice(-10).reverse();
+    const firstResult = recent[0]?.result;
+    if (!firstResult) {
+        return {
+            streak: fallback,
+            streakNum: parseStreakNumber(fallback),
+        };
+    }
+
+    let count = 0;
+    for (const game of recent) {
+        if (game.result !== firstResult) break;
+        count += 1;
+    }
+
+    const streak = `${firstResult}${count}`;
+    return {
+        streak,
+        streakNum: firstResult === 'W' ? count : -count,
+    };
+}
 
 /* ======================================================================
    COMPOSITE RANKING COMPUTATION
@@ -44,6 +91,7 @@ export async function computeRankings() {
     // Completely silence live scoring accumulations during Spring Training
     if (!scoreboardData.isPreseason) {
         for (const g of liveGames) {
+            if (isNonPlayedStatus(g)) continue;
             const home = g.home;
             const away = g.away;
             if (!home || !away) continue;
@@ -287,7 +335,12 @@ export async function computeRankings() {
     const schedulePromises = ranked.map(async (t) => {
         try {
             const sched = await fetchTeamSchedule(t.espnId);
-            t.last5 = (sched.games || []).slice(-5).reverse();
+            const allCompleted = sched.games || [];
+            t.last5 = allCompleted.slice(-5).reverse();
+            const resolvedStreak = resolveScheduleStreak(allCompleted, t.streak);
+            t.streak = resolvedStreak.streak;
+            t.streakNum = resolvedStreak.streakNum;
+            t.hotScore = Math.round((((t.streakNum || 0) * 25) + ((t.winPct || 0) * 40) + (((t.runDiff || 0) / Math.max(1, t.gamesPlayed || 0)) * 10)) * 100) / 100;
         } catch (e) {
             console.error(`Failed to fetch last5 for ${t.id}:`, e.message);
         }

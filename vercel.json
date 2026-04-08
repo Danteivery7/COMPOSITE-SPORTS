@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/mlb/warm",
-      "schedule": "*/5 * * * *"
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/cbb/warm",

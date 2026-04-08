@@ -9,7 +9,7 @@ import { predict } from '@/src/mlb/lib/predictor';
  */
 export async function GET(request, { params }) {
     const { gameId } = await params;
-    const cacheKey = `game_detail_v9_${gameId}`;
+    const cacheKey = `game_detail_v10_${gameId}`;
     const cached = cacheGet(cacheKey);
     if (cached) return NextResponse.json(cached);
 
@@ -227,7 +227,12 @@ export async function GET(request, { params }) {
                     if (sbGame.shortDetail) result.game.shortDetail = sbGame.shortDetail;
                     if (sbGame.statusDetail) result.game.statusDetail = sbGame.statusDetail;
                     if (sbGame.situation) result.game.situation = sbGame.situation;
-                    if (sbGame.postGameOptions) result.game.postGameOptions = sbGame.postGameOptions;
+                    if (sbGame.postGameOptions) {
+                        result.game.postGameOptions = sbGame.postGameOptions;
+                        result.game.finalEventSummary = sbGame.postGameOptions.finalEventSummary || null;
+                        result.game.finalEventType = sbGame.postGameOptions.finalEventType || null;
+                        result.game.milestone = sbGame.postGameOptions.milestone || null;
+                    }
                 }
             }
         } catch (e) {}

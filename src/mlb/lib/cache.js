@@ -19,7 +19,7 @@ export const CACHE_TTL = {
     PLAYERS_TOP: 604800, // 7 days (revalidated in background every 60s)
     PREDICTION: 30,     // 30 seconds for matchup model output
     NEWS: 300,          // 5 minutes for MLB news
-    OVERVIEW: 15,       // 15 seconds for the landing dashboard
+    OVERVIEW: 10,       // 10 seconds for the landing dashboard
 };
 
 // Load from disk on boot
