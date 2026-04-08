@@ -81,6 +81,23 @@ function firstValidUrl(candidates = []) {
   return '';
 }
 
+function collectUrls(candidates = [], bucket = []) {
+  candidates.flat(Infinity).forEach((candidate) => {
+    if (!candidate) return;
+    if (typeof candidate === 'string') {
+      const normalized = normalizeApiUrl(candidate);
+      if (normalized) bucket.push(normalized);
+      return;
+    }
+    const direct = normalizeApiUrl(candidate?.href || candidate?.url || candidate?.source || '');
+    if (direct) bucket.push(direct);
+    if (Array.isArray(candidate?.links)) collectUrls(candidate.links, bucket);
+    if (Array.isArray(candidate?.assets)) collectUrls(candidate.assets, bucket);
+    if (Array.isArray(candidate?.playbacks)) collectUrls(candidate.playbacks, bucket);
+  });
+  return [...new Set(bucket)];
+}
+
 function toYouTubeEmbed(url) {
   const normalized = normalizeApiUrl(url);
   if (!normalized) return '';
@@ -105,7 +122,7 @@ function toYouTubeEmbed(url) {
 
 function normalizeStoryMedia(video = {}) {
   const poster = upgradeEspnImageUrl(video?.posterImages?.full?.href || video?.thumbnail || video?.images?.[0]?.url || '');
-  const directSource = firstValidUrl([
+  const sources = collectUrls([
     video?.links?.source?.href,
     video?.links?.api?.source?.href,
     video?.source?.href,
@@ -114,20 +131,7 @@ function normalizeStoryMedia(video = {}) {
     video?.assets,
     video?.playbacks,
   ]);
-  const directVideo = /\.(mp4|m3u8)(\?|$)/i.test(directSource) || /\/(mp4|m3u8)\//i.test(directSource)
-    ? directSource
-    : '';
-
-  if (directVideo) {
-    return {
-      kind: 'video',
-      src: directVideo,
-      poster,
-      provider: video?.source || 'ESPN',
-      durationSeconds: Number(video?.durationSeconds || video?.duration || 0) || null,
-      mimeType: /\.m3u8(\?|$)/i.test(directVideo) ? 'application/x-mpegURL' : 'video/mp4',
-    };
-  }
+  const directMp4 = sources.find((source) => /\.(mp4)(\?|$)/i.test(source) || /\/mp4\//i.test(source)) || '';
 
   const embedCandidate = firstValidUrl([
     video?.links?.web?.href,
@@ -136,6 +140,19 @@ function normalizeStoryMedia(video = {}) {
     video?.shareUrl,
   ]);
   const youtubeEmbed = toYouTubeEmbed(embedCandidate);
+
+  if (directMp4) {
+    return {
+      kind: 'video',
+      src: directMp4,
+      poster,
+      provider: video?.source || 'ESPN',
+      durationSeconds: Number(video?.durationSeconds || video?.duration || 0) || null,
+      mimeType: 'video/mp4',
+      embedUrl: youtubeEmbed || '',
+    };
+  }
+
   if (youtubeEmbed) {
     return {
       kind: 'embed',

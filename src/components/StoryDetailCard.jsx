@@ -1,12 +1,29 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 
 function StoryMediaPlayer({ media, headline, fallbackImage }) {
   const videoRef = useRef(null);
+  const [renderEmbedFallback, setRenderEmbedFallback] = useState(false);
+  const [hideVideo, setHideVideo] = useState(false);
   if (!media) return null;
 
-  if (media.kind === 'video' && media.src) {
+  if ((media.kind === 'embed' || renderEmbedFallback) && media.embedUrl) {
+    return (
+      <div className="story-detail-media">
+        <div className="story-detail-embed">
+          <iframe
+            src={media.embedUrl}
+            title={headline || 'Story video'}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (media.kind === 'video' && media.src && !hideVideo) {
     return (
       <div className="story-detail-media">
         <video
@@ -16,6 +33,13 @@ function StoryMediaPlayer({ media, headline, fallbackImage }) {
           playsInline
           preload="metadata"
           poster={media.poster || fallbackImage || ''}
+          onError={() => {
+            if (media.embedUrl) {
+              setRenderEmbedFallback(true);
+              return;
+            }
+            setHideVideo(true);
+          }}
         >
           <source src={media.src} type={media.mimeType || undefined} />
         </video>
@@ -42,17 +66,10 @@ function StoryMediaPlayer({ media, headline, fallbackImage }) {
     );
   }
 
-  if (media.kind === 'embed' && media.embedUrl) {
+  if (fallbackImage) {
     return (
       <div className="story-detail-media">
-        <div className="story-detail-embed">
-          <iframe
-            src={media.embedUrl}
-            title={headline || 'Story video'}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
-        </div>
+        <img src={fallbackImage} alt={headline || 'Story media'} className="story-detail-image" />
       </div>
     );
   }

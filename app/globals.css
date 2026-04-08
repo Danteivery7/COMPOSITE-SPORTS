@@ -93,6 +93,7 @@ body[data-composite-route='hub'] {
     linear-gradient(90deg, transparent 0 11%, rgba(255, 255, 255, 0.025) 11% 11.1%, transparent 11.1% 88.9%, rgba(255, 255, 255, 0.025) 88.9% 89%, transparent 89%),
     radial-gradient(circle at 50% -12%, rgba(255, 194, 117, 0.12), transparent 32%);
   opacity: 0.9;
+  animation: hubFieldFloat 26s ease-in-out infinite;
 }
 
 .hub-page::after {
@@ -100,6 +101,7 @@ body[data-composite-route='hub'] {
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 18%, transparent 82%, rgba(255, 255, 255, 0.03)),
     radial-gradient(circle at bottom center, rgba(93, 138, 255, 0.08), transparent 28%);
   opacity: 0.6;
+  animation: hubFieldPulse 20s ease-in-out infinite alternate;
 }
 
 .hub-aurora,
@@ -149,6 +151,7 @@ body[data-composite-route='hub'] {
   background-size: 88px 88px;
   mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.5), transparent 84%);
   opacity: 0.22;
+  animation: hubGridShift 34s linear infinite;
 }
 
 .hub-orbit {
@@ -1516,9 +1519,10 @@ body[data-composite-route='hub'] {
 
 .hub-page[data-theme='light'] {
   background:
-    radial-gradient(circle at 14% -8%, rgba(255, 190, 118, 0.24), transparent 30%),
-    radial-gradient(circle at 82% 10%, rgba(96, 164, 255, 0.22), transparent 24%),
-    linear-gradient(180deg, #f8f2e8 0%, #ecf2fa 46%, #dce6f3 100%);
+    radial-gradient(circle at 14% -8%, rgba(255, 184, 91, 0.34), transparent 32%),
+    radial-gradient(circle at 82% 10%, rgba(77, 148, 255, 0.24), transparent 24%),
+    radial-gradient(circle at 48% 108%, rgba(48, 199, 152, 0.12), transparent 28%),
+    linear-gradient(180deg, #f3ead9 0%, #ebf2fb 44%, #d8e6f5 100%);
 }
 
 .hub-page[data-theme='light'] .route-theme-toggle,
@@ -1566,6 +1570,20 @@ body[data-composite-route='hub'] {
 .football-league-shell[data-theme='light'] .route-site-menu-copy span,
 .vendor-shell[data-theme='light'] .route-site-menu-copy span {
   color: #51647f;
+}
+
+.hub-page[data-theme='light'] .hub-hero-copy p:last-of-type,
+.hub-page[data-theme='light'] .hub-module-head span,
+.hub-page[data-theme='light'] .hub-story-kicker,
+.hub-page[data-theme='light'] .hub-card-site-label,
+.hub-page[data-theme='light'] .hub-card-subline,
+.hub-page[data-theme='light'] .hub-world-copy span,
+.hub-page[data-theme='light'] .hub-world-copy p,
+.hub-page[data-theme='light'] .hub-parlay-footnote,
+.hub-page[data-theme='light'] .hub-story-card-copy p,
+.hub-page[data-theme='light'] .hub-story-feature p,
+.hub-page[data-theme='light'] .hub-story-card p {
+  color: #42546e;
 }
 
 .generic-route-shell[data-theme='light'] .generic-sidebar,
@@ -5679,7 +5697,52 @@ body[data-composite-route='football'] {
 }
 
 .story-detail-back {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(135deg, rgba(118, 177, 255, 0.94), rgba(132, 242, 255, 0.9));
+  color: #07101e;
   box-shadow: 0 14px 28px rgba(0, 0, 0, 0.22);
+}
+
+.hub-page[data-theme='light'] .story-detail-back,
+.generic-route-shell[data-theme='light'] .story-detail-back,
+.football-landing-shell[data-theme='light'] .story-detail-back,
+.football-league-shell[data-theme='light'] .story-detail-back,
+.vendor-shell[data-theme='light'] .story-detail-back,
+.mlb-route-shell[data-theme='light'] .story-detail-back {
+  border-color: rgba(15, 23, 42, 0.12);
+  background: linear-gradient(135deg, rgba(255, 216, 156, 0.96), rgba(135, 197, 255, 0.94));
+  color: #102038;
+}
+
+@keyframes hubFieldFloat {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.88;
+  }
+  50% {
+    transform: translate3d(0, 14px, 0) scale(1.02);
+    opacity: 1;
+  }
+}
+
+@keyframes hubFieldPulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.42;
+  }
+  100% {
+    transform: scale(1.04);
+    opacity: 0.72;
+  }
+}
+
+@keyframes hubGridShift {
+  0% {
+    background-position: 0 0, 0 0;
+  }
+  100% {
+    background-position: 88px 44px, 44px 88px;
+  }
 }
 
 @keyframes hubMarquee {

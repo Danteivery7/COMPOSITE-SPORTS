@@ -112,6 +112,10 @@ const immersiveLayer = createImmersiveLayer({
   enterButton: dom.enterRinkButton,
 });
 
+function settledValue(result, fallback) {
+  return result?.status === "fulfilled" ? result.value : fallback;
+}
+
 function saveSettings() {
   writeCachedSettings("settings", state.settings);
 }
@@ -307,11 +311,15 @@ async function loadBaseData(force = false) {
   state.loading.bootstrap = true;
   render();
 
-  const [scoreboard, teams, news] = await Promise.all([
+  const [scoreboardResult, teamsResult, newsResult] = await Promise.allSettled([
     getScoreboardWindow(force),
     getTeams(force),
     getNews(force),
   ]);
+
+  const scoreboard = settledValue(scoreboardResult, state.scoreboard || { events: [] });
+  const teams = settledValue(teamsResult, state.teams || []);
+  const news = settledValue(newsResult, state.news || []);
 
   state.scoreboard = scoreboard;
   state.teams = teams;
@@ -325,24 +333,43 @@ async function loadBaseData(force = false) {
   state.loading.bootstrap = false;
   render();
 
-  const [standings, seasonLeaders, rosters, advancedSnapshot] = await Promise.all([
+  const [standingsResult, seasonLeadersResult, rostersResult] = await Promise.allSettled([
     getLeagueStandings(state.seasonYear, force),
     getSeasonLeaders(state.seasonYear, force),
     getAllRosters(teams.map((team) => team.id), force),
-    getAdvancedLeagueSnapshot(state.seasonYear, teams, force),
   ]);
 
-  state.standings = standings;
-  state.seasonLeaders = seasonLeaders;
-  state.rosters = rosters;
-  state.advancedSnapshot = advancedSnapshot;
-  state.lastSync.rankings = Date.now();
-  state.lastSync.players = Date.now();
+  state.standings = settledValue(standingsResult, state.standings || []);
+  state.seasonLeaders = settledValue(seasonLeadersResult, state.seasonLeaders || []);
+  state.rosters = settledValue(rostersResult, state.rosters || {});
+  if (state.standings.length) {
+    state.lastSync.rankings = Date.now();
+  }
+  if (state.seasonLeaders.length || Object.keys(state.rosters).length) {
+    state.lastSync.players = Date.now();
+  }
   recomputeDerivedState();
   render();
   prefetchFeaturedPlayerCards();
 
+  void loadAdvancedSnapshot(force);
   void ensureTeamStats(force);
+}
+
+async function loadAdvancedSnapshot(force = false) {
+  if (!state.seasonYear || !state.teams.length) return;
+  try {
+    const advancedSnapshot = await getAdvancedLeagueSnapshot(state.seasonYear, state.teams, force);
+    if (!advancedSnapshot) return;
+    state.advancedSnapshot = advancedSnapshot;
+    state.lastSync.players = Date.now();
+    state.lastSync.rankings = Date.now();
+    recomputeDerivedState();
+    render();
+    prefetchFeaturedPlayerCards();
+  } catch (_error) {
+    return null;
+  }
 }
 
 async function ensureTeamStats(force = false) {
@@ -351,13 +378,19 @@ async function ensureTeamStats(force = false) {
 
   state.loading.teamStats = true;
   render();
-  const teamIds = state.teams.map((team) => team.id);
-  state.teamStatsById = await getAllTeamStatistics(teamIds, force);
-  state.lastSync.rankings = Date.now();
-  state.loading.teamStats = false;
-  recomputeDerivedState();
-  render();
-  ensureRouteData();
+  try {
+    const teamIds = state.teams.map((team) => team.id);
+    state.teamStatsById = await getAllTeamStatistics(teamIds, force);
+    state.lastSync.rankings = Date.now();
+    recomputeDerivedState();
+    render();
+    ensureRouteData();
+  } catch (_error) {
+    return null;
+  } finally {
+    state.loading.teamStats = false;
+    render();
+  }
 }
 
 async function ensureRosters(force = false) {
@@ -365,12 +398,17 @@ async function ensureRosters(force = false) {
   if (!force && Object.keys(state.rosters).length) return;
 
   state.loading.rosters = true;
-  const teamIds = state.teams.map((team) => team.id);
-  state.rosters = await getAllRosters(teamIds, force);
-  state.lastSync.players = Date.now();
-  state.loading.rosters = false;
-  recomputeDerivedState();
-  render();
+  try {
+    const teamIds = state.teams.map((team) => team.id);
+    state.rosters = await getAllRosters(teamIds, force);
+    state.lastSync.players = Date.now();
+    recomputeDerivedState();
+  } catch (_error) {
+    return null;
+  } finally {
+    state.loading.rosters = false;
+    render();
+  }
 }
 
 async function ensureGameSummary(eventId, force = false) {
@@ -457,13 +495,17 @@ async function ensureRouteData(force = false) {
 }
 
 async function refreshScoreboard(force = true) {
-  state.scoreboard = await getScoreboardWindow(force);
-  state.lastSync.scoreboard = Date.now();
-  if (state.route.view === "game" && state.route.id) {
-    void ensureGameSummary(state.route.id, true);
+  try {
+    state.scoreboard = await getScoreboardWindow(force);
+    state.lastSync.scoreboard = Date.now();
+    if (state.route.view === "game" && state.route.id) {
+      void ensureGameSummary(state.route.id, true);
+    }
+    recomputeDerivedState();
+    render();
+  } catch (_error) {
+    return null;
   }
-  recomputeDerivedState();
-  render();
 }
 
 function stopPolling() {
@@ -616,7 +658,12 @@ async function bootstrap() {
   immersiveLayer.mount();
   wireEvents();
   render();
-  await loadBaseData(false);
+  try {
+    await loadBaseData(false);
+  } catch (_error) {
+    state.loading.bootstrap = false;
+    render();
+  }
   ensureRouteData();
   schedulePolling();
 }
