@@ -73,6 +73,82 @@ function selectBestImage(article) {
   return upgradeEspnImageUrl(best?.url || best?.href || '');
 }
 
+function firstValidUrl(candidates = []) {
+  for (const candidate of candidates.flat(Infinity)) {
+    const value = normalizeApiUrl(candidate?.href || candidate?.url || candidate?.source || candidate || '');
+    if (value) return value;
+  }
+  return '';
+}
+
+function toYouTubeEmbed(url) {
+  const normalized = normalizeApiUrl(url);
+  if (!normalized) return '';
+
+  try {
+    const parsed = new URL(normalized);
+    if (parsed.hostname.includes('youtu.be')) {
+      const id = parsed.pathname.replaceAll('/', '').trim();
+      return id ? `https://www.youtube.com/embed/${id}` : '';
+    }
+    if (parsed.hostname.includes('youtube.com')) {
+      if (parsed.pathname.startsWith('/embed/')) return normalized;
+      const id = parsed.searchParams.get('v');
+      return id ? `https://www.youtube.com/embed/${id}` : '';
+    }
+  } catch (_error) {
+    return '';
+  }
+
+  return '';
+}
+
+function normalizeStoryMedia(video = {}) {
+  const poster = upgradeEspnImageUrl(video?.posterImages?.full?.href || video?.thumbnail || video?.images?.[0]?.url || '');
+  const directSource = firstValidUrl([
+    video?.links?.source?.href,
+    video?.links?.api?.source?.href,
+    video?.source?.href,
+    video?.playbackSource?.href,
+    video?.media?.source?.href,
+    video?.assets,
+    video?.playbacks,
+  ]);
+  const directVideo = /\.(mp4|m3u8)(\?|$)/i.test(directSource) || /\/(mp4|m3u8)\//i.test(directSource)
+    ? directSource
+    : '';
+
+  if (directVideo) {
+    return {
+      kind: 'video',
+      src: directVideo,
+      poster,
+      provider: video?.source || 'ESPN',
+      durationSeconds: Number(video?.durationSeconds || video?.duration || 0) || null,
+      mimeType: /\.m3u8(\?|$)/i.test(directVideo) ? 'application/x-mpegURL' : 'video/mp4',
+    };
+  }
+
+  const embedCandidate = firstValidUrl([
+    video?.links?.web?.href,
+    video?.links?.mobile?.href,
+    video?.link,
+    video?.shareUrl,
+  ]);
+  const youtubeEmbed = toYouTubeEmbed(embedCandidate);
+  if (youtubeEmbed) {
+    return {
+      kind: 'embed',
+      embedUrl: youtubeEmbed,
+      poster,
+      provider: 'YouTube',
+      durationSeconds: Number(video?.durationSeconds || video?.duration || 0) || null,
+    };
+  }
+
+  return null;
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -122,6 +198,7 @@ function normalizeRelated(items = []) {
 }
 
 function buildStoryDetailFromHeadline(headline, storyId) {
+  const media = normalizeStoryMedia(headline?.videos?.[0] || headline?.video || {});
   return {
     storyId: String(headline?.id || storyId),
     headline: headline?.headline || headline?.title || 'ESPN Story',
@@ -132,6 +209,7 @@ function buildStoryDetailFromHeadline(headline, storyId) {
     source: headline?.source || 'ESPN',
     image: selectBestImage(headline),
     contentType: headline?.type || 'Story',
+    media,
     related: normalizeRelated(headline?.related || headline?.videos || []),
   };
 }
@@ -149,6 +227,7 @@ function buildStoryDetailFromVideo(video, storyId) {
     source: video?.source || 'ESPN',
     image: poster,
     contentType: video?.type || 'Media',
+    media: normalizeStoryMedia(video),
     related: [],
   };
 }

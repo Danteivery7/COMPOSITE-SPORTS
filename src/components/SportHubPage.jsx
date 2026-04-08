@@ -28,7 +28,7 @@ function ensureHeadshotFallback(event) {
   event.currentTarget.src = 'https://a.espncdn.com/i/headshots/nophoto.png';
 }
 
-const HERO_CACHE_KEY = 'composite-hub-hero-v2';
+const HERO_CACHE_KEY = 'composite-hub-hero-v3';
 const ET_TIME_FORMATTER = new Intl.DateTimeFormat('en-US', {
   timeZone: 'America/New_York',
   hour: 'numeric',
@@ -42,39 +42,59 @@ function formatEtLabel(value, fallback) {
   return `Last updated ${ET_TIME_FORMATTER.format(date)} ET`;
 }
 
-export default function SportHubPage() {
+function hasRenderableHero(hero) {
+  return Boolean(
+    hero &&
+    (
+      (Array.isArray(hero?.heroStories) && hero.heroStories.length) ||
+      (Array.isArray(hero?.worldBoard?.players) && hero.worldBoard.players.length) ||
+      (Array.isArray(hero?.betLegs) && hero.betLegs.length)
+    )
+  );
+}
+
+export default function SportHubPage({ initialHero = null }) {
   const cards = getSportCards();
   const sportRailRef = useRef(null);
   const { theme, toggleTheme } = useCompositeTheme('hub');
-  const [hero, setHero] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [hero, setHero] = useState(initialHero);
+  const [loading, setLoading] = useState(!hasRenderableHero(initialHero));
   const [activeStory, setActiveStory] = useState(null);
   const [storyIndex, setStoryIndex] = useState(0);
   const [activeSportIndex, setActiveSportIndex] = useState(0);
+  const [showAllStories, setShowAllStories] = useState(false);
 
   useEffect(() => {
     document.documentElement.removeAttribute('data-theme');
     document.body.removeAttribute('data-theme');
     document.body.dataset.compositeRoute = 'hub';
 
-    try {
-      const cached = window.sessionStorage.getItem(HERO_CACHE_KEY);
-      if (cached) {
-        setHero(JSON.parse(cached));
-        setLoading(false);
+    if (hasRenderableHero(initialHero)) {
+      try {
+        window.sessionStorage.setItem(HERO_CACHE_KEY, JSON.stringify(initialHero));
+      } catch (_error) {
+        // ignore storage issues
       }
-    } catch (_error) {
-      // ignore storage issues
+    } else {
+      try {
+        const cached = window.sessionStorage.getItem(HERO_CACHE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (hasRenderableHero(parsed)) {
+            setHero(parsed);
+            setLoading(false);
+          }
+        }
+      } catch (_error) {
+        // ignore storage issues
+      }
     }
 
     async function loadHero() {
       try {
         const response = await fetch('/api/hub/hero', { cache: 'no-store' });
         const json = await response.json();
-        const hasMeaningfulContent =
-          Array.isArray(json?.worldBoard?.players) && json.worldBoard.players.length ||
-          Array.isArray(json?.heroStories) && json.heroStories.length ||
-          Array.isArray(json?.betLegs) && json.betLegs.length;
+        const hasMeaningfulContent = hasRenderableHero(json);
         const invalidHero =
           !response.ok ||
           !Array.isArray(json?.worldBoard?.players) ||
@@ -110,7 +130,9 @@ export default function SportHubPage() {
       }
     }
 
-    loadHero();
+    if (!hasRenderableHero(initialHero)) {
+      loadHero();
+    }
     const timer = window.setInterval(loadHero, 60_000);
 
     return () => {
@@ -141,6 +163,11 @@ export default function SportHubPage() {
   const featuredStory = heroStories[storyIndex] || heroStories[0] || null;
   const movingStories = secondaryStories.length > 1 ? [...secondaryStories, ...secondaryStories] : secondaryStories;
   const tickerLoop = liveTicker.length > 1 ? [...liveTicker, ...liveTicker] : liveTicker;
+  const heroStoryIds = new Set(heroStories.map((story) => story.storyId));
+  const expandedStories = (hero?.trendingStories || [])
+    .filter((story) => !heroStoryIds.has(story.storyId))
+    .slice(0, 30);
+  const displayedStories = showAllStories ? expandedStories : secondaryStories;
 
   useEffect(() => {
     if (heroStories.length <= 1) return undefined;
@@ -484,8 +511,8 @@ export default function SportHubPage() {
           <span>Only stories from the last 24 hours</span>
         </div>
         <div className="hub-story-grid">
-          {secondaryStories.length
-            ? secondaryStories.map((story) => (
+          {displayedStories.length
+            ? displayedStories.map((story) => (
                 <button className="hub-story-card" type="button" key={story.storyId} onClick={() => openStory(story)}>
                   {story.image ? <img src={story.image} alt={story.headline} className="hub-story-card-image" /> : null}
                   <div className="hub-story-card-copy">
@@ -501,6 +528,13 @@ export default function SportHubPage() {
                 </div>
               ))}
         </div>
+        {expandedStories.length > secondaryStories.length ? (
+          <div className="hub-story-actions">
+            <button className="hub-story-toggle" type="button" onClick={() => setShowAllStories((value) => !value)}>
+              {showAllStories ? 'Show Fewer Stories' : `Show More Stories (${expandedStories.length})`}
+            </button>
+          </div>
+        ) : null}
         {movingStories.length ? (
           <div className="hub-story-marquee" aria-hidden="true">
             <div className="hub-story-marquee-track">

@@ -1,5 +1,65 @@
 'use client';
 
+import { useRef } from 'react';
+
+function StoryMediaPlayer({ media, headline, fallbackImage }) {
+  const videoRef = useRef(null);
+  if (!media) return null;
+
+  if (media.kind === 'video' && media.src) {
+    return (
+      <div className="story-detail-media">
+        <video
+          ref={videoRef}
+          className="story-detail-video"
+          controls
+          playsInline
+          preload="metadata"
+          poster={media.poster || fallbackImage || ''}
+        >
+          <source src={media.src} type={media.mimeType || undefined} />
+        </video>
+        <div className="story-detail-media-controls">
+          <button type="button" onClick={() => videoRef.current && (videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10))}>
+            -10s
+          </button>
+          <button type="button" onClick={() => {
+            if (!videoRef.current) return;
+            if (videoRef.current.paused) {
+              void videoRef.current.play();
+              return;
+            }
+            videoRef.current.pause();
+          }}
+          >
+            Play / Pause
+          </button>
+          <button type="button" onClick={() => videoRef.current && (videoRef.current.currentTime += 10)}>
+            +10s
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (media.kind === 'embed' && media.embedUrl) {
+    return (
+      <div className="story-detail-media">
+        <div className="story-detail-embed">
+          <iframe
+            src={media.embedUrl}
+            title={headline || 'Story video'}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 export default function StoryDetailCard({ story, onBack, backLabel = 'Back', onOpenRelated }) {
   return (
     <section className="story-detail-shell">
@@ -11,8 +71,8 @@ export default function StoryDetailCard({ story, onBack, backLabel = 'Back', onO
 
       <article className="generic-card story-detail-card">
         <div className="story-detail-head">
-          <div>
-            <p className="eyebrow">{story?.source || 'ESPN'}</p>
+          <div className="story-detail-heading">
+            <p className="eyebrow story-detail-source">{story?.source || 'ESPN'}</p>
             <h2>{story?.headline || 'Story unavailable'}</h2>
             <div className="story-detail-meta">
               <span>{story?.contentType || 'Story'}</span>
@@ -22,7 +82,9 @@ export default function StoryDetailCard({ story, onBack, backLabel = 'Back', onO
           </div>
         </div>
 
-        {story?.image ? (
+        {story?.media ? (
+          <StoryMediaPlayer media={story.media} headline={story.headline} fallbackImage={story.image} />
+        ) : story?.image ? (
           <img src={story.image} alt={story.headline} className="story-detail-image" />
         ) : null}
 
@@ -51,7 +113,7 @@ export default function StoryDetailCard({ story, onBack, backLabel = 'Back', onO
                 onClick={() => onOpenRelated?.(item)}
               >
                 {item.image ? <img src={item.image} alt={item.headline} className="story-related-image" /> : null}
-                <div>
+                <div className="story-related-copy">
                   <strong>{item.headline}</strong>
                   <span>{item.contentType || 'Story'}</span>
                 </div>

@@ -25,8 +25,8 @@ import {
 
 const STORY_TTL_MS = 5 * 60 * 1000;
 const BETS_TTL_MS = 90 * 1000;
-const HERO_TTL_MS = 60 * 1000;
-const HUB_CACHE_VERSION = 'v13';
+const HERO_TTL_MS = 2 * 60 * 1000;
+const HUB_CACHE_VERSION = 'v14';
 
 const EXTERNAL_NEWS_SOURCES = [
   {
@@ -481,7 +481,7 @@ async function buildTrendingStoriesSnapshot() {
   });
 
   const sortedStories = Array.from(bestByCluster.values()).sort((left, right) => scoreStory(right) - scoreStory(left));
-  const heroStories = diversifyStories(sortedStories, 3).map((story, index) => ({
+  const heroStories = diversifyStories(sortedStories, 5).map((story, index) => ({
     ...story,
     heroRank: index + 1,
   }));
