@@ -170,26 +170,32 @@ function syncMobileNav() {
 
 function recomputeDerivedState() {
   if (state.advancedSnapshot && state.teams.length) {
-    state.playerDirectory = buildPlayerDirectory(
+    const nextPlayerDirectory = buildPlayerDirectory(
       state.advancedSnapshot,
       state.rosters,
       state.teamsById,
       state.standings,
     );
-    state.playerDirectoryById = Object.fromEntries(
-      state.playerDirectory.map((player) => [player.playerId, player]),
-    );
+    if (nextPlayerDirectory.length) {
+      state.playerDirectory = nextPlayerDirectory;
+      state.playerDirectoryById = Object.fromEntries(
+        state.playerDirectory.map((player) => [player.playerId, player]),
+      );
+    }
   }
 
   if (state.standings.length && state.teams.length) {
-    state.teamRankings = buildTeamRankings(
+    const nextRankings = buildTeamRankings(
       state.standings,
       state.teamStatsById,
       state.teamsById,
       state.advancedSnapshot,
       state.playerDirectory,
     );
-    state.rankingsById = buildRankingsLookup(state.teamRankings);
+    if (nextRankings.length) {
+      state.teamRankings = nextRankings;
+      state.rankingsById = buildRankingsLookup(state.teamRankings);
+    }
   }
 
   if (state.playerDirectory.length) {

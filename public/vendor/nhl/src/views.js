@@ -95,6 +95,12 @@ function renderMiniMetric(label, value, foot = "") {
   `;
 }
 
+function formatMetricValue(value, digits = 2) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return String(value ?? "--");
+  return numeric.toFixed(digits);
+}
+
 function renderPlayerStatChips(player) {
   if (!player) return "";
   if (player.resolvedPosition === "G") {
@@ -277,7 +283,7 @@ function renderStoryDetail(state) {
 function renderOverview(state) {
   const pulse = state.leaguePulse;
   const rankings = state.teamRankings || [];
-  const players = (state.playerDirectory || []).slice(0, 6);
+  const players = (state.playerDirectory?.length ? state.playerDirectory : state.featuredPlayers || []).slice(0, 6);
   const predictorCards = state.predictorCards || [];
   const news = state.news || [];
 
@@ -521,7 +527,7 @@ function renderTeams(state) {
 }
 
 function renderPlayers(state) {
-  const players = state.playerDirectory || [];
+  const players = state.playerDirectory?.length ? state.playerDirectory : state.featuredPlayers || [];
   if (!players.length) {
     return renderEmptyState("Players are still syncing", "The full NHL player directory is still filling from official roster and advanced stat data.");
   }
@@ -1008,10 +1014,10 @@ function renderTeamDetail(state) {
           <span class="rank-chip">${ranking.compositeScore} OVR</span>
         </div>
         <div class="metric-strip">
-          ${renderMiniMetric("Top Six", String(ranking.forwardCore))}
-          ${renderMiniMetric("Blue Line", String(ranking.defenseCore))}
-          ${renderMiniMetric("Goalies", String(ranking.goaltending))}
-          ${renderMiniMetric("Special Teams", String(ranking.specialTeams))}
+          ${renderMiniMetric("Top Six", formatMetricValue(ranking.forwardCore))}
+          ${renderMiniMetric("Blue Line", formatMetricValue(ranking.defenseCore))}
+          ${renderMiniMetric("Goalies", formatMetricValue(ranking.goaltending))}
+          ${renderMiniMetric("Special Teams", formatMetricValue(ranking.specialTeams))}
         </div>
       </article>
 
@@ -1023,7 +1029,7 @@ function renderTeamDetail(state) {
           </div>
         </div>
         <div class="inline-list">
-          ${explainTeamSignals(ranking).map((signal) => `<span class="stat-chip"><strong>${escapeHtml(signal.label)}</strong> ${escapeHtml(String(Math.round(signal.diff)))}</span>`).join("")}
+          ${explainTeamSignals(ranking).map((signal) => `<span class="stat-chip"><strong>${escapeHtml(signal.label)}</strong> ${escapeHtml(formatMetricValue(signal.diff))}</span>`).join("")}
         </div>
       </article>
     </section>

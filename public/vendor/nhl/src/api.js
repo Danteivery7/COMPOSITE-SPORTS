@@ -240,6 +240,10 @@ async function mapWithConcurrency(items, mapper, concurrency = 6) {
   return results;
 }
 
+function settledRows(result) {
+  return result?.status === "fulfilled" && Array.isArray(result.value) ? result.value : [];
+}
+
 function isExpiredFinalEvent(event, { durationHours = GAME_DURATION_HOURS, visibilityHours = FINAL_VISIBILITY_HOURS } = {}) {
   const state = String(event?.status?.type?.state || event?.competitions?.[0]?.status?.type?.state || "").toLowerCase();
   if (state !== "post") return false;
@@ -439,22 +443,22 @@ export async function getAdvancedLeagueSnapshot(seasonYear, teams = [], force = 
   const priorSeason = previousSeasonId(seasonYear);
 
   const [
-    teamSummary,
-    teamPercentages,
-    skaterSummary,
-    skaterRealtime,
-    skaterPercentages,
-    skaterTimeOnIce,
-    goalieSummary,
-    goalieAdvanced,
-    priorSkaterSummary,
-    priorSkaterRealtime,
-    priorSkaterPercentages,
-    priorSkaterTimeOnIce,
-    priorGoalieSummary,
-    priorGoalieAdvanced,
-    teamRecentFormEntries,
-  ] = await Promise.all([
+    teamSummaryResult,
+    teamPercentagesResult,
+    skaterSummaryResult,
+    skaterRealtimeResult,
+    skaterPercentagesResult,
+    skaterTimeOnIceResult,
+    goalieSummaryResult,
+    goalieAdvancedResult,
+    priorSkaterSummaryResult,
+    priorSkaterRealtimeResult,
+    priorSkaterPercentagesResult,
+    priorSkaterTimeOnIceResult,
+    priorGoalieSummaryResult,
+    priorGoalieAdvancedResult,
+    teamRecentFormResult,
+  ] = await Promise.allSettled([
     getStatsRestReport("team/summary", seasonYear, force, { limit: 100 }),
     getStatsRestReport("team/percentages", seasonYear, force, { limit: 100 }),
     getStatsRestReport("skater/summary", seasonYear, force),
@@ -478,6 +482,22 @@ export async function getAdvancedLeagueSnapshot(seasonYear, teams = [], force = 
       6,
     ),
   ]);
+
+  const teamSummary = settledRows(teamSummaryResult);
+  const teamPercentages = settledRows(teamPercentagesResult);
+  const skaterSummary = settledRows(skaterSummaryResult);
+  const skaterRealtime = settledRows(skaterRealtimeResult);
+  const skaterPercentages = settledRows(skaterPercentagesResult);
+  const skaterTimeOnIce = settledRows(skaterTimeOnIceResult);
+  const goalieSummary = settledRows(goalieSummaryResult);
+  const goalieAdvanced = settledRows(goalieAdvancedResult);
+  const priorSkaterSummary = settledRows(priorSkaterSummaryResult);
+  const priorSkaterRealtime = settledRows(priorSkaterRealtimeResult);
+  const priorSkaterPercentages = settledRows(priorSkaterPercentagesResult);
+  const priorSkaterTimeOnIce = settledRows(priorSkaterTimeOnIceResult);
+  const priorGoalieSummary = settledRows(priorGoalieSummaryResult);
+  const priorGoalieAdvanced = settledRows(priorGoalieAdvancedResult);
+  const teamRecentFormEntries = settledRows(teamRecentFormResult);
 
   return {
     seasonYear,

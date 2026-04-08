@@ -161,6 +161,13 @@ function sliceAverage(players = []) {
   return values.length ? average(values) : 50;
 }
 
+function sliceAverageWithFallback(players = [], fallback = 50) {
+  const values = players
+    .map((player) => player?.overallPercentile)
+    .filter(Number.isFinite);
+  return values.length ? average(values) : fallback;
+}
+
 function leagueAverage(rows = [], key) {
   return average(rows.map((row) => toNumber(row?.[key], null)));
 }
@@ -242,7 +249,9 @@ function buildTeamContexts(standingsEntries = [], teamsById = {}, advancedSnapsh
         last10GoalDiffRate: 0,
         otFinalCount: 0,
       };
-      const gamesPlayed = Number(summaryRow.gamesPlayed || overall?.summary || 0) || 1;
+      const gamesPlayed = Number(summaryRow.gamesPlayed || recordStats.gamesPlayed?.value || 0) || 1;
+      const standingPoints = Number(recordStats.points?.value || summaryRow.points || 0);
+      const derivedPointPct = standingPoints > 0 ? (standingPoints / Math.max(1, gamesPlayed * 2)) * 100 : null;
       const goalDiffRate = (Number(summaryRow.goalsFor || 0) - Number(summaryRow.goalsAgainst || 0)) / Math.max(1, gamesPlayed);
       const underlyingRaw =
         (decimalToPct(percentageRow?.usatPct) || 50) * 0.4 +
@@ -262,7 +271,8 @@ function buildTeamContexts(standingsEntries = [], teamsById = {}, advancedSnapsh
         streak: streakValue(recordStats.streak?.displayValue || "-"),
         recent,
         gamesPlayed,
-        pointPct: decimalToPct(summaryRow.pointPct) || 50,
+        points: standingPoints,
+        pointPct: decimalToPct(summaryRow.pointPct) || derivedPointPct || 50,
         goalsForPerGame: Number(summaryRow.goalsForPerGame || 0),
         goalsAgainstPerGame: Number(summaryRow.goalsAgainstPerGame || 0),
         powerPlayPct: decimalToPct(summaryRow.powerPlayPct) || 0,
@@ -768,12 +778,26 @@ export function buildTeamRankings(standingsEntries = [], teamStatsById = {}, tea
   }
 
   const teamContexts = buildTeamContexts(standingsEntries, teamsById, advancedSnapshot);
+  if (!Object.keys(teamContexts).length) {
+    return buildLegacyTeamRankings(standingsEntries, teamStatsById, teamsById);
+  }
   const playersByTeam = groupBy(
     (playerDirectory || []).filter((player) => player?.teamId),
     (player) => player.teamId,
   );
+  const contextList = Object.values(teamContexts);
+  const goalsForValues = contextList.map((team) => team.goalsForPerGame);
+  const goalsAgainstValues = contextList.map((team) => team.goalsAgainstPerGame);
+  const shotsForValues = contextList.map((team) => team.shotsForPerGame);
+  const shotsAgainstValues = contextList.map((team) => team.shotsAgainstPerGame);
+  const powerPlayValues = contextList.map((team) => team.powerPlayPct);
+  const penaltyKillValues = contextList.map((team) => team.penaltyKillPct);
+  const savePctValues = contextList.map((team) => team.savePct5v5);
+  const faceoffValues = contextList.map((team) => team.faceoffPct);
+  const goalDiffValues = contextList.map((team) => team.goalDiffRate);
+  const recentGoalDiffValues = contextList.map((team) => team.recent.last10GoalDiffRate);
 
-  const rawTeams = Object.values(teamContexts)
+  const rawTeams = contextList
     .map((context) => {
       const roster = playersByTeam[context.teamId] || [];
       const forwards = roster
@@ -786,30 +810,60 @@ export function buildTeamRankings(standingsEntries = [], teamStatsById = {}, tea
         .filter((player) => player.resolvedPosition === "G")
         .sort((left, right) => (right.currentRawMetrics?.starts || 0) - (left.currentRawMetrics?.starts || 0));
 
-      const line1 = sliceAverage(forwards.slice(0, 3));
-      const line2 = sliceAverage(forwards.slice(3, 6));
-      const line3 = sliceAverage(forwards.slice(6, 9));
-      const line4 = sliceAverage(forwards.slice(9, 12));
-      const pair1 = sliceAverage(defense.slice(0, 2));
-      const pair2 = sliceAverage(defense.slice(2, 4));
-      const pair3 = sliceAverage(defense.slice(4, 6));
-      const starter = goalies[0]?.overallPercentile || 50;
-      const backup = goalies[1]?.overallPercentile || 50;
+      const forwardFallback =
+        (percentile(context.goalsForPerGame, goalsForValues) * 0.42) +
+        (percentile(context.shotsForPerGame, shotsForValues) * 0.18) +
+        (percentile(context.powerPlayPct, powerPlayValues) * 0.16) +
+        (context.seasonPct * 0.24);
+      const defenseFallback =
+        (percentile(context.goalsAgainstPerGame, goalsAgainstValues, true) * 0.32) +
+        (percentile(context.shotsAgainstPerGame, shotsAgainstValues, true) * 0.24) +
+        (percentile(context.penaltyKillPct, penaltyKillValues) * 0.16) +
+        (percentile(context.faceoffPct, faceoffValues) * 0.08) +
+        (percentile(context.goalDiffRate, goalDiffValues) * 0.2);
+      const goalieFallback =
+        (percentile(context.savePct5v5, savePctValues) * 0.55) +
+        (percentile(context.goalsAgainstPerGame, goalsAgainstValues, true) * 0.25) +
+        (percentile(context.recent.last10GoalDiffRate, recentGoalDiffValues) * 0.2);
+      const depthFallback =
+        (context.seasonPct * 0.46) +
+        (context.satPct * 0.27) +
+        (context.usatPct * 0.27);
+
+      const line1 = sliceAverageWithFallback(forwards.slice(0, 3), forwardFallback);
+      const line2 = sliceAverageWithFallback(forwards.slice(3, 6), forwardFallback);
+      const line3 = sliceAverageWithFallback(forwards.slice(6, 9), depthFallback);
+      const line4 = sliceAverageWithFallback(forwards.slice(9, 12), depthFallback);
+      const pair1 = sliceAverageWithFallback(defense.slice(0, 2), defenseFallback);
+      const pair2 = sliceAverageWithFallback(defense.slice(2, 4), defenseFallback);
+      const pair3 = sliceAverageWithFallback(defense.slice(4, 6), depthFallback);
+      const starter = goalies[0]?.overallPercentile ?? goalieFallback;
+      const backup = goalies[1]?.overallPercentile ?? goalieFallback;
       const forwardCore = (line1 * 0.45) + (line2 * 0.3) + (line3 * 0.15) + (line4 * 0.1);
       const defenseCore = (pair1 * 0.5) + (pair2 * 0.32) + (pair3 * 0.18);
       const goaltending = (starter * 0.75) + (backup * 0.25);
       const depthScore = average([line3, line4, pair3]);
-      const specialTeams = average([context.powerPlayPct, context.penaltyKillPct]);
-      const underlyingScore = (context.usatPct * 0.4) + (context.satPct * 0.3) + (percentile(context.goalDiffRate, Object.values(teamContexts).map((team) => team.goalDiffRate)) * 0.3);
-      const recentScore = (context.recent.last10PointsPct * 100 * 0.6) + (percentile(context.recent.last10GoalDiffRate, Object.values(teamContexts).map((team) => team.recent.last10GoalDiffRate)) * 0.4);
+      const specialTeams = average([
+        percentile(context.powerPlayPct, powerPlayValues),
+        percentile(context.penaltyKillPct, penaltyKillValues),
+      ]);
+      const underlyingScore =
+        (context.usatPct * 0.4) +
+        (context.satPct * 0.3) +
+        (percentile(context.goalDiffRate, goalDiffValues) * 0.3);
+      const recentScore =
+        (context.recent.last10PointsPct * 100 * 0.6) +
+        (percentile(context.recent.last10GoalDiffRate, recentGoalDiffValues) * 0.4);
+      const seasonScore = context.seasonPct;
       const teamBase =
-        (forwardCore * 0.26) +
+        (forwardCore * 0.25) +
         (defenseCore * 0.22) +
         (goaltending * 0.18) +
         (depthScore * 0.1) +
         (specialTeams * 0.1) +
-        (underlyingScore * 0.08) +
-        (recentScore * 0.06);
+        (underlyingScore * 0.07) +
+        (seasonScore * 0.04) +
+        (recentScore * 0.04);
 
       return {
         id: context.teamId,
@@ -818,20 +872,22 @@ export function buildTeamRankings(standingsEntries = [], teamStatsById = {}, tea
         recordDisplay: context.recordDisplay,
         streakDisplay: context.streakDisplay,
         winPct: context.pointPct / 100,
+        points: round(context.points || 0, 2),
         goalsForPerGame: round(context.goalsForPerGame, 2),
         goalsAgainstPerGame: round(context.goalsAgainstPerGame, 2),
-        powerPlayPct: round(context.powerPlayPct, 1),
-        penaltyKillPct: round(context.penaltyKillPct, 1),
-        faceoffPct: round(context.faceoffPct, 1),
-        shotsForPerGame: round(context.shotsForPerGame, 1),
-        shotsAgainstPerGame: round(context.shotsAgainstPerGame, 1),
-        forwardCore: round(forwardCore, 1),
-        defenseCore: round(defenseCore, 1),
-        goaltending: round(goaltending, 1),
-        depthScore: round(depthScore, 1),
-        specialTeams: round(specialTeams, 1),
-        underlyingScore: round(underlyingScore, 1),
-        recentScore: round(recentScore, 1),
+        powerPlayPct: round(context.powerPlayPct, 2),
+        penaltyKillPct: round(context.penaltyKillPct, 2),
+        faceoffPct: round(context.faceoffPct, 2),
+        shotsForPerGame: round(context.shotsForPerGame, 2),
+        shotsAgainstPerGame: round(context.shotsAgainstPerGame, 2),
+        forwardCore: round(forwardCore, 2),
+        defenseCore: round(defenseCore, 2),
+        goaltending: round(goaltending, 2),
+        depthScore: round(depthScore, 2),
+        specialTeams: round(specialTeams, 2),
+        underlyingScore: round(underlyingScore, 2),
+        seasonScore: round(seasonScore, 2),
+        recentScore: round(recentScore, 2),
         predictiveScore: round(teamBase, 2),
         context,
       };
@@ -857,10 +913,10 @@ export function buildTeamRankings(standingsEntries = [], teamStatsById = {}, tea
       const delta = Number.isFinite(prior) ? compositeScore - prior : 0;
       return {
         ...team,
-        compositeScore,
-        offenseScore: round((team.forwardCore * 0.78) + (team.specialTeams * 0.22), 1),
-        defenseScore: round((team.defenseCore * 0.62) + (team.goaltending * 0.38), 1),
-        teamPercentile,
+        compositeScore: round(compositeScore, 2),
+        offenseScore: round((team.forwardCore * 0.78) + (team.specialTeams * 0.22), 2),
+        defenseScore: round((team.defenseCore * 0.62) + (team.goaltending * 0.38), 2),
+        teamPercentile: round(teamPercentile, 2),
         trend: delta > 0.5 ? "up" : delta < -0.5 ? "down" : "flat",
         trendLabel:
           delta > 0.5 ? `Up ${formatSigned(delta, 1)}` :
