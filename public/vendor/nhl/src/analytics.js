@@ -182,8 +182,17 @@ function scalePlayerPercentileToOverall(percentileValue, options = {}) {
   return clamp(round(overall, 0), 60, 97);
 }
 
+function normalizedPlayerName(player) {
+  return String(player?.fullName || player?.displayName || player?.shortName || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/gi, " ")
+    .trim()
+    .toLowerCase();
+}
+
 function playerNameMatches(player, pattern) {
-  return pattern.test(String(player?.fullName || player?.shortName || ""));
+  return pattern.test(normalizedPlayerName(player));
 }
 
 function applyElitePlayerTierRules(players = []) {
@@ -199,8 +208,8 @@ function applyElitePlayerTierRules(players = []) {
       return (right.overall || 0) - (left.overall || 0);
     });
 
-  const mcdavidIndex = sorted.findIndex((player) => playerNameMatches(player, /\bconnor\b.*\bmcdavid\b/i));
-  const macKinnonIndex = sorted.findIndex((player) => playerNameMatches(player, /\bnathan\b.*\bmac?kinnon\b/i));
+  const mcdavidIndex = sorted.findIndex((player) => playerNameMatches(player, /\bmcdavid\b/i));
+  const macKinnonIndex = sorted.findIndex((player) => playerNameMatches(player, /\bmackinnon\b/i));
   const lockedIds = new Set();
 
   if (mcdavidIndex >= 0) {

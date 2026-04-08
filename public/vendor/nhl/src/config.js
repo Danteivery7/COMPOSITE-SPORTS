@@ -1,4 +1,4 @@
-export const CACHE_PREFIX = "composite-nhl";
+export const CACHE_PREFIX = "composite-nhl-v2";
 
 export const TTL = {
   SCOREBOARD: 10 * 1000,
