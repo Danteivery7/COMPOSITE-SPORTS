@@ -1,3 +1,4 @@
+import { unstable_cache } from 'next/cache';
 import { fetchEspnStoryDetail, normalizeEspnNewsArticle } from '@/src/lib/espn-news';
 import { getWorldTopPlayers } from '@/src/lib/world-rankings';
 import { fetchMLBNews } from '@/src/mlb/lib/news';
@@ -504,6 +505,12 @@ async function buildTrendingStoriesSnapshot() {
   };
 }
 
+const getCachedTrendingStoriesSnapshot = unstable_cache(
+  async () => buildTrendingStoriesSnapshot(),
+  [`hub-trending-stories-${HUB_CACHE_VERSION}`],
+  { revalidate: Math.max(60, Math.floor(STORY_TTL_MS / 1000)) },
+);
+
 async function getMlbSpotlightPlayers() {
   const snapshot = await getHotSnapshot(
     'hub-mlb-top-players',
@@ -1004,6 +1011,12 @@ async function buildTopBetsSnapshot() {
   };
 }
 
+const getCachedTopBetsSnapshot = unstable_cache(
+  async () => buildTopBetsSnapshot(),
+  [`hub-top-bets-${HUB_CACHE_VERSION}`],
+  { revalidate: Math.max(60, Math.floor(BETS_TTL_MS / 1000)) },
+);
+
 async function buildHubHeroSnapshot() {
   const footballLeagueKeys = Object.keys(FOOTBALL_LEAGUES);
   const [storiesResult, betsResult, worldBoardResult, mlbScoreboardResult, nbaSnapshotResult, nhlGamesResult, nflBoardResult, cbbBoardResult, footballBoardsResult] = await Promise.allSettled([
@@ -1091,7 +1104,16 @@ async function buildHubHeroSnapshot() {
   };
 }
 
+const getCachedHubHeroSnapshot = unstable_cache(
+  async () => buildHubHeroSnapshot(),
+  [HUB_HERO_SNAPSHOT_KEY],
+  { revalidate: Math.max(60, Math.floor(HERO_TTL_MS / 1000)) },
+);
+
 export async function getHubTrendingStories({ force = false } = {}) {
+  if (!force) {
+    return getCachedTrendingStoriesSnapshot();
+  }
   return getHotSnapshot(`hub-trending-stories-${HUB_CACHE_VERSION}`, () => buildTrendingStoriesSnapshot(), {
     ttlMs: STORY_TTL_MS,
     force,
@@ -1135,6 +1157,9 @@ export async function getHubStoryDetail(storyId, apiHref = '') {
 }
 
 export async function getHubTopBets({ force = false } = {}) {
+  if (!force) {
+    return getCachedTopBetsSnapshot();
+  }
   return getHotSnapshot(`hub-top-bets-${HUB_CACHE_VERSION}`, () => buildTopBetsSnapshot(), {
     ttlMs: BETS_TTL_MS,
     force,
@@ -1142,6 +1167,9 @@ export async function getHubTopBets({ force = false } = {}) {
 }
 
 export async function getHubHero({ force = false } = {}) {
+  if (!force) {
+    return getCachedHubHeroSnapshot();
+  }
   return getHotSnapshot(HUB_HERO_SNAPSHOT_KEY, () => buildHubHeroSnapshot(), {
     ttlMs: HERO_TTL_MS,
     force,
@@ -1163,9 +1191,9 @@ export async function warmHubSnapshots() {
       },
       { force: true, ttlMs: 15 * 60 * 1000 },
     ),
-    warmSnapshot(`hub-trending-stories-${HUB_CACHE_VERSION}`, () => buildTrendingStoriesSnapshot(), { force: true, ttlMs: STORY_TTL_MS }),
-    warmSnapshot(`hub-top-bets-${HUB_CACHE_VERSION}`, () => buildTopBetsSnapshot(), { force: true, ttlMs: BETS_TTL_MS }),
-    warmSnapshot(HUB_HERO_SNAPSHOT_KEY, () => buildHubHeroSnapshot(), { force: true, ttlMs: HERO_TTL_MS }),
+    getHubTrendingStories(),
+    getHubTopBets(),
+    getHubHero(),
     getGenericSportSnapshot('nfl', { force: true }),
     getGenericSportSnapshot('cbb', { force: true }),
     getFootballLandingSnapshot({ force: true }),

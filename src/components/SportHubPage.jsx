@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { startTransition, useEffect, useRef, useState } from 'react';
 import { getSportCards, SPORT_CONFIGS } from '@/src/data/sports';
 import RouteSiteMenu from '@/src/components/RouteSiteMenu';
 import StoryDetailCard from '@/src/components/StoryDetailCard';
@@ -67,8 +67,10 @@ export default function SportHubPage({ initialHero = null }) {
     document.documentElement.removeAttribute('data-theme');
     document.body.removeAttribute('data-theme');
     document.body.dataset.compositeRoute = 'hub';
+    const hasInitialHero = hasRenderableHero(initialHero);
 
-    async function loadHero() {
+    async function loadHero({ allowForce = false } = {}) {
+      if (document.visibilityState === 'hidden') return;
       try {
         const response = await fetch('/api/hub/hero', { cache: 'no-store' });
         const json = await response.json();
@@ -81,16 +83,20 @@ export default function SportHubPage({ initialHero = null }) {
           !json.heroStories.length;
 
         if (response.ok && hasMeaningfulContent) {
-          setHero(json);
+          startTransition(() => {
+            setHero(json);
+          });
         }
 
         setLoading(false);
 
-        if (invalidHero) {
+        if (allowForce && invalidHero) {
           const refreshResponse = await fetch('/api/hub/hero?force=1', { cache: 'no-store' });
           const refreshJson = await refreshResponse.json();
           if (refreshResponse.ok) {
-            setHero(refreshJson);
+            startTransition(() => {
+              setHero(refreshJson);
+            });
           }
         }
       } finally {
@@ -98,14 +104,13 @@ export default function SportHubPage({ initialHero = null }) {
       }
     }
 
-    const bootstrapTimer = window.setTimeout(
-      loadHero,
-      hasRenderableHero(initialHero) ? 1200 : 0,
-    );
-    const timer = window.setInterval(loadHero, 60_000);
+    const bootstrapTimer = hasInitialHero
+      ? null
+      : window.setTimeout(() => loadHero({ allowForce: true }), 0);
+    const timer = window.setInterval(() => loadHero({ allowForce: false }), 60_000);
 
     return () => {
-      window.clearTimeout(bootstrapTimer);
+      if (bootstrapTimer) window.clearTimeout(bootstrapTimer);
       window.clearInterval(timer);
       delete document.body.dataset.compositeRoute;
     };
