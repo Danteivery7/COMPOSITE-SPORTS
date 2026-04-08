@@ -527,7 +527,8 @@ function renderTeams(state) {
 }
 
 function renderPlayers(state) {
-  const players = state.playerDirectory || [];
+  const usingDirectory = Boolean(state.playerDirectory?.length);
+  const players = usingDirectory ? state.playerDirectory : state.featuredPlayers || [];
   if (!players.length) {
     return renderEmptyState("Players are still syncing", "The full NHL player directory is still filling from official roster and advanced stat data.");
   }
@@ -546,7 +547,13 @@ function renderPlayers(state) {
         <div>
           <p class="eyebrow">Player Ratings</p>
           <h3 class="section-title">Full NHL directory</h3>
-          <p class="section-subtitle">Sorted best OVR to worst, with the full rostered player pool searchable right here.</p>
+          <p class="section-subtitle">${
+            escapeHtml(
+              usingDirectory
+                ? "Sorted best OVR to worst, with the full rostered player pool searchable right here."
+                : "Live player board is still syncing, so the featured player fallback is showing first."
+            )
+          }</p>
         </div>
       </div>
       <div class="player-directory-toolbar">
