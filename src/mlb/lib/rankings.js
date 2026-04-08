@@ -17,7 +17,7 @@ import { fetchStandings, fetchAllTeamStats, fetchScoreboard, fetchTeamSchedule }
 import { ALL_TEAMS } from './teams';
 import { cacheGet, cacheSet, CACHE_TTL } from './cache';
 
-const RANKINGS_CACHE_KEY = 'computed_rankings_v11';
+const RANKINGS_CACHE_KEY = 'computed_rankings_v12';
 
 function parseStreakNumber(streak) {
     if (!streak || streak === '—') return 0;
@@ -383,7 +383,7 @@ export async function computeRankings() {
     const result = {
         rankings: ranked,
         sources: activeSources.map(s => ({ id: s.id, name: s.name, active: true, scope: s.scope })),
-        failedSources,
+        failedSources: failedSources.filter((sourceId) => sourceId !== 'streak_form'),
         lastUpdated: new Date().toISOString(),
     };
 
