@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { getSportCards, SPORT_CONFIGS } from '@/src/data/sports';
+import RouteSiteMenu from '@/src/components/RouteSiteMenu';
 import StoryDetailCard from '@/src/components/StoryDetailCard';
 import RouteThemeToggle from '@/src/components/RouteThemeToggle';
 import useCompositeTheme from '@/src/hooks/useCompositeTheme';
@@ -28,6 +29,18 @@ function ensureHeadshotFallback(event) {
 }
 
 const HERO_CACHE_KEY = 'composite-hub-hero-v2';
+const ET_TIME_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/New_York',
+  hour: 'numeric',
+  minute: '2-digit',
+});
+
+function formatEtLabel(value, fallback) {
+  if (!value) return fallback;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return fallback;
+  return `Last updated ${ET_TIME_FORMATTER.format(date)} ET`;
+}
 
 export default function SportHubPage() {
   const cards = getSportCards();
@@ -181,6 +194,7 @@ export default function SportHubPage() {
         <div className="hub-aurora aurora-a" aria-hidden="true" />
         <div className="hub-aurora aurora-b" aria-hidden="true" />
         <div className="route-shell-actions route-shell-actions-hub">
+          <RouteSiteMenu theme={theme} onToggleTheme={toggleTheme} />
           <RouteThemeToggle theme={theme} onToggle={toggleTheme} compact />
         </div>
         <StoryDetailCard
@@ -203,6 +217,7 @@ export default function SportHubPage() {
       <div className="hub-orbit orbit-b" aria-hidden="true" />
 
       <div className="route-shell-actions route-shell-actions-hub">
+        <RouteSiteMenu theme={theme} onToggleTheme={toggleTheme} />
         <RouteThemeToggle theme={theme} onToggle={toggleTheme} compact />
       </div>
 
@@ -227,10 +242,7 @@ export default function SportHubPage() {
         <div className="hub-hero-copy">
           <p className="eyebrow">COMPOSITE Sports</p>
           <h1>{SPORT_CONFIGS.hub.title}</h1>
-          <p>
-            The main menu is now the live front page: every sport, the world-player board,
-            trending stories across the last 24 hours, and the top parlay-worthy edges on today&apos;s slate.
-          </p>
+          <p>Live cross-sport hub for rankings, world-player boards, trends, and today&apos;s best edges.</p>
         </div>
 
         <div className="hub-hero-stack">
@@ -240,7 +252,7 @@ export default function SportHubPage() {
                 <p className="eyebrow">Trending Stories</p>
                 <h2>Last 24 Hours</h2>
               </div>
-              <span>{hero?.nowLabel || 'Syncing'}</span>
+              <span>{formatEtLabel(hero?.lastUpdated, 'Updating live…')}</span>
             </div>
             {featuredStory ? (
               <button className="hub-story-feature" type="button" onClick={() => openStory(featuredStory)}>
@@ -252,7 +264,9 @@ export default function SportHubPage() {
                 </div>
               </button>
             ) : (
-              <div className="hub-story-feature is-loading" />
+              <div className="hub-story-feature is-loading">
+                <span className="hub-loading-copy">Updating live…</span>
+              </div>
             )}
             {heroStories.length > 1 ? (
               <div className="hub-story-dots" aria-label="Story rotation">
@@ -282,7 +296,7 @@ export default function SportHubPage() {
                     ? 'Building'
                     : betLegs.length
                       ? `${betLegs.length} legs live`
-                      : 'Syncing'}
+                      : 'Refreshing today’s slate…'}
               </span>
             </div>
             <div className="hub-parlay-summary">
@@ -324,38 +338,43 @@ export default function SportHubPage() {
                   </div>
                 ))}
               </div>
-            ) : null}
+            ) : hero?.status === 'closed' ? null : (
+              <div className="hub-parlay-legs" aria-label="Loading parlay board">
+                {[...Array(3)].map((_, index) => (
+                  <div className="hub-parlay-leg is-loading" key={index}>
+                    <span className="hub-loading-copy">Refreshing today’s slate…</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="hub-parlay-footnote">
               {hero?.status === 'closed'
                 ? 'Today’s board is closed. Fewer than two live parlay legs remain on the current ET slate.'
                 : hero?.status === 'building'
                   ? `Building the next board for ${hero?.resetAtEt || '6:00 AM ET'}`
                   : parlay?.verifiedAt
-                    ? `Verified ${new Date(parlay.verifiedAt).toLocaleTimeString()} • ${betLegs.length} active legs • ${hero?.remainingEligibleGames || betLegs.length} upcoming games remain today`
-                    : 'Live parlay board syncing now'}
+                    ? `${formatEtLabel(parlay.verifiedAt, 'Refreshing today’s slate…')} • ${betLegs.length} active legs • ${hero?.remainingEligibleGames || betLegs.length} upcoming games remain today`
+                    : 'Refreshing today’s slate…'}
             </div>
-            <p className="hub-parlay-note">
-              {hero?.status === 'closed'
-                ? 'The parlay card resets at 6:00 AM ET and returns as soon as at least two same-day cross-sport legs are available.'
-                : 'The parlay card is the only betting module on the main menu. It uses verified odds math and the strongest same-day cross-sport edge set after the 6:00 AM ET reset.'}
-            </p>
           </article>
         </div>
 
-        <div className="hub-status-strip" aria-hidden="true">
-          {cards.map((card) => (
-            <span
+        <nav className="hub-status-strip" aria-label="COMPOSITE site navigation">
+          {cards.map((card, index) => (
+            <Link
               key={`${card.key}-pulse`}
-              className="hub-status-pill"
+              href={card.path}
+              className={`hub-status-pill hub-status-link ${index === activeSportIndex ? 'is-active' : ''}`}
               style={{
                 '--pill-accent': card.theme?.hub?.accent || card.accent,
                 '--pill-accent-alt': card.theme?.hub?.accentAlt || card.accentAlt,
               }}
             >
+              {card.hubTile?.icon ? <img src={card.hubTile.icon} alt="" className="hub-status-icon" /> : null}
               {card.label}
-            </span>
+            </Link>
           ))}
-        </div>
+        </nav>
       </section>
 
       <section className="hub-sport-rail-section">
@@ -405,7 +424,7 @@ export default function SportHubPage() {
               </div>
               <div className="hub-card-footer compact">
                 <span className="hub-card-hover-label">{card.hoverLabel || card.theme?.hoverCue}</span>
-                <span className="hub-card-cta">Enter</span>
+                <span className="hub-card-cta">Open Site</span>
               </div>
             </Link>
           ))}
@@ -429,11 +448,15 @@ export default function SportHubPage() {
             <p className="eyebrow">Global Player Board</p>
             <h2>Top 5 Players In The World</h2>
           </div>
-          <span>{hero?.worldBoard?.lastUpdated ? `Updated ${new Date(hero.worldBoard.lastUpdated).toLocaleTimeString()}` : 'Sync pending'}</span>
+          <span>{formatEtLabel(hero?.worldBoard?.lastUpdated, 'Pulling latest board…')}</span>
         </div>
         <div className="hub-world-grid">
           {loading
-            ? [...Array(5)].map((_, index) => <div key={index} className="hub-world-card is-loading" />)
+            ? [...Array(5)].map((_, index) => (
+                <div key={index} className="hub-world-card is-loading">
+                  <span className="hub-loading-copy">Pulling latest board…</span>
+                </div>
+              ))
             : worldPlayers.map((player) => (
                 <Link className="hub-world-card" key={player.id} href={player.href || '#'}>
                   <div className="hub-world-rank">#{player.worldRank}</div>
@@ -472,7 +495,11 @@ export default function SportHubPage() {
                   </div>
                 </button>
               ))
-            : [...Array(4)].map((_, index) => <div key={index} className="hub-story-card is-loading" />)}
+            : [...Array(4)].map((_, index) => (
+                <div key={index} className="hub-story-card is-loading">
+                  <span className="hub-loading-copy">Updating live…</span>
+                </div>
+              ))}
         </div>
         {movingStories.length ? (
           <div className="hub-story-marquee" aria-hidden="true">
@@ -487,6 +514,10 @@ export default function SportHubPage() {
           </div>
         ) : null}
       </section>
+
+      <footer className="hub-disclaimer">
+        For entertainment and informational purposes only. If you or someone you know has a gambling problem and wants help, call 1-800-GAMBLER.
+      </footer>
 
     </main>
   );

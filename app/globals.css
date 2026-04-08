@@ -224,6 +224,34 @@ body[data-composite-route='hub'] {
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
 }
 
+.hub-status-link {
+  color: inherit;
+  text-decoration: none;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background 180ms ease;
+}
+
+.hub-status-link:hover,
+.hub-status-link:focus-visible,
+.hub-status-link.is-active {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--pill-accent) 44%, white 18%);
+  background: color-mix(in srgb, var(--pill-accent) 26%, rgba(6, 11, 24, 0.96));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--pill-accent) 18%, transparent) inset,
+    0 14px 28px color-mix(in srgb, var(--pill-accent) 22%, transparent);
+}
+
+.hub-status-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  object-fit: contain;
+  display: block;
+}
+
 .hub-status-pill::before {
   content: '';
   width: 9px;
@@ -1299,6 +1327,12 @@ body[data-composite-route='hub'] {
   z-index: 35;
 }
 
+.route-site-menu,
+.route-site-menu-overlay,
+.route-site-menu-panel {
+  display: none;
+}
+
 .route-theme-toggle {
   display: inline-flex;
   align-items: center;
@@ -1335,6 +1369,136 @@ body[data-composite-route='hub'] {
   font-size: 0.9rem;
 }
 
+.route-site-menu-open {
+  overflow: hidden;
+}
+
+.route-site-menu-trigger,
+.route-site-menu-close {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(10, 16, 28, 0.82);
+  color: #eef4ff;
+  backdrop-filter: blur(18px);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.24);
+}
+
+.route-site-menu-trigger {
+  width: 48px;
+  height: 48px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 16px;
+  cursor: pointer;
+}
+
+.route-site-menu-trigger span {
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  transition: transform 180ms ease, opacity 180ms ease;
+}
+
+.route-site-menu-trigger.is-open span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.route-site-menu-trigger.is-open span:nth-child(2) {
+  opacity: 0;
+}
+
+.route-site-menu-trigger.is-open span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+.route-site-menu-close {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  cursor: pointer;
+  font-size: 1.35rem;
+}
+
+.route-site-menu-head strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 1rem;
+}
+
+.route-site-menu-list {
+  display: grid;
+  gap: 10px;
+}
+
+.route-site-menu-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  text-decoration: none;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.route-site-menu-link:hover,
+.route-site-menu-link:focus-visible,
+.route-site-menu-link.is-current {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--site-accent) 34%, rgba(255, 255, 255, 0.12));
+  background: color-mix(in srgb, var(--site-accent) 16%, rgba(255, 255, 255, 0.06));
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--site-accent) 18%, transparent);
+}
+
+.route-site-menu-icon-shell {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.05));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
+}
+
+.route-site-menu-icon {
+  width: 70%;
+  height: 70%;
+  object-fit: contain;
+}
+
+.route-site-menu-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.route-site-menu-copy strong {
+  font-size: 0.95rem;
+}
+
+.route-site-menu-copy span {
+  color: rgba(229, 237, 255, 0.72);
+  font-size: 0.77rem;
+  line-height: 1.4;
+}
+
+.route-site-menu-theme .route-theme-toggle {
+  width: 100%;
+  justify-content: space-between;
+}
+
 .hub-page[data-theme='light'],
 .generic-route-shell[data-theme='light'],
 .football-landing-shell[data-theme='light'],
@@ -1365,6 +1529,43 @@ body[data-composite-route='hub'] {
   background: rgba(255, 255, 255, 0.86);
   color: #13243e;
   border-color: rgba(17, 24, 39, 0.12);
+}
+
+.hub-page[data-theme='light'] .route-site-menu-trigger,
+.hub-page[data-theme='light'] .route-site-menu-close,
+.hub-page[data-theme='light'] .route-site-menu-panel,
+.generic-route-shell[data-theme='light'] .route-site-menu-trigger,
+.generic-route-shell[data-theme='light'] .route-site-menu-close,
+.generic-route-shell[data-theme='light'] .route-site-menu-panel,
+.football-landing-shell[data-theme='light'] .route-site-menu-trigger,
+.football-landing-shell[data-theme='light'] .route-site-menu-close,
+.football-landing-shell[data-theme='light'] .route-site-menu-panel,
+.football-league-shell[data-theme='light'] .route-site-menu-trigger,
+.football-league-shell[data-theme='light'] .route-site-menu-close,
+.football-league-shell[data-theme='light'] .route-site-menu-panel,
+.vendor-shell[data-theme='light'] .route-site-menu-trigger,
+.vendor-shell[data-theme='light'] .route-site-menu-close,
+.vendor-shell[data-theme='light'] .route-site-menu-panel {
+  background: rgba(255, 255, 255, 0.92);
+  color: #13243e;
+  border-color: rgba(17, 24, 39, 0.12);
+}
+
+.hub-page[data-theme='light'] .route-site-menu-link,
+.generic-route-shell[data-theme='light'] .route-site-menu-link,
+.football-landing-shell[data-theme='light'] .route-site-menu-link,
+.football-league-shell[data-theme='light'] .route-site-menu-link,
+.vendor-shell[data-theme='light'] .route-site-menu-link {
+  background: rgba(244, 247, 252, 0.82);
+  border-color: rgba(15, 23, 42, 0.1);
+}
+
+.hub-page[data-theme='light'] .route-site-menu-copy span,
+.generic-route-shell[data-theme='light'] .route-site-menu-copy span,
+.football-landing-shell[data-theme='light'] .route-site-menu-copy span,
+.football-league-shell[data-theme='light'] .route-site-menu-copy span,
+.vendor-shell[data-theme='light'] .route-site-menu-copy span {
+  color: #51647f;
 }
 
 .generic-route-shell[data-theme='light'] .generic-sidebar,
@@ -4745,6 +4946,17 @@ body[data-composite-route='football'] {
     radial-gradient(circle at top right, rgba(92, 255, 166, 0.14), transparent 55%);
 }
 
+.hub-parlay-leg.is-loading {
+  min-height: 94px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.04), rgba(255,255,255,0.1), rgba(255,255,255,0.04));
+  background-size: 220% 100%;
+  animation: hubShimmer 1.6s linear infinite;
+}
+
 .hub-parlay-leg-top,
 .hub-parlay-leg-main,
 .hub-parlay-leg-meta {
@@ -4908,6 +5120,39 @@ body[data-composite-route='football'] {
   animation: hubShimmer 1.6s linear infinite;
 }
 
+.hub-story-feature.is-loading,
+.hub-story-card.is-loading,
+.hub-world-card.is-loading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+}
+
+.hub-loading-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(7, 12, 24, 0.64);
+  color: rgba(241, 246, 255, 0.92);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.hub-loading-copy::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(150, 202, 255, 0.92);
+  box-shadow: 0 0 14px rgba(150, 202, 255, 0.6);
+  animation: hubPulse 1.8s ease-in-out infinite;
+}
+
 .hub-bet-card-mid {
   display: flex;
   align-items: center;
@@ -5024,6 +5269,15 @@ body[data-composite-route='football'] {
 .hub-parlay-note {
   margin: 10px 0 0;
   color: rgba(215, 255, 229, 0.82);
+  line-height: 1.7;
+}
+
+.hub-disclaimer {
+  max-width: 96rem;
+  margin: 0 auto;
+  padding: 0 28px 32px;
+  color: rgba(229, 237, 255, 0.56);
+  font-size: 0.72rem;
   line-height: 1.7;
 }
 
@@ -5225,6 +5479,25 @@ body[data-composite-route='football'] {
 
 .hub-page[data-theme='light'] .hub-parlay-note {
   color: #406651;
+}
+
+.hub-page[data-theme='light'] .hub-status-link {
+  color: #13243e;
+}
+
+.hub-page[data-theme='light'] .hub-status-link:hover,
+.hub-page[data-theme='light'] .hub-status-link:focus-visible,
+.hub-page[data-theme='light'] .hub-status-link.is-active {
+  background: color-mix(in srgb, var(--pill-accent) 18%, rgba(255, 255, 255, 0.96));
+}
+
+.hub-page[data-theme='light'] .hub-loading-copy {
+  background: rgba(255, 255, 255, 0.9);
+  color: #13243e;
+}
+
+.hub-page[data-theme='light'] .hub-disclaimer {
+  color: #6a7890;
 }
 
 .hub-page[data-theme='light'] .hub-bet-chip.is-strong {
@@ -5449,6 +5722,65 @@ body[data-composite-route='football'] {
 }
 
 @media (max-width: 980px) {
+  .route-site-menu {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .route-shell-actions .route-theme-toggle,
+  .route-shell-actions-hub .route-theme-toggle,
+  .football-stage-header .route-theme-toggle {
+    display: none;
+  }
+
+  .route-site-menu-overlay {
+    position: fixed;
+    inset: 0;
+    display: block;
+    border: 0;
+    background: rgba(4, 8, 14, 0.6);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 33;
+  }
+
+  .route-site-menu-overlay.is-open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .route-site-menu-panel {
+    position: fixed;
+    top: 74px;
+    right: 16px;
+    width: min(88vw, 360px);
+    display: grid;
+    gap: 14px;
+    padding: 18px;
+    border-radius: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(10, 16, 28, 0.92);
+    box-shadow: 0 28px 72px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(24px);
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+    pointer-events: none;
+    z-index: 36;
+  }
+
+  .route-site-menu-panel.is-open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+
+  .route-site-menu-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
   .generic-menu-button,
   .football-menu-button {
     display: inline-flex;
@@ -5550,6 +5882,11 @@ body[data-composite-route='football'] {
   .route-shell-actions-hub {
     top: 64px;
     right: 16px;
+  }
+
+  .route-site-menu-panel {
+    top: 112px;
+    width: min(92vw, 360px);
   }
 
   .hub-sport-rail-pager {

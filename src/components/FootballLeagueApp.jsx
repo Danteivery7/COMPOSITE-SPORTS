@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import RouteSiteMenu from '@/src/components/RouteSiteMenu';
 import StoryDetailCard from '@/src/components/StoryDetailCard';
 import RouteThemeToggle from '@/src/components/RouteThemeToggle';
 import { getFootballLeagueConfig } from '@/src/lib/football';
@@ -848,6 +849,7 @@ export default function FootballLeagueApp({ leagueKey, initialEntry = null, them
             <button className="football-refresh football-menu-button" type="button" onClick={() => setMobileNavOpen((value) => !value)}>
               Menu
             </button>
+            <RouteSiteMenu theme={theme} onToggleTheme={toggleTheme} />
             <RouteThemeToggle theme={theme} onToggle={toggleTheme} compact />
             <button className="football-refresh" type="button" onClick={fetchBootstrap}>
               Refresh

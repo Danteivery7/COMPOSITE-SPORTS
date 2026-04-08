@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import FootballIntroGate from '@/src/components/FootballIntroGate';
+import RouteSiteMenu from '@/src/components/RouteSiteMenu';
 import RouteThemeToggle from '@/src/components/RouteThemeToggle';
 import useCompositeTheme from '@/src/hooks/useCompositeTheme';
 
@@ -100,6 +101,7 @@ export default function FootballLandingRoute() {
             <p>{data?.subtitle || 'The global football selector is syncing the marquee board and league hubs.'}</p>
           </div>
           <div className="route-shell-actions">
+            <RouteSiteMenu theme={theme} onToggleTheme={toggleTheme} />
             <RouteThemeToggle theme={theme} onToggle={toggleTheme} compact />
             <Link href="/" className="football-hub-link">
               Back To Hub
