@@ -20,6 +20,59 @@ function normalizeApiUrl(url) {
   return String(url).replace('http://', 'https://').replace('.pvt', '.com');
 }
 
+function upgradeEspnImageUrl(url) {
+  let normalized = normalizeApiUrl(url);
+  if (!normalized) return '';
+
+  normalized = normalized.replace(/\/i\/teamlogos\/([^/]+)\/(\d+)(\/[^?#]+)/i, (_match, sport, size, rest) => {
+    const upgraded = Math.max(Number(size) || 0, 500);
+    return `/i/teamlogos/${sport}/${upgraded}${rest}`;
+  });
+
+  normalized = normalized.replace(/\/i\/headshots\/([^/]+)\/players\/(\d+)(\/[^?#]+)/i, (_match, sport, size, rest) => {
+    const upgraded = Math.max(Number(size) || 0, 500);
+    return `/i/headshots/${sport}/players/${upgraded}${rest}`;
+  });
+
+  try {
+    const parsed = new URL(normalized);
+    if (parsed.searchParams.has('w')) {
+      parsed.searchParams.set('w', String(Math.max(Number(parsed.searchParams.get('w')) || 0, 1200)));
+    }
+    if (parsed.searchParams.has('h')) {
+      parsed.searchParams.set('h', String(Math.max(Number(parsed.searchParams.get('h')) || 0, 675)));
+    }
+    normalized = parsed.toString();
+  } catch (_error) {
+    // ignore non-URL strings
+  }
+
+  return normalized;
+}
+
+function selectBestImage(article) {
+  const candidates = [
+    ...(Array.isArray(article?.images) ? article.images : []),
+    article?.thumbnail,
+    article?.image,
+    article?.images?.[0],
+  ].filter(Boolean);
+
+  const best = candidates
+    .map((image, index) => {
+      const width = Number(image?.width || image?.w || 0);
+      const height = Number(image?.height || image?.h || 0);
+      return {
+        image,
+        index,
+        score: width > 0 && height > 0 ? width * height : -(index + 1),
+      };
+    })
+    .sort((left, right) => right.score - left.score)[0]?.image;
+
+  return upgradeEspnImageUrl(best?.url || best?.href || '');
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -69,7 +122,6 @@ function normalizeRelated(items = []) {
 }
 
 function buildStoryDetailFromHeadline(headline, storyId) {
-  const primaryImage = headline?.images?.[0] || headline?.thumbnail || headline?.image || null;
   return {
     storyId: String(headline?.id || storyId),
     headline: headline?.headline || headline?.title || 'ESPN Story',
@@ -78,14 +130,14 @@ function buildStoryDetailFromHeadline(headline, storyId) {
     published: headline?.published || headline?.originallyPosted || headline?.lastModified || null,
     byline: headline?.byline || headline?.source || 'ESPN',
     source: headline?.source || 'ESPN',
-    image: primaryImage?.url || primaryImage?.href || '',
+    image: selectBestImage(headline),
     contentType: headline?.type || 'Story',
     related: normalizeRelated(headline?.related || headline?.videos || []),
   };
 }
 
 function buildStoryDetailFromVideo(video, storyId) {
-  const poster = video?.posterImages?.full?.href || video?.thumbnail || video?.images?.[0]?.url || '';
+  const poster = upgradeEspnImageUrl(video?.posterImages?.full?.href || video?.thumbnail || video?.images?.[0]?.url || '');
   const description = video?.description || video?.caption || video?.headline || '';
   return {
     storyId: String(video?.id || storyId),
@@ -102,7 +154,6 @@ function buildStoryDetailFromVideo(video, storyId) {
 }
 
 export function normalizeEspnNewsArticle(article, { fallbackSource = 'ESPN', fallbackId = null } = {}) {
-  const image = article?.images?.[0] || article?.thumbnail || article?.image || null;
   const storyId = String(article?.id || article?.guid || fallbackId || '');
   return {
     id: storyId || String(fallbackId || article?.headline || ''),
@@ -114,7 +165,7 @@ export function normalizeEspnNewsArticle(article, { fallbackSource = 'ESPN', fal
     published: article?.published || article?.originallyPosted || article?.lastModified || null,
     source: article?.source || fallbackSource,
     byline: article?.byline || article?.source || fallbackSource,
-    image: image?.url || image?.href || '',
+    image: selectBestImage(article),
     link: normalizeApiUrl(article?.links?.web?.href || article?.links?.mobile?.href || article?.link || ''),
   };
 }

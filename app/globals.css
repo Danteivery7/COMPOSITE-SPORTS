@@ -2358,6 +2358,90 @@ body[data-composite-route='hub'] {
   font-size: 0.9rem;
 }
 
+.hub-page[data-theme='light'] .story-detail-card,
+.generic-route-shell[data-theme='light'] .story-detail-card,
+.football-landing-shell[data-theme='light'] .story-detail-card,
+.football-league-shell[data-theme='light'] .story-detail-card,
+.vendor-shell[data-theme='light'] .story-detail-card,
+.mlb-route-shell[data-theme='light'] .story-detail-card {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(15, 23, 42, 0.08);
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
+}
+
+.hub-page[data-theme='light'] .story-detail-meta,
+.generic-route-shell[data-theme='light'] .story-detail-meta,
+.football-landing-shell[data-theme='light'] .story-detail-meta,
+.football-league-shell[data-theme='light'] .story-detail-meta,
+.vendor-shell[data-theme='light'] .story-detail-meta,
+.mlb-route-shell[data-theme='light'] .story-detail-meta,
+.hub-page[data-theme='light'] .story-related-card span,
+.generic-route-shell[data-theme='light'] .story-related-card span,
+.football-landing-shell[data-theme='light'] .story-related-card span,
+.football-league-shell[data-theme='light'] .story-related-card span,
+.vendor-shell[data-theme='light'] .story-related-card span,
+.mlb-route-shell[data-theme='light'] .story-related-card span {
+  color: rgba(71, 85, 105, 0.92);
+}
+
+.hub-page[data-theme='light'] .story-detail-dek,
+.generic-route-shell[data-theme='light'] .story-detail-dek,
+.football-landing-shell[data-theme='light'] .story-detail-dek,
+.football-league-shell[data-theme='light'] .story-detail-dek,
+.vendor-shell[data-theme='light'] .story-detail-dek,
+.mlb-route-shell[data-theme='light'] .story-detail-dek,
+.hub-page[data-theme='light'] .story-detail-body,
+.generic-route-shell[data-theme='light'] .story-detail-body,
+.football-landing-shell[data-theme='light'] .story-detail-body,
+.football-league-shell[data-theme='light'] .story-detail-body,
+.vendor-shell[data-theme='light'] .story-detail-body,
+.mlb-route-shell[data-theme='light'] .story-detail-body {
+  color: #0f172a;
+}
+
+.hub-page[data-theme='light'] .story-detail-body strong,
+.generic-route-shell[data-theme='light'] .story-detail-body strong,
+.football-landing-shell[data-theme='light'] .story-detail-body strong,
+.football-league-shell[data-theme='light'] .story-detail-body strong,
+.vendor-shell[data-theme='light'] .story-detail-body strong,
+.mlb-route-shell[data-theme='light'] .story-detail-body strong {
+  color: #020617;
+}
+
+.hub-page[data-theme='light'] .story-detail-body hr,
+.generic-route-shell[data-theme='light'] .story-detail-body hr,
+.football-landing-shell[data-theme='light'] .story-detail-body hr,
+.football-league-shell[data-theme='light'] .story-detail-body hr,
+.vendor-shell[data-theme='light'] .story-detail-body hr,
+.mlb-route-shell[data-theme='light'] .story-detail-body hr {
+  border-top-color: rgba(15, 23, 42, 0.12);
+}
+
+.hub-page[data-theme='light'] .story-detail-image,
+.generic-route-shell[data-theme='light'] .story-detail-image,
+.football-landing-shell[data-theme='light'] .story-detail-image,
+.football-league-shell[data-theme='light'] .story-detail-image,
+.vendor-shell[data-theme='light'] .story-detail-image,
+.mlb-route-shell[data-theme='light'] .story-detail-image,
+.hub-page[data-theme='light'] .story-related-image,
+.generic-route-shell[data-theme='light'] .story-related-image,
+.football-landing-shell[data-theme='light'] .story-related-image,
+.football-league-shell[data-theme='light'] .story-related-image,
+.vendor-shell[data-theme='light'] .story-related-image,
+.mlb-route-shell[data-theme='light'] .story-related-image {
+  border-color: rgba(15, 23, 42, 0.1);
+}
+
+.hub-page[data-theme='light'] .story-related-card,
+.generic-route-shell[data-theme='light'] .story-related-card,
+.football-landing-shell[data-theme='light'] .story-related-card,
+.football-league-shell[data-theme='light'] .story-related-card,
+.vendor-shell[data-theme='light'] .story-related-card,
+.mlb-route-shell[data-theme='light'] .story-related-card {
+  background: rgba(248, 250, 252, 0.92);
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
 .sportview-matchup {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
