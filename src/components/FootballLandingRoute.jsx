@@ -85,6 +85,10 @@ export default function FootballLandingRoute() {
   const topPlayers = data?.topPlayers || [];
   const leagues = data?.leagues || [];
   const liveMatchCount = topMatches.filter((match) => ['live', 'in'].includes(match?.state)).length;
+  const visualLogos = [
+    ...topMatches.flatMap((match) => [match?.away?.logo, match?.home?.logo]),
+    ...leagues.map((league) => league.logo),
+  ].filter(Boolean).slice(0, 6);
   const tickerItems = [
     ...topMatches.slice(0, 6).map((match) => ({
       id: `match-${match.id}`,
@@ -149,6 +153,39 @@ export default function FootballLandingRoute() {
                   )}
                 </div>
               ))}
+            </div>
+            <div className="football-hero-media-strip">
+              <div className="football-hero-logo-row">
+                {visualLogos.map((logo, index) => (
+                  <span className="football-hero-logo-chip" key={`${logo}-${index}`}>
+                    <img src={logo} alt="" className="football-club-logo" />
+                  </span>
+                ))}
+              </div>
+              <div className="football-hero-player-row">
+                {topPlayers.slice(0, 3).map((player) => (
+                  <div className="football-hero-player-chip" key={`${player.leagueKey}-${player.id}`}>
+                    {player.headshot ? (
+                      <img
+                        src={player.headshot}
+                        alt={player.displayName}
+                        className="football-player-headshot"
+                        onError={(event) => {
+                          if (event.currentTarget.dataset.fallbackApplied === '1') return;
+                          event.currentTarget.dataset.fallbackApplied = '1';
+                          event.currentTarget.src = 'https://a.espncdn.com/i/headshots/nophoto.png';
+                        }}
+                      />
+                    ) : (
+                      <span className="football-logo-fallback">{player.displayName?.slice(0, 2)?.toUpperCase() || 'PL'}</span>
+                    )}
+                    <div>
+                      <strong>{player.displayName}</strong>
+                      <span>{player.team?.abbreviation || player.leagueLabel}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
           <div className="route-shell-actions">

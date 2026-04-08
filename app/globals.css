@@ -1702,6 +1702,142 @@ body[data-composite-route='hub'] {
   color: var(--text);
 }
 
+.football-landing-shell[data-theme='light'],
+.football-league-shell[data-theme='light'] {
+  --bg: #eef5ed;
+  --surface: rgba(255, 252, 246, 0.82);
+  --surface-strong: rgba(255, 255, 250, 0.94);
+  --border: rgba(18, 52, 61, 0.12);
+  --text: #0d2236;
+  --muted: #496273;
+  --shadow: 0 24px 60px rgba(25, 55, 76, 0.12);
+  background:
+    radial-gradient(circle at 12% -8%, rgba(119, 255, 179, 0.4), transparent 27%),
+    radial-gradient(circle at 88% 4%, rgba(80, 165, 255, 0.28), transparent 24%),
+    radial-gradient(circle at 50% 108%, rgba(49, 173, 116, 0.18), transparent 28%),
+    linear-gradient(180deg, #f7f8ef 0%, #eff6ef 36%, #d8eadf 100%);
+}
+
+.football-landing-shell[data-theme='light']::before,
+.football-league-shell[data-theme='light']::before {
+  background:
+    linear-gradient(90deg, transparent 0 8%, rgba(18, 42, 58, 0.04) 8% 8.12%, transparent 8.12% 49.84%, rgba(48, 162, 104, 0.08) 49.84% 50.16%, transparent 50.16% 91.88%, rgba(18, 42, 58, 0.04) 91.88% 92%, transparent 92%),
+    linear-gradient(180deg, transparent 0 10%, rgba(48, 162, 104, 0.06) 10% 10.28%, transparent 10.28% 33%, rgba(48, 162, 104, 0.06) 33% 33.28%, transparent 33.28% 66%, rgba(48, 162, 104, 0.06) 66% 66.28%, transparent 66.28%),
+    radial-gradient(circle at 50% 88%, rgba(69, 164, 99, 0.18), transparent 28%);
+  opacity: 0.92;
+}
+
+.football-landing-shell[data-theme='light']::after,
+.football-league-shell[data-theme='light']::after {
+  background:
+    radial-gradient(circle at 15% 16%, rgba(255, 255, 255, 0.5), transparent 14%),
+    radial-gradient(circle at 82% 14%, rgba(255, 255, 255, 0.36), transparent 14%),
+    linear-gradient(112deg, transparent 22%, rgba(62, 185, 124, 0.12) 38%, transparent 54%),
+    linear-gradient(132deg, transparent 46%, rgba(255, 255, 255, 0.2) 50%, transparent 56%);
+  opacity: 0.62;
+}
+
+.football-landing-shell[data-theme='light'] .football-marquee-board,
+.football-landing-shell[data-theme='light'] .football-top-player-board,
+.football-landing-shell[data-theme='light'] .football-league-selector,
+.football-league-shell[data-theme='light'] .football-sidebar,
+.football-league-shell[data-theme='light'] .football-stage,
+.football-league-shell[data-theme='light'] .football-panel,
+.football-landing-shell[data-theme='light'] .football-card,
+.football-landing-shell[data-theme='light'] .football-hero-visual,
+.football-landing-shell[data-theme='light'] .football-live-ticker,
+.football-league-shell[data-theme='light'] .football-row-button,
+.football-league-shell[data-theme='light'] .football-side-card,
+.football-league-shell[data-theme='light'] .football-news-card,
+.football-league-shell[data-theme='light'] .football-news-feature,
+.football-league-shell[data-theme='light'] .football-game-card,
+.football-league-shell[data-theme='light'] .football-top-club,
+.football-league-shell[data-theme='light'] .football-top-player {
+  border-color: rgba(18, 52, 61, 0.1);
+  background:
+    radial-gradient(circle at top right, rgba(56, 182, 121, 0.1), transparent 26%),
+    linear-gradient(180deg, rgba(255, 252, 245, 0.9), rgba(241, 247, 241, 0.88));
+  box-shadow: 0 22px 56px rgba(23, 49, 67, 0.1);
+}
+
+.football-landing-shell[data-theme='light'] .football-card::before,
+.football-league-shell[data-theme='light'] .football-panel::before,
+.football-league-shell[data-theme='light'] .football-row-button::before,
+.football-league-shell[data-theme='light'] .football-side-card::before,
+.football-landing-shell[data-theme='light'] .football-hero-visual-sweep {
+  background: linear-gradient(120deg, transparent 0 30%, rgba(255, 255, 255, 0.65) 48%, transparent 66%);
+}
+
+.football-landing-shell[data-theme='light'] .football-section-head span,
+.football-landing-shell[data-theme='light'] .football-card-head span,
+.football-landing-shell[data-theme='light'] .football-marquee-side span,
+.football-landing-shell[data-theme='light'] .football-marquee-league span,
+.football-landing-shell[data-theme='light'] .football-empty-copy,
+.football-league-shell[data-theme='light'] .football-section-head span,
+.football-league-shell[data-theme='light'] .football-card-head span,
+.football-league-shell[data-theme='light'] .football-toolbar span,
+.football-league-shell[data-theme='light'] .football-row-button span,
+.football-league-shell[data-theme='light'] .football-news-card p,
+.football-league-shell[data-theme='light'] .football-news-feature p,
+.football-league-shell[data-theme='light'] .football-empty-copy,
+.football-landing-shell[data-theme='light'] .football-live-ribbon span,
+.football-landing-shell[data-theme='light'] .football-live-ticker-item,
+.football-league-shell[data-theme='light'] .football-side-label,
+.football-league-shell[data-theme='light'] .football-mini-match span {
+  color: #4c6472;
+}
+
+.football-landing-shell[data-theme='light'] .football-live-ribbon,
+.football-landing-shell[data-theme='light'] .football-hero-match-card,
+.football-landing-shell[data-theme='light'] .football-mini-match {
+  border-color: rgba(28, 70, 86, 0.1);
+  background:
+    radial-gradient(circle at top right, rgba(61, 184, 122, 0.12), transparent 30%),
+    linear-gradient(180deg, rgba(255, 253, 248, 0.9), rgba(242, 248, 243, 0.88));
+  box-shadow: 0 18px 40px rgba(20, 46, 60, 0.08);
+}
+
+.football-landing-shell[data-theme='light'] .football-live-ribbon strong,
+.football-landing-shell[data-theme='light'] .football-hero-match-row strong,
+.football-landing-shell[data-theme='light'] .football-hero-match-row span,
+.football-landing-shell[data-theme='light'] .football-mini-match strong,
+.football-landing-shell[data-theme='light'] .football-live-ticker-item,
+.football-landing-shell[data-theme='light'] .football-top-player-card strong,
+.football-league-shell[data-theme='light'] .football-top-player strong,
+.football-league-shell[data-theme='light'] .football-top-club strong,
+.football-league-shell[data-theme='light'] .football-row-button strong {
+  color: #0d2236;
+}
+
+.football-landing-shell[data-theme='light'] .football-rank-badge,
+.football-landing-shell[data-theme='light'] .football-chip,
+.football-league-shell[data-theme='light'] .football-chip,
+.football-league-shell[data-theme='light'] .football-brand-block span {
+  background: rgba(33, 131, 88, 0.12);
+  color: #0f5a40;
+  border-color: rgba(33, 131, 88, 0.12);
+}
+
+.football-landing-shell[data-theme='light'] .football-status-pill.is-pre,
+.football-league-shell[data-theme='light'] .football-status-pill.is-pre {
+  background: rgba(64, 123, 255, 0.12);
+  color: #2d5cb6;
+}
+
+.football-landing-shell[data-theme='light'] .football-status-pill.is-in,
+.football-landing-shell[data-theme='light'] .football-status-pill.is-live,
+.football-league-shell[data-theme='light'] .football-status-pill.is-in,
+.football-league-shell[data-theme='light'] .football-status-pill.is-live {
+  background: rgba(33, 131, 88, 0.14);
+  color: #0f6a47;
+}
+
+.football-landing-shell[data-theme='light'] .football-status-pill.is-post,
+.football-league-shell[data-theme='light'] .football-status-pill.is-post {
+  background: rgba(23, 45, 65, 0.08);
+  color: #536979;
+}
+
 .vendor-topbar,
 .generic-route-topbar,
 .mlb-route-topbar {
@@ -4418,6 +4554,62 @@ body[data-composite-route='football'] {
   margin-top: auto;
 }
 
+.football-hero-media-strip {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.football-hero-logo-row,
+.football-hero-player-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.football-hero-logo-chip,
+.football-hero-player-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(160, 233, 207, 0.14);
+  background: rgba(4, 12, 22, 0.38);
+  backdrop-filter: blur(12px);
+}
+
+.football-hero-logo-chip .football-club-logo {
+  width: 34px;
+  height: 34px;
+}
+
+.football-hero-player-chip .football-player-headshot,
+.football-hero-player-chip .football-logo-fallback {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+}
+
+.football-hero-player-chip strong,
+.football-hero-player-chip span {
+  display: block;
+}
+
+.football-hero-player-chip strong {
+  color: #f5fffb;
+  font-size: 0.84rem;
+}
+
+.football-hero-player-chip span {
+  color: rgba(219, 243, 232, 0.7);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .football-hero-match-card {
   position: relative;
   display: grid;
@@ -4505,6 +4697,20 @@ body[data-composite-route='football'] {
   border-radius: 50%;
   background: #63ffb1;
   box-shadow: 0 0 14px rgba(99, 255, 177, 0.65);
+}
+
+.football-landing-shell[data-theme='light'] .football-hero-logo-chip,
+.football-landing-shell[data-theme='light'] .football-hero-player-chip {
+  border-color: rgba(18, 52, 61, 0.1);
+  background: rgba(255, 252, 246, 0.72);
+}
+
+.football-landing-shell[data-theme='light'] .football-hero-player-chip strong {
+  color: #0d2236;
+}
+
+.football-landing-shell[data-theme='light'] .football-hero-player-chip span {
+  color: #55707e;
 }
 
 .football-marquee-league,
