@@ -528,7 +528,29 @@ function renderTeams(state) {
 
 function renderPlayers(state) {
   const usingDirectory = Boolean(state.playerDirectory?.length);
-  const players = usingDirectory ? state.playerDirectory : state.featuredPlayers || [];
+  const players = (usingDirectory ? state.playerDirectory : state.featuredPlayers || [])
+    .map((player) => {
+      const syncedCard = state.playerCards?.[player.playerId];
+      if (!syncedCard) return player;
+      return {
+        ...player,
+        fullName: syncedCard.fullName || player.fullName,
+        shortName: syncedCard.shortName || player.shortName,
+        headshot: syncedCard.headshot || player.headshot,
+        team: syncedCard.team || player.team,
+        resolvedPosition: syncedCard.resolvedPosition || player.resolvedPosition,
+        jersey: syncedCard.jersey || player.jersey,
+        overall: syncedCard.overall ?? player.overall,
+        overallPercentile: syncedCard.overallPercentile ?? player.overallPercentile,
+        hotnessScore: syncedCard.hotnessScore ?? player.hotnessScore,
+        tone: syncedCard.tone || player.tone,
+      };
+    })
+    .sort((left, right) => {
+      if ((right.overall ?? 0) !== (left.overall ?? 0)) return (right.overall ?? 0) - (left.overall ?? 0);
+      return (right.overallPercentile ?? 0) - (left.overallPercentile ?? 0);
+    });
+
   if (!players.length) {
     return renderEmptyState("Players are still syncing", "The full NHL player directory is still filling from official roster and advanced stat data.");
   }
