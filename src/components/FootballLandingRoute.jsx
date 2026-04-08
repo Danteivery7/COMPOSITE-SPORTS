@@ -84,6 +84,17 @@ export default function FootballLandingRoute() {
   const topMatches = data?.topMatches || [];
   const topPlayers = data?.topPlayers || [];
   const leagues = data?.leagues || [];
+  const liveMatchCount = topMatches.filter((match) => ['live', 'in'].includes(match?.state)).length;
+  const tickerItems = [
+    ...topMatches.slice(0, 6).map((match) => ({
+      id: `match-${match.id}`,
+      label: `${match.leagueLabel} • ${match.away?.abbreviation || match.away?.displayName} vs ${match.home?.abbreviation || match.home?.displayName} • ${match.statusLabel}`,
+    })),
+    ...leagues.slice(0, 6).map((league) => ({
+      id: `league-${league.key}`,
+      label: `${league.label} • ${league.liveCount} live • ${league.matchCount} fixtures`,
+    })),
+  ];
 
   return (
     <FootballIntroGate
@@ -99,6 +110,46 @@ export default function FootballLandingRoute() {
             <p className="eyebrow">COMPOSITE Sports</p>
             <h1>Composite Football</h1>
             <p>{data?.subtitle || 'The global football selector is syncing the marquee board and league hubs.'}</p>
+            <div className="football-chip-row football-landing-chip-row">
+              <span className="football-chip">{liveMatchCount} live now</span>
+              <span className="football-chip">{leagues.length} league hubs</span>
+              <span className="football-chip">{topPlayers.length} elite players tracked</span>
+            </div>
+          </div>
+          <div className="football-hero-visual" aria-hidden="true">
+            <div className="football-hero-visual-grid" />
+            <div className="football-hero-visual-sweep" />
+            <div className="football-live-ribbon">
+              <span>Match Night Control Room</span>
+              <strong>{liveMatchCount ? `${liveMatchCount} live` : 'Global slate primed'}</strong>
+            </div>
+            <div className="football-hero-match-stack">
+              {(topMatches.length ? topMatches.slice(0, 2) : [{}, {}]).map((match, index) => (
+                <div
+                  className={`football-hero-match-card ${['live', 'in'].includes(match?.state) ? 'is-live' : ''} ${loading ? 'is-loading' : ''}`}
+                  key={match?.id || `hero-match-${index}`}
+                >
+                  {loading || !match?.id ? (
+                    <span className="football-hero-match-placeholder">Loading live board</span>
+                  ) : (
+                    <>
+                      <div className="football-card-head">
+                        <span className={`football-status-pill is-${match.state}`}>{match.statusLabel}</span>
+                        <span>{match.leagueLabel}</span>
+                      </div>
+                      <div className="football-hero-match-row">
+                        <strong>{match.away?.abbreviation}</strong>
+                        <span>{match.away?.score}</span>
+                      </div>
+                      <div className="football-hero-match-row">
+                        <strong>{match.home?.abbreviation}</strong>
+                        <span>{match.home?.score}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
           <div className="route-shell-actions">
             <RouteSiteMenu theme={theme} onToggleTheme={toggleTheme} />
@@ -108,6 +159,18 @@ export default function FootballLandingRoute() {
             </a>
           </div>
         </header>
+
+        {tickerItems.length ? (
+          <section className="football-live-ticker" aria-label="Live football ticker">
+            <div className="football-live-ticker-track">
+              {[...tickerItems, ...tickerItems].map((item, index) => (
+                <span className="football-live-ticker-item" key={`${item.id}-${index}`}>
+                  {item.label}
+                </span>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <section className="football-marquee-board">
           <div className="football-section-head">
@@ -127,7 +190,7 @@ export default function FootballLandingRoute() {
           ) : (
             <div className="football-marquee-grid">
               {topMatches.map((match) => (
-                <article className="football-card football-marquee-card" key={`${match.leagueKey}-${match.id}`}>
+                <article className={`football-card football-marquee-card ${['live', 'in'].includes(match.state) ? 'is-live' : ''}`} key={`${match.leagueKey}-${match.id}`}>
                   <div className="football-marquee-league">
                     {match.leagueLogo ? <img src={match.leagueLogo} alt={match.leagueLabel} className="football-league-logo" /> : null}
                     <div>

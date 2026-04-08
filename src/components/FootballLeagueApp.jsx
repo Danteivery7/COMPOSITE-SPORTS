@@ -70,7 +70,7 @@ function PlayerVisual({ player }) {
 
 function GameCard({ game, onOpen }) {
   return (
-    <button className="football-panel football-game-card" type="button" onClick={() => onOpen(game.id)}>
+    <button className={`football-panel football-game-card ${['live', 'in'].includes(game?.state) ? 'is-live' : ''}`} type="button" onClick={() => onOpen(game.id)}>
       <div className="football-card-head">
         <span className={`football-status-pill is-${game.state}`}>{game.statusLabel}</span>
         <span>{game.broadcast || game.startLabel || 'ESPN'}</span>
@@ -102,7 +102,7 @@ function FootballOverview({ bootstrap, openGame, openTeam, openPlayer, openStory
 
   return (
     <section className="football-overview-shell">
-      <article className="football-panel football-hero-panel">
+      <article className="football-panel football-hero-panel football-broadcast-panel">
         <div className="football-hero-copy">
           <p className="eyebrow">{bootstrap.league?.region || 'Football Night'}</p>
           <h2>{bootstrap.league?.label}</h2>
@@ -111,6 +111,14 @@ function FootballOverview({ bootstrap, openGame, openTeam, openPlayer, openStory
             <span className="football-chip">{bootstrap.meta?.liveGames || 0} live matches</span>
             <span className="football-chip">{bootstrap.rankings?.length || 0} clubs tracked</span>
             <span className="football-chip">{bootstrap.featuredPlayers?.length || 0} featured players</span>
+          </div>
+          <div className="football-hero-mini-board">
+            {(bootstrap.scoreboard || []).slice(0, 3).map((game) => (
+              <button className={`football-mini-match ${['live', 'in'].includes(game.state) ? 'is-live' : ''}`} key={game.id} type="button" onClick={() => openGame(game.id)}>
+                <span>{game.away.abbreviation} vs {game.home.abbreviation}</span>
+                <strong>{game.statusLabel}</strong>
+              </button>
+            ))}
           </div>
         </div>
 
