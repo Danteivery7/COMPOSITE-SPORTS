@@ -1359,15 +1359,19 @@ export function buildPlayerCard(bundle, teamsById = {}, context = {}) {
   const seasonStats = mapStats(bundle?.seasonStats);
   const careerStats = mapStats(bundle?.careerStats);
   const playerId = String(profile.id || bundle.playerId || "");
-  const teamId = extractIdFromRef(profile.team?.$ref) || context.playerDirectoryById?.[playerId]?.teamId || null;
-  const team = teamsById[teamId] || context.playerDirectoryById?.[playerId]?.team || null;
+  const seededPlayer =
+    context.playerDirectoryById?.[playerId] ||
+    context.featuredPlayersById?.[playerId] ||
+    null;
+  const teamId = extractIdFromRef(profile.team?.$ref) || seededPlayer?.teamId || null;
+  const team = teamsById[teamId] || seededPlayer?.team || null;
   const resolvedPosition = normalizeNhlPosition(
-    context.playerDirectoryById?.[playerId]?.resolvedPosition ||
+    seededPlayer?.resolvedPosition ||
     profile.position?.abbreviation ||
     profile.position?.name ||
     "W",
   );
-  const existing = context.playerDirectoryById?.[playerId] || null;
+  const existing = seededPlayer;
   const overall = existing?.overall ?? fallbackPlayerOverall(profile, seasonStats, careerStats, resolvedPosition);
   const games = Number(seasonStats.games?.value || 0);
   const seasonPpg = Number(seasonStats.points?.value || 0) / Math.max(1, games);

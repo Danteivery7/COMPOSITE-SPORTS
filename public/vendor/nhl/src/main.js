@@ -185,31 +185,6 @@ function recomputeDerivedState() {
     }
   }
 
-  if (state.playerDirectory.length && Object.keys(state.playerCards).length) {
-    Object.keys(state.playerCards).forEach((playerId) => {
-      const livePlayer = state.playerDirectoryById[playerId];
-      const existingCard = state.playerCards[playerId];
-      if (!livePlayer || !existingCard) return;
-      state.playerCards[playerId] = {
-        ...existingCard,
-        fullName: livePlayer.fullName || existingCard.fullName,
-        shortName: livePlayer.shortName || existingCard.shortName,
-        jersey: livePlayer.jersey || existingCard.jersey,
-        team: livePlayer.team || existingCard.team,
-        teamId: livePlayer.teamId || existingCard.teamId,
-        position: livePlayer.resolvedPosition || existingCard.position,
-        resolvedPosition: livePlayer.resolvedPosition || existingCard.resolvedPosition,
-        headshot: livePlayer.headshot || existingCard.headshot,
-        overall: livePlayer.overall,
-        overallPercentile: livePlayer.overallPercentile,
-        hotnessScore: livePlayer.hotnessScore,
-        tone: livePlayer.tone || existingCard.tone,
-        sampleTrust: livePlayer.reliability ?? existingCard.sampleTrust,
-        modelReasons: livePlayer.modelReasons || existingCard.modelReasons,
-      };
-    });
-  }
-
   if (state.standings.length && state.teams.length) {
     const nextRankings = buildTeamRankings(
       state.standings,
@@ -249,6 +224,35 @@ function recomputeDerivedState() {
           : player;
       })
       .slice(0, 30);
+  }
+
+  const featuredPlayersById = Object.fromEntries(
+    (state.featuredPlayers || []).map((player) => [player.playerId, player]),
+  );
+
+  if (Object.keys(state.playerCards).length) {
+    Object.keys(state.playerCards).forEach((playerId) => {
+      const livePlayer = state.playerDirectoryById[playerId] || featuredPlayersById[playerId];
+      const existingCard = state.playerCards[playerId];
+      if (!livePlayer || !existingCard) return;
+      state.playerCards[playerId] = {
+        ...existingCard,
+        fullName: livePlayer.fullName || existingCard.fullName,
+        shortName: livePlayer.shortName || existingCard.shortName,
+        jersey: livePlayer.jersey || existingCard.jersey,
+        team: livePlayer.team || existingCard.team,
+        teamId: livePlayer.teamId || existingCard.teamId,
+        position: livePlayer.resolvedPosition || existingCard.position,
+        resolvedPosition: livePlayer.resolvedPosition || existingCard.resolvedPosition,
+        headshot: livePlayer.headshot || existingCard.headshot,
+        overall: livePlayer.overall,
+        overallPercentile: livePlayer.overallPercentile,
+        hotnessScore: livePlayer.hotnessScore,
+        tone: livePlayer.tone || existingCard.tone,
+        sampleTrust: livePlayer.reliability ?? existingCard.sampleTrust,
+        modelReasons: livePlayer.modelReasons || existingCard.modelReasons,
+      };
+    });
   }
 
   if (state.scoreboard && state.teamRankings.length) {
@@ -467,6 +471,7 @@ async function ensurePlayerCard(playerId, force = false) {
   const bundle = await getPlayerBundle(playerId, state.seasonYear, force);
   state.playerCards[playerId] = buildPlayerCard(bundle, state.teamsById, {
     playerDirectoryById: state.playerDirectoryById,
+    featuredPlayersById: Object.fromEntries((state.featuredPlayers || []).map((player) => [player.playerId, player])),
     rankingsById: state.rankingsById,
   });
   recomputeDerivedState();
