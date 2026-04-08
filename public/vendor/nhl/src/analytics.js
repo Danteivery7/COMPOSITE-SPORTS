@@ -195,6 +195,13 @@ function playerNameMatches(player, pattern) {
   return pattern.test(normalizedPlayerName(player));
 }
 
+function eliteLockedOverallForPlayer(player) {
+  const normalized = normalizedPlayerName(player);
+  if (/\bmcdavid\b/.test(normalized)) return 99;
+  if (/\bmackinnon\b/.test(normalized)) return 98;
+  return null;
+}
+
 function applyElitePlayerTierRules(players = []) {
   const sorted = players
     .map((player) => ({
@@ -208,14 +215,14 @@ function applyElitePlayerTierRules(players = []) {
       return (right.overall || 0) - (left.overall || 0);
     });
 
-  const mcdavidIndex = sorted.findIndex((player) => playerNameMatches(player, /\bmcdavid\b/i));
-  const macKinnonIndex = sorted.findIndex((player) => playerNameMatches(player, /\bmackinnon\b/i));
+  const mcdavidIndex = sorted.findIndex((player) => eliteLockedOverallForPlayer(player) === 99);
+  const macKinnonIndex = sorted.findIndex((player) => eliteLockedOverallForPlayer(player) === 98);
   const lockedIds = new Set();
 
   if (mcdavidIndex >= 0) {
     sorted[mcdavidIndex] = {
       ...sorted[mcdavidIndex],
-      overall: 99,
+      overall: eliteLockedOverallForPlayer(sorted[mcdavidIndex]),
     };
     lockedIds.add(sorted[mcdavidIndex].playerId);
   }
@@ -223,7 +230,7 @@ function applyElitePlayerTierRules(players = []) {
   if (macKinnonIndex >= 0) {
     sorted[macKinnonIndex] = {
       ...sorted[macKinnonIndex],
-      overall: 98,
+      overall: eliteLockedOverallForPlayer(sorted[macKinnonIndex]),
     };
     lockedIds.add(sorted[macKinnonIndex].playerId);
   }
@@ -1381,7 +1388,14 @@ export function buildPlayerCard(bundle, teamsById = {}, context = {}) {
     "W",
   );
   const existing = seededPlayer;
-  const overall = existing?.overall ?? fallbackPlayerOverall(profile, seasonStats, careerStats, resolvedPosition);
+  const seededOverall = existing?.overall ?? fallbackPlayerOverall(profile, seasonStats, careerStats, resolvedPosition);
+  const overall = eliteLockedOverallForPlayer({
+    ...existing,
+    ...profile,
+    fullName: profile.fullName || existing?.fullName,
+    shortName: profile.shortName || existing?.shortName,
+    displayName: profile.displayName || existing?.displayName,
+  }) ?? seededOverall;
   const games = Number(seasonStats.games?.value || 0);
   const seasonPpg = Number(seasonStats.points?.value || 0) / Math.max(1, games);
   const careerGames = Number(careerStats.games?.value || 0);
