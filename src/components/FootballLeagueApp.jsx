@@ -769,7 +769,7 @@ export default function FootballLeagueApp({ leagueKey, initialEntry = null, them
             setPage={setPage}
             onBack={() => {
               if (hubOriginPlayer) {
-                window.location.href = '/';
+                window.location.assign('/');
                 return;
               }
               setPage('players');
@@ -832,9 +832,9 @@ export default function FootballLeagueApp({ leagueKey, initialEntry = null, them
           <Link href="/football" className="football-hub-link">
             Football Hub
           </Link>
-          <Link href="/" className="football-hub-link secondary">
+          <a href="/" className="football-hub-link secondary" target="_top">
             Back To Hub
-          </Link>
+          </a>
         </div>
       </aside>
 

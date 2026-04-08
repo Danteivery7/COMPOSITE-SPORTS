@@ -27,18 +27,23 @@ export default function NewsStoryPage({ story, onBack, onStoryClick }) {
     );
   }
 
-  if (loading && !data) {
-    return (
-      <div className="page-container">
-        <div className="skeleton skeleton-card" style={{ height: '480px' }} />
-      </div>
-    );
-  }
+  const resolvedStory = data || {
+    storyId,
+    headline: story?.headline || 'Loading story…',
+    dek: story?.description || '',
+    body: `<p>${story?.description || 'Loading story…'}</p>`,
+    source: story?.source || 'ESPN',
+    byline: story?.byline || story?.source || 'ESPN',
+    published: story?.published || null,
+    image: story?.image || '',
+    contentType: story?.contentType || 'Story',
+    related: [],
+  };
 
   return (
     <div className="page-container">
       <StoryDetailCard
-        story={data}
+        story={resolvedStory}
         onBack={onBack}
         backLabel="Back to news"
         onOpenRelated={(nextStory) => onStoryClick?.(nextStory)}

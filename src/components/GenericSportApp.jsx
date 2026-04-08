@@ -914,7 +914,7 @@ export default function GenericSportApp({ sportKey, initialEntry = null }) {
             setPage={setPage}
             onBack={() => {
               if (hubOriginPlayer) {
-                window.location.href = '/';
+                window.location.assign('/');
                 return;
               }
               setPage('players');
@@ -991,9 +991,9 @@ export default function GenericSportApp({ sportKey, initialEntry = null }) {
           ))}
         </nav>
         <div className="generic-sidebar-footer">
-          <Link href="/" className="generic-hub-link">
+          <a href="/" className="generic-hub-link" target="_top">
             Back To Hub
-          </Link>
+          </a>
         </div>
       </aside>
       <div className="generic-stage">

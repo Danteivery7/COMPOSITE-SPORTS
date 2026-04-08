@@ -48,9 +48,9 @@ export default function Navbar({ currentPage, onNavigate, theme, toggleTheme }) 
                 </ul>
 
                 <div className="navbar-controls">
-                    <Link href="/" className="nav-hub-link">
+                    <a href="/" className="nav-hub-link" target="_top">
                         Back To Hub
-                    </Link>
+                    </a>
                     <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
                         {theme === 'dark' ? 'Light' : 'Dark'}
                     </button>

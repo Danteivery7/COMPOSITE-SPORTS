@@ -993,7 +993,7 @@ export default function CBBApp({ initialEntry = null }) {
             playerDetail={playerDetail}
             onBack={() => {
               if (hubOriginPlayer) {
-                window.location.href = '/';
+                window.location.assign('/');
                 return;
               }
               setPage('players');
@@ -1064,9 +1064,9 @@ export default function CBBApp({ initialEntry = null }) {
           ))}
         </nav>
         <div className="generic-sidebar-footer">
-          <Link href="/" className="generic-hub-link">
+          <a href="/" className="generic-hub-link" target="_top">
             Back To Hub
-          </Link>
+          </a>
         </div>
       </aside>
       <div className="generic-stage">

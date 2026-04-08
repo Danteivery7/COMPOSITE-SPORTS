@@ -103,9 +103,9 @@ export default function FootballLandingRoute() {
           <div className="route-shell-actions">
             <RouteSiteMenu theme={theme} onToggleTheme={toggleTheme} />
             <RouteThemeToggle theme={theme} onToggle={toggleTheme} compact />
-            <Link href="/" className="football-hub-link">
+            <a href="/" className="football-hub-link" target="_top">
               Back To Hub
-            </Link>
+            </a>
           </div>
         </header>
 

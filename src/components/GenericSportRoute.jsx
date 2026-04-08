@@ -31,9 +31,9 @@ export default function GenericSportRoute({ sportKey, initialEntry = null }) {
           <div className="route-shell-actions">
             <RouteSiteMenu theme={theme} onToggleTheme={toggleTheme} />
             <RouteThemeToggle theme={theme} onToggle={toggleTheme} compact />
-            <Link href="/" className="hub-back-link">
+            <a href="/" className="hub-back-link" target="_top">
               Back To Hub
-            </Link>
+            </a>
           </div>
         </div>
         <GenericSportApp sportKey={sportKey} initialEntry={initialEntry} />

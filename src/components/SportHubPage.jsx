@@ -149,9 +149,33 @@ export default function SportHubPage({ initialHero = null }) {
     const storyId = typeof storyRef === 'string' ? storyRef : storyRef?.storyId;
     if (!storyId) return;
     const apiHref = typeof storyRef === 'object' && storyRef?.apiHref ? `?apiHref=${encodeURIComponent(storyRef.apiHref)}` : '';
-    const response = await fetch(`/api/hub/trending-stories/${storyId}${apiHref}`);
-    const json = await response.json();
-    setActiveStory(json);
+    const fallbackStory = typeof storyRef === 'object'
+      ? {
+          storyId,
+          headline: storyRef.headline || 'Loading story…',
+          dek: storyRef.summary || storyRef.description || '',
+          body: `<p>${storyRef.summary || storyRef.description || 'Loading story…'}</p>`,
+          source: storyRef.source || 'ESPN',
+          published: storyRef.published || null,
+          image: storyRef.image || '',
+          contentType: storyRef.contentType || 'Story',
+          related: [],
+        }
+      : {
+          storyId,
+          headline: 'Loading story…',
+          body: '<p>Loading story…</p>',
+          source: 'ESPN',
+          related: [],
+        };
+    setActiveStory(fallbackStory);
+    try {
+      const response = await fetch(`/api/hub/trending-stories/${storyId}${apiHref}`);
+      const json = await response.json();
+      setActiveStory(json);
+    } catch (_error) {
+      setActiveStory(fallbackStory);
+    }
   }
 
   const worldPlayers = hero?.worldBoard?.players || [];

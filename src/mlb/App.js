@@ -130,7 +130,7 @@ export default function Home({ theme = 'dark', toggleTheme, initialEntry = null 
     // Go back to where user came from
     const prev = prevPageRef.current;
     if (prev === 'hub') {
-      window.location.href = '/';
+      window.location.assign('/');
     } else if (prev === 'team-detail') {
       setCurrentPage('team-detail');
     } else {
