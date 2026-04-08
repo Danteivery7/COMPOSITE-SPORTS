@@ -301,7 +301,7 @@ export default function SportHubPage({ initialHero = null }) {
             <div className="hub-module-head">
               <div>
                 <p className="eyebrow">Trending Stories</p>
-                <h2>Last 24 Hours</h2>
+                <h2>Top 5 Live Stories</h2>
               </div>
               <span>{formatEtLabel(hero?.lastUpdated, 'Updating live…')}</span>
             </div>
@@ -432,8 +432,8 @@ export default function SportHubPage({ initialHero = null }) {
         <div className="hub-module-head">
           <div>
             <p className="eyebrow">COMPOSITE Sites</p>
-            <h2>Choose A COMPOSITE Site To Enter</h2>
-            <p className="hub-module-helper">Swipe or click through the live sport sites below.</p>
+            <h2>Open A Sport Site</h2>
+            <p className="hub-module-helper">Move through every live sport site below.</p>
           </div>
           <div className="hub-rail-controls">
             <button type="button" onClick={() => shiftSportRail(-1)} aria-label="Previous sports">
@@ -530,9 +530,9 @@ export default function SportHubPage({ initialHero = null }) {
         <div className="hub-module-head">
           <div>
             <p className="eyebrow">Trending Stories</p>
-            <h2>Main Storylines Across Sports</h2>
+            <h2>More From The Feed</h2>
           </div>
-          <span>Only stories from the last 24 hours</span>
+          <span>30 live stories across every sport</span>
         </div>
         <div className="hub-story-grid">
           {displayedStories.length
