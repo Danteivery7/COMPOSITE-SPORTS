@@ -154,6 +154,34 @@ function scalePercentileToOverall(percentileValue, options = {}) {
   return clamp(round(overall, 1), 60, 98);
 }
 
+function scalePlayerPercentileToOverall(percentileValue, options = {}) {
+  const pct = clamp(percentileValue, 0, 1);
+  const bands = [
+    [0.0, 0.18, 60, 68],
+    [0.18, 0.45, 68, 74],
+    [0.45, 0.72, 74, 80],
+    [0.72, 0.88, 80, 86],
+    [0.88, 0.95, 86, 91],
+    [0.95, 0.98, 91, 94],
+    [0.98, 0.992, 94, 95.5],
+    [0.992, 0.997, 95.5, 97],
+    [0.997, 1.0, 97, 98],
+  ];
+
+  let overall = 60;
+  bands.some(([start, end, low, high]) => {
+    const withinBand = pct >= start && (pct <= end || end === 1);
+    if (!withinBand) return false;
+    const span = end - start || 1;
+    const progress = clamp((pct - start) / span, 0, 1);
+    overall = low + ((high - low) * progress);
+    return true;
+  });
+
+  if (options.allow99) return 99;
+  return clamp(round(overall, 1), 60, 98);
+}
+
 function sliceAverage(players = []) {
   const values = players
     .map((player) => player?.overallPercentile)
@@ -637,11 +665,12 @@ function buildPlayerProfiles(advancedSnapshot = null, rosters = {}, teamsById = 
     );
     const coreMetricThresholds = Object.values(stableMetrics).filter((value) => Number.isFinite(value) && value >= 97).length;
     const allow99 =
-      finalPercentile >= 99.7 &&
-      recentAdj > 0 &&
+      finalPercentile >= 99.9 &&
+      recentAdj > 0.35 &&
       durabilityAdj >= 0 &&
-      coreMetricThresholds >= 3;
-    const overall = scalePercentileToOverall(finalPercentile / 100, { allow99 });
+      reliability >= 0.82 &&
+      coreMetricThresholds >= 4;
+    const overall = scalePlayerPercentileToOverall(finalPercentile / 100, { allow99 });
 
     return {
       ...profile,
@@ -1253,18 +1282,20 @@ function fallbackPlayerOverall(profile, seasonStats, careerStats, resolvedPositi
   const shootingPct = Number(seasonStats.shootingPct?.value || 0);
   const savePct = Number(seasonStats.savePct?.value || 0);
   const gaa = Number(seasonStats.avgGoalsAgainst?.value || 0);
+  const wins = Number(seasonStats.wins?.value || 0);
   const careerGp = Math.max(1, Number(careerStats.games?.value || 0));
   const careerPointsPerGame = Number(careerStats.points?.value || 0) / careerGp;
 
   if (resolvedPosition === "G") {
-    const raw = 62 + ((savePct - 0.87) * 160) + ((3.4 - gaa) * 7.5);
-    return clamp(round(raw, 1), 60, 98);
+    const winRate = wins / gp;
+    const raw = 70 + ((savePct - 0.89) * 300) + ((2.9 - gaa) * 8) + (winRate * 8);
+    return clamp(round(raw, 1), 60, 95);
   }
 
-  let raw = 64 + (seasonPointsPerGame * 16) + (seasonGoalsPerGame * 12) + (seasonAssistsPerGame * 8) + (shootingPct * 0.18);
-  raw += clamp((seasonPointsPerGame - careerPointsPerGame) * 6, -2.5, 2.5);
-  if (resolvedPosition === "C") raw += clamp(((Number(seasonStats.faceoffPercent?.value || 50) - 50) * 0.08), -2, 2);
-  return clamp(round(raw, 1), 60, 98);
+  let raw = 68 + (seasonPointsPerGame * 12) + (seasonGoalsPerGame * 8) + (seasonAssistsPerGame * 5) + (shootingPct * 0.1);
+  raw += clamp((seasonPointsPerGame - careerPointsPerGame) * 5, -2, 2.5);
+  if (resolvedPosition === "C") raw += clamp(((Number(seasonStats.faceoffPercent?.value || 50) - 50) * 0.06), -1.2, 1.2);
+  return clamp(round(raw, 1), 60, 96);
 }
 
 export function buildPlayerCard(bundle, teamsById = {}, context = {}) {
