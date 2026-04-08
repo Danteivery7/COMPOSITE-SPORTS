@@ -70,7 +70,7 @@ function refreshInBackground(teamId) {
     refreshing.add(teamId);
     computeTeamDetail(teamId)
         .then(result => {
-            cacheSet(`team_detail_v2_${teamId}`, result, CACHE_TTL.TEAM_DETAIL);
+            cacheSet(`team_detail_${teamId}`, result, CACHE_TTL.TEAM_DETAIL);
         })
         .catch(err => console.error(`Background team detail refresh failed for ${teamId}:`, err.message))
         .finally(() => { refreshing.delete(teamId); });
@@ -84,7 +84,7 @@ export async function GET(request, { params }) {
         return Response.json({ error: 'Team not found' }, { status: 404 });
     }
 
-    const cacheKey = `team_detail_v2_${teamId}`;
+    const cacheKey = `team_detail_${teamId}`;
 
     // Return cached data immediately if available (stale-while-revalidate)
     const cached = cacheGet(cacheKey);

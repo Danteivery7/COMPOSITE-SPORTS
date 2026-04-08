@@ -9,7 +9,7 @@ import { computeRankings } from '@/src/mlb/lib/rankings';
 
 export async function GET(request, { params }) {
     const { playerId } = await params;
-    const cacheKey = `player_detail_v20_${playerId}`;
+    const cacheKey = `player_detail_v19_${playerId}`;
     const cached = cacheGet(cacheKey);
     // Robust JSON fetcher to prevent 404s from killing the page
     const fetchJSON = async (url) => {

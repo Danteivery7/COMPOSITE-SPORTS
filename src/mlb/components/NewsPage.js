@@ -4,7 +4,6 @@ import { useMLBRouteData } from '@/src/mlb/lib/useMLBRouteData';
 
 export default function NewsPage({ onStoryClick }) {
     const { data = { articles: [], lastUpdated: null }, loading, error, refresh } = useMLBRouteData('/api/mlb/news');
-    const articles = (data?.articles || []).slice(0, 8);
 
     const formatTimestamp = (isoString) => {
         if (!isoString) return 'Never';
@@ -34,7 +33,7 @@ export default function NewsPage({ onStoryClick }) {
                     <p className="page-subtitle">Loading MLB headlines...</p>
                 </div>
                 <div className="news-grid">
-                    {[...Array(8)].map((_, i) => (
+                    {[...Array(6)].map((_, i) => (
                         <div key={i} className="skeleton skeleton-card" style={{ height: '240px' }} />
                     ))}
                 </div>
@@ -63,7 +62,7 @@ export default function NewsPage({ onStoryClick }) {
                 </div>
             )}
 
-            {!articles.length ? (
+            {!data?.articles?.length ? (
                 <div className="empty-state">
                     <div className="empty-icon"></div>
                     <h3>No News Available</h3>
@@ -71,7 +70,7 @@ export default function NewsPage({ onStoryClick }) {
                 </div>
             ) : (
                 <div className="news-grid">
-                    {articles.map((article) => (
+                    {data.articles.map((article) => (
                         <button
                             key={article.id}
                             type="button"

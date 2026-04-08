@@ -9,7 +9,7 @@ import useCompositeTheme from '@/src/hooks/useCompositeTheme';
 import { getSportConfig } from '@/src/data/sports';
 import MLBApp from '@/src/mlb/App';
 
-export default function MLBRoute({ initialEntry = null, initialRoutes = null }) {
+export default function MLBRoute({ initialEntry = null }) {
   const config = getSportConfig('mlb');
   const { theme, toggleTheme } = useCompositeTheme('mlb');
 
@@ -38,7 +38,7 @@ export default function MLBRoute({ initialEntry = null, initialRoutes = null }) 
             </Link>
           </div>
         </div>
-        <MLBApp theme={theme} toggleTheme={toggleTheme} initialEntry={initialEntry} initialRoutes={initialRoutes} />
+        <MLBApp theme={theme} toggleTheme={toggleTheme} initialEntry={initialEntry} />
       </section>
     </SportIntroGate>
   );

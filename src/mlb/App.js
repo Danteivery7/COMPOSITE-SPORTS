@@ -14,7 +14,7 @@ import PlayerDetailPage from '@/src/mlb/components/PlayerDetailPage';
 import GameDetailPage from '@/src/mlb/components/GameDetailPage';
 import NewsPage from '@/src/mlb/components/NewsPage';
 import NewsStoryPage from '@/src/mlb/components/NewsStoryPage';
-import { fetchMLBRouteJson, prefetchMLBRoutes, primeMLBRouteCache } from '@/src/mlb/lib/clientPrefetch';
+import { fetchMLBRouteJson, prefetchMLBRoutes } from '@/src/mlb/lib/clientPrefetch';
 
 const MLB_BOOTSTRAP_ROUTES = [
   '/api/mlb/overview',
@@ -30,7 +30,7 @@ const MLB_PRIMARY_REFRESH_ROUTES = [
   '/api/mlb/rankings',
 ];
 
-export default function Home({ theme = 'dark', toggleTheme, initialEntry = null, initialRoutes = null }) {
+export default function Home({ theme = 'dark', toggleTheme, initialEntry = null }) {
   const [currentPage, setCurrentPage] = useState('overview');
   const [favorites, setFavorites] = useState([]);
   const [selectedTeamId, setSelectedTeamId] = useState(null);
@@ -39,24 +39,14 @@ export default function Home({ theme = 'dark', toggleTheme, initialEntry = null,
   const [selectedStory, setSelectedStory] = useState(null);
   const prevPageRef = useRef('players'); // Track where user came from
   const initialEntryHandledRef = useRef(false);
-  const initialRoutesPrimedRef = useRef(false);
-
-  if (!initialRoutesPrimedRef.current && initialRoutes && typeof initialRoutes === 'object') {
-    primeMLBRouteCache(initialRoutes);
-    initialRoutesPrimedRef.current = true;
-  }
 
   useEffect(() => {
     const savedFavs = localStorage.getItem('composite-hub-mlb-favorites');
     if (savedFavs) setFavorites(JSON.parse(savedFavs));
 
-    const hasInitialRoutes = Boolean(initialRoutes && Object.keys(initialRoutes).length);
-
     // Warm the server cache first, then keep the main MLB tabs hot in the browser.
-    if (!hasInitialRoutes) {
-      fetchMLBRouteJson('/api/mlb/warm', { force: true, allowStaleOnError: true }).catch(() => { });
-      prefetchMLBRoutes(MLB_BOOTSTRAP_ROUTES, { allowStaleOnError: true }).catch(() => { });
-    }
+    fetchMLBRouteJson('/api/mlb/warm', { force: true, allowStaleOnError: true }).catch(() => { });
+    prefetchMLBRoutes(MLB_BOOTSTRAP_ROUTES, { allowStaleOnError: true }).catch(() => { });
 
     const primaryRefresh = setInterval(() => {
       prefetchMLBRoutes(MLB_PRIMARY_REFRESH_ROUTES, { force: true, allowStaleOnError: true }).catch(() => { });
@@ -75,7 +65,7 @@ export default function Home({ theme = 'dark', toggleTheme, initialEntry = null,
       clearInterval(playersRefresh);
       clearInterval(newsRefresh);
     };
-  }, [initialRoutes]);
+  }, []);
 
   const toggleFavorite = useCallback((teamId) => {
     setFavorites(prev => {

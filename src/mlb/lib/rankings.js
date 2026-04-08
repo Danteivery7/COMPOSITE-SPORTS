@@ -17,15 +17,7 @@ import { fetchStandings, fetchAllTeamStats, fetchScoreboard, fetchTeamSchedule }
 import { ALL_TEAMS } from './teams';
 import { cacheGet, cacheSet, CACHE_TTL } from './cache';
 
-const RANKINGS_CACHE_KEY = 'computed_rankings_v9';
-
-function isNonPlayedStatus(game) {
-    const statusText = `${game?.state || ''} ${game?.statusDetail || ''} ${game?.shortDetail || ''}`.toLowerCase();
-    return statusText.includes('postponed') ||
-        statusText.includes('ppd') ||
-        statusText.includes('canceled') ||
-        statusText.includes('cancelled');
-}
+const RANKINGS_CACHE_KEY = 'computed_rankings_v10';
 
 function parseStreakNumber(streak) {
     if (!streak || streak === '—') return 0;
@@ -59,9 +51,8 @@ function resolveScheduleStreak(games = [], fallback = '—') {
         count += 1;
     }
 
-    const streak = `${firstResult}${count}`;
     return {
-        streak,
+        streak: `${firstResult}${count}`,
         streakNum: firstResult === 'W' ? count : -count,
     };
 }
@@ -91,7 +82,6 @@ export async function computeRankings() {
     // Completely silence live scoring accumulations during Spring Training
     if (!scoreboardData.isPreseason) {
         for (const g of liveGames) {
-            if (isNonPlayedStatus(g)) continue;
             const home = g.home;
             const away = g.away;
             if (!home || !away) continue;
@@ -335,14 +325,14 @@ export async function computeRankings() {
     const schedulePromises = ranked.map(async (t) => {
         try {
             const sched = await fetchTeamSchedule(t.espnId);
-            const allCompleted = sched.games || [];
-            t.last5 = allCompleted.slice(-5).reverse();
-            const resolvedStreak = resolveScheduleStreak(allCompleted, t.streak);
+            const completed = sched.games || [];
+            t.last5 = completed.slice(-5).reverse();
+            const resolvedStreak = resolveScheduleStreak(completed, t.streak);
             t.streak = resolvedStreak.streak;
             t.streakNum = resolvedStreak.streakNum;
             t.hotScore = Math.round((((t.streakNum || 0) * 25) + ((t.winPct || 0) * 40) + (((t.runDiff || 0) / Math.max(1, t.gamesPlayed || 0)) * 10)) * 100) / 100;
-        } catch (e) {
-            console.error(`Failed to fetch last5 for ${t.id}:`, e.message);
+        } catch (_error) {
+            t.last5 = [];
         }
     });
     await Promise.all(schedulePromises);

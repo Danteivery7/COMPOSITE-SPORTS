@@ -82,22 +82,6 @@ export default function GameDetailPage({ gameId, onBack }) {
                                 </div>
                             </div>
                         )}
-                        {game.finalEventSummary && (
-                            <div style={{
-                                marginTop: game.postGameOptions.pog ? '-2px' : 0,
-                                marginBottom: '12px',
-                                padding: '10px 12px',
-                                borderRadius: '10px',
-                                background: 'var(--bg-primary)',
-                                border: '1px solid var(--border-color)',
-                                fontSize: '13px',
-                                lineHeight: 1.5,
-                                color: 'var(--text-secondary)'
-                            }}>
-                                <strong style={{ color: 'var(--text-primary)', marginRight: '6px' }}>What happened:</strong>
-                                <span>{game.finalEventSummary}</span>
-                            </div>
-                        )}
                         <div className="postgame-decisions">
                             {game.postGameOptions.winningPitcher && (
                                 <div className="decision-pill" style={{ fontSize: '13px' }}>

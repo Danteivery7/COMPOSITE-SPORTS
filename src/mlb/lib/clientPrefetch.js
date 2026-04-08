@@ -24,14 +24,6 @@ export function getMLBPrefetchedData(url) {
     return clientRouteCache.get(url)?.data ?? null;
 }
 
-export function primeMLBRouteCache(seed = {}) {
-    if (!seed || typeof seed !== 'object') return;
-    for (const [url, data] of Object.entries(seed)) {
-        if (!url) continue;
-        storeData(url, data);
-    }
-}
-
 export function subscribeMLBRoute(url, listener) {
     if (!clientRouteListeners.has(url)) {
         clientRouteListeners.set(url, new Set());
