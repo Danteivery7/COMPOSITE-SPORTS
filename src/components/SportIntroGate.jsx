@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-const EXIT_DURATION_MS = 1120;
+const EXIT_DURATION_MS = 920;
+const REVEAL_DURATION_MS = 560;
 
 function IntroScene({ motif }) {
   if (motif === 'court') {
@@ -98,7 +99,9 @@ export default function SportIntroGate({ config, children }) {
   const [ready, setReady] = useState(false);
   const [open, setOpen] = useState(false);
   const [exiting, setExiting] = useState(false);
+  const [revealing, setRevealing] = useState(false);
   const exitTimerRef = useRef(null);
+  const revealTimerRef = useRef(null);
 
   useEffect(() => {
     setExiting(false);
@@ -119,12 +122,19 @@ export default function SportIntroGate({ config, children }) {
       if (exitTimerRef.current) {
         window.clearTimeout(exitTimerRef.current);
       }
+      if (revealTimerRef.current) {
+        window.clearTimeout(revealTimerRef.current);
+      }
     };
   }, []);
 
   function completeIntro() {
     setOpen(false);
     setExiting(false);
+    setRevealing(true);
+    revealTimerRef.current = window.setTimeout(() => {
+      setRevealing(false);
+    }, REVEAL_DURATION_MS);
   }
 
   function enterIntro() {
@@ -194,7 +204,7 @@ export default function SportIntroGate({ config, children }) {
           </div>
         </section>
       ) : null}
-      <div className={`sport-stage ${open ? 'is-hidden' : ''}`}>{children}</div>
+      <div className={`sport-stage ${open ? 'is-hidden' : ''} ${revealing ? 'is-revealing' : ''}`}>{children}</div>
     </div>
   );
 }

@@ -534,6 +534,7 @@ body[data-composite-route='hub'] {
   overflow: hidden;
   isolation: isolate;
   background: var(--sport-surface);
+  contain: paint;
 }
 
 .sport-intro::before,
@@ -569,6 +570,9 @@ body[data-composite-route='hub'] {
 .sport-intro-detail {
   position: absolute;
   pointer-events: none;
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .sport-intro-noise,
@@ -618,7 +622,7 @@ body[data-composite-route='hub'] {
   height: 44rem;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 74%);
   clip-path: polygon(50% 0, 78% 0, 100% 100%, 0 100%, 22% 0);
-  filter: blur(10px);
+  filter: blur(6px);
   opacity: 0.2;
   transform-origin: top center;
   animation: introSpotlightSweep 7s ease-in-out infinite;
@@ -657,7 +661,7 @@ body[data-composite-route='hub'] {
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow:
     0 0 0 1rem rgba(255, 255, 255, 0.03),
-    0 0 6rem color-mix(in srgb, var(--sport-accent) 18%, transparent);
+    0 0 4.2rem color-mix(in srgb, var(--sport-accent) 16%, transparent);
   opacity: 0.74;
 }
 
@@ -1086,13 +1090,21 @@ body[data-composite-route='hub'] {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 34px;
   background: rgba(7, 11, 24, 0.76);
-  backdrop-filter: blur(24px);
+  backdrop-filter: blur(16px);
   box-shadow: var(--shadow);
   text-align: center;
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .sport-intro-panel {
   margin-top: clamp(14rem, 30vh, 20rem);
+  animation: introPanelReveal 760ms cubic-bezier(.2, .82, .22, 1) both;
+}
+
+.sport-intro-scene {
+  animation: introSceneReveal 900ms cubic-bezier(.18, .84, .24, 1) both;
 }
 
 .sport-intro-panel h1,
@@ -1147,7 +1159,10 @@ body[data-composite-route='hub'] {
   font-size: 1.28rem;
   letter-spacing: 0.08em;
   box-shadow: 0 18px 34px color-mix(in srgb, var(--sport-accent) 28%, transparent);
-  transition: transform 180ms ease, box-shadow 180ms ease;
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  transition: transform 150ms ease, box-shadow 150ms ease;
 }
 
 .sport-intro-button:hover {
@@ -1238,6 +1253,30 @@ body[data-composite-route='hub'] {
   }
 }
 
+@keyframes introSceneReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes introPanelReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(26px) scale(0.97);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @keyframes introPanelExit {
   0% {
     opacity: 1;
@@ -1247,6 +1286,18 @@ body[data-composite-route='hub'] {
   100% {
     opacity: 0;
     transform: translateY(40px) scale(0.94);
+  }
+}
+
+@keyframes sportStageReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.992);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -1326,10 +1377,17 @@ body[data-composite-route='hub'] {
   display: none;
 }
 
+.sport-stage.is-revealing {
+  animation: sportStageReveal 560ms cubic-bezier(.16, .82, .22, 1) both;
+}
+
 .vendor-shell,
 .generic-route-shell,
 .mlb-route-shell {
   min-height: 100vh;
+  will-change: opacity, transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .route-shell-actions {
@@ -1402,7 +1460,7 @@ body[data-composite-route='hub'] {
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(10, 16, 28, 0.82);
   color: #eef4ff;
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(14px);
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.24);
 }
 
@@ -1652,6 +1710,9 @@ body[data-composite-route='hub'] {
   align-items: center;
   gap: 18px;
   padding: 18px 24px;
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .vendor-topbar h1,
@@ -1665,6 +1726,10 @@ body[data-composite-route='hub'] {
   height: calc(100vh - 94px);
   border: 0;
   background: #05070c;
+  display: block;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  contain: paint;
 }
 
 .generic-sport-shell {
@@ -1680,8 +1745,12 @@ body[data-composite-route='hub'] {
 .generic-loading {
   border: 1px solid var(--border);
   background: rgba(8, 14, 29, 0.86);
-  backdrop-filter: blur(20px);
+  backdrop-filter: blur(14px);
   box-shadow: var(--shadow);
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  contain: paint;
 }
 
 .generic-sidebar {
@@ -1857,7 +1926,10 @@ body[data-composite-route='hub'] {
 .generic-team-card,
 .generic-feature-card,
 .generic-card button {
-  transition: transform 180ms ease, border-color 180ms ease;
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
 }
 
 .generic-game-card:hover,
@@ -3746,11 +3818,16 @@ body[data-composite-route='football'] {
   display: none;
 }
 
+.football-gate-stage.is-revealing {
+  animation: sportStageReveal 560ms cubic-bezier(.16, .82, .22, 1) both;
+}
+
 .football-intro {
   position: relative;
   min-height: 100vh;
   overflow: hidden;
   isolation: isolate;
+  contain: paint;
 }
 
 .football-intro::before,
@@ -3777,6 +3854,9 @@ body[data-composite-route='football'] {
 .football-intro-pitch {
   position: absolute;
   pointer-events: none;
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .football-intro-floodlight {
@@ -3785,7 +3865,7 @@ body[data-composite-route='football'] {
   height: 54rem;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(141, 177, 255, 0.06) 28%, transparent 78%);
   clip-path: polygon(38% 0, 62% 0, 100% 100%, 0 100%);
-  filter: blur(10px);
+  filter: blur(6px);
   opacity: 0.3;
   transform-origin: top center;
   animation: footballFloodlightSweep 7.2s ease-in-out infinite;
@@ -3895,9 +3975,13 @@ body[data-composite-route='football'] {
   border: 1px solid rgba(255, 255, 255, 0.08);
   background:
     linear-gradient(180deg, rgba(10, 17, 32, 0.84), rgba(8, 13, 24, 0.78));
-  backdrop-filter: blur(24px);
+  backdrop-filter: blur(16px);
   box-shadow: var(--shadow);
   text-align: center;
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  animation: introPanelReveal 760ms cubic-bezier(.2, .82, .22, 1) both;
 }
 
 .football-intro-panel h1 {
@@ -3954,7 +4038,10 @@ body[data-composite-route='football'] {
   border: 0;
   border-radius: 999px;
   cursor: pointer;
-  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
 }
 
 .football-intro-button,
@@ -4044,6 +4131,10 @@ body[data-composite-route='football'] {
 .football-sidebar {
   position: relative;
   z-index: 1;
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  contain: paint;
 }
 
 .football-landing-hero,

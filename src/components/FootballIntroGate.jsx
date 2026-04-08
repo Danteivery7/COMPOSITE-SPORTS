@@ -2,16 +2,20 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-const EXIT_DURATION_MS = 1180;
+const EXIT_DURATION_MS = 980;
+const REVEAL_DURATION_MS = 560;
 
 export default function FootballIntroGate({ title, copy, enterLabel, accent = '#8db1ff', accentAlt = '#edf3ff', children }) {
   const [open, setOpen] = useState(true);
   const [exiting, setExiting] = useState(false);
+  const [revealing, setRevealing] = useState(false);
   const timerRef = useRef(null);
+  const revealTimerRef = useRef(null);
 
   useEffect(() => {
     return () => {
       if (timerRef.current) window.clearTimeout(timerRef.current);
+      if (revealTimerRef.current) window.clearTimeout(revealTimerRef.current);
     };
   }, []);
 
@@ -25,6 +29,10 @@ export default function FootballIntroGate({ title, copy, enterLabel, accent = '#
     timerRef.current = window.setTimeout(() => {
       setOpen(false);
       setExiting(false);
+      setRevealing(true);
+      revealTimerRef.current = window.setTimeout(() => {
+        setRevealing(false);
+      }, REVEAL_DURATION_MS);
     }, EXIT_DURATION_MS);
   }
 
@@ -69,7 +77,7 @@ export default function FootballIntroGate({ title, copy, enterLabel, accent = '#
           </div>
         </section>
       ) : null}
-      <div className={`football-gate-stage ${open ? 'is-hidden' : ''}`}>{children}</div>
+      <div className={`football-gate-stage ${open ? 'is-hidden' : ''} ${revealing ? 'is-revealing' : ''}`}>{children}</div>
     </div>
   );
 }
