@@ -6380,6 +6380,12 @@ body[data-composite-route='football'] {
   flex-wrap: wrap;
 }
 
+.nfl-card-topline {
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .nfl-header-actions {
   justify-content: flex-end;
 }
@@ -6702,7 +6708,8 @@ body[data-composite-route='football'] {
 .nfl-top-player,
 .nfl-fantasy-headliner,
 .nfl-team-card,
-.nfl-predictor-card {
+.nfl-predictor-card,
+.nfl-score-card {
   display: grid;
   gap: 14px;
   width: 100%;
@@ -6710,6 +6717,11 @@ body[data-composite-route='football'] {
   color: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.nfl-score-card {
+  min-height: 214px;
+  align-content: start;
 }
 
 .nfl-team-card-head,
@@ -6731,6 +6743,37 @@ body[data-composite-route='football'] {
   justify-content: space-between;
 }
 
+.nfl-score-row {
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  padding: 10px 0;
+}
+
+.nfl-score-row + .nfl-score-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.nfl-route-shell[data-theme='light'] .nfl-score-row + .nfl-score-row {
+  border-top-color: rgba(31, 71, 43, 0.08);
+}
+
+.nfl-team-row-copy {
+  flex: 1 1 auto;
+}
+
+.nfl-team-row-copy > div {
+  min-width: 0;
+}
+
+.nfl-team-row-copy strong,
+.nfl-team-row-copy span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .nfl-match-score,
 .nfl-rating-block {
   display: grid;
@@ -6743,6 +6786,14 @@ body[data-composite-route='football'] {
 .nfl-score-number,
 .nfl-predictor-score {
   font-size: clamp(1.6rem, 2vw, 2.4rem);
+}
+
+.nfl-score-number {
+  flex: 0 0 3.4rem;
+  min-width: 3.4rem;
+  text-align: right;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .nfl-player-headshot,

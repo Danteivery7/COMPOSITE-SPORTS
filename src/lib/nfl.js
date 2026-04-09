@@ -292,6 +292,11 @@ function buildFantasyLookupKeys(name = '', teamAbbr = '') {
   return Array.from(keys);
 }
 
+function top100RankToPercentile(rank) {
+  if (!Number.isFinite(rank) || rank <= 0 || rank > 100) return null;
+  return 60 + ((100 - rank) / 99) * 39;
+}
+
 function fantasyRankToPercentile(rank, total = 200) {
   if (!Number.isFinite(rank) || rank <= 0 || total <= 1) return 50;
   return Math.max(1, Math.min(99, ((total - rank) / (total - 1)) * 100));
@@ -919,6 +924,54 @@ function parseEspnStatPageLeaders(payload = {}) {
   });
 }
 
+function extractOfficialTop100Players(html = '') {
+  const players = [];
+  const pattern =
+    /<div class="nfl-o-ranked-item nfl-is-ranked-player"[\s\S]*?<div class="nfl-o-ranked-item__label--second">\s*(\d+)\s*<\/div>[\s\S]*?<div class="nfl-o-ranked-item__title">\s*<a [^>]*>([^<]+)<\/a>[\s\S]*?<div class="nfl-o-ranked-item__info">\s*<span>([^<]+)<\/span>[\s\S]*?<span>([^<]+)<\/span>/g;
+  let match;
+
+  while ((match = pattern.exec(String(html || ''))) !== null) {
+    const rank = parseNumeric(match[1]);
+    const displayName = decodeHtmlEntities(match[2]).trim();
+    const teamLabel = decodeHtmlEntities(match[3]).trim();
+    const position = decodeHtmlEntities(match[4]).trim();
+    if (!Number.isFinite(rank) || !displayName) continue;
+    players.push({
+      rank,
+      displayName,
+      teamLabel,
+      teamKey: normalizeKey(teamLabel),
+      position,
+      positionGroup: resolvePositionGroup(position),
+      source: 'NFL Top 100',
+    });
+  }
+
+  return players;
+}
+
+async function fetchOfficialTop100Players(seasonYear) {
+  const key = cacheKey('top100', seasonYear);
+  const cached = readCache(key);
+  if (cached) return cached;
+
+  const ranges = ['100-91', '90-81', '80-71', '70-61', '60-51', '50-41', '40-31', '30-21', '20-11', '10-1'];
+  const payloads = await mapLimit(
+    ranges,
+    async (range) => {
+      const html = await fetchText(`https://www.nfl.com/news/top-100-players-of-${seasonYear}-nos-${range}`, 12 * 60 * 60 * 1000);
+      return extractOfficialTop100Players(html);
+    },
+    3,
+  );
+
+  return writeCache(
+    key,
+    uniqBy(payloads.flat().filter((entry) => entry?.rank && entry?.displayName), (entry) => `${normalizeFantasyLookupName(entry.displayName)}:${entry.positionGroup}:${entry.teamKey}`),
+    12 * 60 * 60 * 1000,
+  );
+}
+
 async function fetchHtmlLeaders(seasonYear) {
   const pages = [
     `https://www.espn.com/nfl/stats/player/_/season/${seasonYear}/seasontype/2/table/passing/sort/passingYards/dir/desc`,
@@ -1052,6 +1105,29 @@ function buildLeaderMetricMap(leaders) {
     byAthlete[leader.athleteId][leader.metricKey] = leader;
   });
   return byAthlete;
+}
+
+function findTop100EntryForPlayer(player, top100Entries = []) {
+  const normalizedName = normalizeFantasyLookupName(player.displayName);
+  if (!normalizedName) return null;
+  const nameMatches = top100Entries.filter((entry) => normalizeFantasyLookupName(entry.displayName) === normalizedName);
+  if (!nameMatches.length) return null;
+
+  const positionMatches = nameMatches.filter((entry) => entry.positionGroup === player.positionGroup);
+  const pool = positionMatches.length ? positionMatches : nameMatches;
+  const teamKeys = new Set(
+    [
+      player.team?.displayName,
+      player.team?.shortDisplayName,
+      player.team?.location,
+      player.team?.nickname,
+      player.team?.abbreviation,
+    ]
+      .filter(Boolean)
+      .map((value) => normalizeKey(value)),
+  );
+  const teamMatches = pool.filter((entry) => entry.teamKey && teamKeys.has(entry.teamKey));
+  return (teamMatches.length ? teamMatches : pool).sort((left, right) => left.rank - right.rank)[0] || null;
 }
 
 function positionComponentNames(group) {
@@ -1301,9 +1377,10 @@ export async function getNFLPlayerCatalog() {
   if (cached) return cached;
 
   const teams = await getTeams();
-  const [rankings, leaders] = await Promise.all([
+  const [rankings, leaders, officialTop100Entries] = await Promise.all([
     computeRankings().catch(() => buildFallbackRankings(teams)),
     fetchLeaders().catch(() => []),
+    fetchOfficialTop100Players(seasonYear).catch(() => []),
   ]);
   const rankingMap = Object.fromEntries(rankings.map((team) => [team.id, team]));
   const leaderMap = buildLeaderMetricMap(leaders);
@@ -1321,6 +1398,7 @@ export async function getNFLPlayerCatalog() {
   const players = uniqBy(rosters.flat().filter(Boolean), (player) => player.id).map((player) => ({
     ...player,
     leaders: leaders.filter((entry) => entry.athleteId === player.id).sort((a, b) => a.rank - b.rank),
+    officialTop100: findTop100EntryForPlayer(player, officialTop100Entries),
     rawComponents: computePositionComponents(player, leaderMap, teamMap),
   }));
 
@@ -1359,6 +1437,19 @@ export async function getNFLPlayerCatalog() {
       const recentAdj = leaderCount ? ((player.team?.recentScore || 50) - 50) * 0.02 : 0;
       const bestRank = Math.min(...(player.leaders || []).map((entry) => Number(entry.rank || 999)), 999);
       const leaderboardBonus = leaderCount ? Math.max(0, (40 - bestRank) * 0.18) : 0;
+      const officialTop100Rank = Number(player.officialTop100?.rank || NaN);
+      const officialTop100Percentile = top100RankToPercentile(officialTop100Rank);
+      const officialTop100Floor = Number.isFinite(officialTop100Percentile)
+        ? Math.max(
+            1,
+            Math.min(
+              99.9,
+              (basePercentile + teamContext + roleDifficulty + ageAdj + experienceAdj + recentAdj + leaderboardBonus) * 0.62 +
+                officialTop100Percentile * 0.38 +
+                Math.max(0, (22 - Math.min(officialTop100Rank, 22)) * 0.22),
+            ),
+          )
+        : null;
       const noDataPenalty =
         leaderCount > 0
           ? 0
@@ -1367,9 +1458,10 @@ export async function getNFLPlayerCatalog() {
             : player.positionGroup === 'K/P'
               ? -12
               : -9;
+      const modelPercentile = basePercentile + teamContext + roleDifficulty + ageAdj + experienceAdj + recentAdj + leaderboardBonus + noDataPenalty;
       const finalPercentile = Math.max(
         1,
-        Math.min(99.9, basePercentile + teamContext + roleDifficulty + ageAdj + experienceAdj + recentAdj + leaderboardBonus + noDataPenalty),
+        Math.min(99.9, Math.max(modelPercentile, officialTop100Floor ?? modelPercentile)),
       );
       const rating = roundOvr(convertPercentileToOvr(finalPercentile));
 
@@ -1379,10 +1471,16 @@ export async function getNFLPlayerCatalog() {
         ovr: rating,
         percentile: Math.round(finalPercentile * 10) / 10,
         tier: bucketTier(rating),
-        leaderSummary: leaderSummary(leaderMap, player.id),
+        officialTop100Rank: Number.isFinite(officialTop100Rank) ? officialTop100Rank : null,
+        leaderSummary: leaderSummary(leaderMap, player.id) || (Number.isFinite(officialTop100Rank) ? `NFL Top 100 #${officialTop100Rank}` : 'Roster board'),
       };
     })
-    .sort((left, right) => right.rating - left.rating || left.displayName.localeCompare(right.displayName))
+    .sort(
+      (left, right) =>
+        right.rating - left.rating ||
+        (left.officialTop100Rank || Number.MAX_SAFE_INTEGER) - (right.officialTop100Rank || Number.MAX_SAFE_INTEGER) ||
+        left.displayName.localeCompare(right.displayName),
+    )
     .map((player, index) => ({
       ...player,
       rank: index + 1,
