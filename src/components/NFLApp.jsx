@@ -106,6 +106,7 @@ function OverviewView({ bootstrap, openGame, openTeam, openPlayer, openStory, se
   const leadStory = bootstrap.news?.[0];
   const bestEdge = bootstrap.predictors?.[0];
   const fantasyHeadliner = bootstrap.fantasyRankings?.[0];
+  const heroPlayers = (bootstrap.featuredPlayers || []).slice(0, 4);
 
   return (
     <section className="nfl-overview-shell">
@@ -124,6 +125,28 @@ function OverviewView({ bootstrap, openGame, openTeam, openPlayer, openStory, se
           </div>
         </div>
         <div className="nfl-hero-side">
+          {leadStory ? (
+            <button className="nfl-hero-story-visual" type="button" onClick={() => openStory(leadStory, 'overview')}>
+              {leadStory.image ? <img src={leadStory.image} alt={leadStory.headline} className="nfl-hero-story-photo" /> : null}
+              <div className="nfl-hero-story-overlay">
+                <span className="nfl-panel-kicker">Lead Story</span>
+                <strong>{leadStory.headline}</strong>
+              </div>
+            </button>
+          ) : null}
+          {heroPlayers.length ? (
+            <div className="nfl-hero-player-strip">
+              {heroPlayers.map((player) => (
+                <button className="nfl-hero-player-chip" key={player.id} type="button" onClick={() => openPlayer(player.id)}>
+                  <PlayerVisual player={player} />
+                  <div>
+                    <strong>{player.displayName}</strong>
+                    <span>{player.team?.abbreviation} • {player.rating} OVR</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : null}
           {leadGame ? (
             <button className="nfl-spotlight-card" type="button" onClick={() => openGame(leadGame.id)}>
               <span className="nfl-panel-kicker">Featured Game</span>
@@ -808,6 +831,11 @@ export default function NFLApp({ initialEntry = null, initialBootstrap = null, t
   const [customPredictor, setCustomPredictor] = useState([]);
   const [predictorLoading, setPredictorLoading] = useState(false);
   const initialEntryHandledRef = useRef(false);
+  const bootstrapRef = useRef(initialBootstrap);
+
+  useEffect(() => {
+    bootstrapRef.current = bootstrap;
+  }, [bootstrap]);
 
   async function fetchBootstrap(force = false) {
     try {
@@ -823,26 +851,22 @@ export default function NFLApp({ initialEntry = null, initialBootstrap = null, t
     let ignore = false;
     const refresh = () => {
       if (ignore) return;
-      fetchBootstrap(Boolean(!initialBootstrap && !bootstrap));
+      fetchBootstrap(Boolean(!initialBootstrap && !bootstrapRef.current));
     };
 
     if (!initialBootstrap) {
       refresh();
     } else {
-      const warmTimer = window.setTimeout(() => {
-        if (!ignore) fetchBootstrap(false);
-      }, 1200);
       const interval = window.setInterval(() => {
         if (!ignore) fetchBootstrap(false);
-      }, 45_000);
+      }, 60_000);
       return () => {
         ignore = true;
-        window.clearTimeout(warmTimer);
         window.clearInterval(interval);
       };
     }
 
-    const interval = window.setInterval(refresh, 45_000);
+    const interval = window.setInterval(refresh, 60_000);
     return () => {
       ignore = true;
       window.clearInterval(interval);

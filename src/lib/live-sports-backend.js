@@ -14,7 +14,6 @@ const SPORT_BOOTSTRAP_TTL = 2 * 60 * 1000;
 const SPORT_PLAYER_TTL = 10 * 60 * 1000;
 const FOOTBALL_LANDING_TTL = 2 * 60 * 1000;
 const CBB_SNAPSHOT_VERSION = 'v3';
-const NFL_SNAPSHOT_VERSION = 'v1';
 const FOOTBALL_SNAPSHOT_VERSION = 'v11';
 const FOOTBALL_LANDING_VERSION = 'v7';
 
@@ -105,14 +104,6 @@ async function buildGenericSportSnapshot(sport) {
   };
 }
 
-async function buildNFLSnapshot() {
-  const bootstrap = await getNFLBootstrap();
-  return {
-    ...bootstrap,
-    lastUpdated: bootstrap?.lastUpdated || new Date().toISOString(),
-  };
-}
-
 async function buildFootballLeagueSnapshot(leagueKey) {
   const bootstrap = await getFootballBootstrap(leagueKey);
   const playersCatalog = bootstrap?.playersCatalog?.players?.length ? bootstrap.playersCatalog : (await getFootballPlayerCatalog(leagueKey));
@@ -165,19 +156,11 @@ export async function warmGenericSportSnapshot(sport, force = false) {
 }
 
 export async function getNFLSnapshot({ force = false } = {}) {
-  return getHotSnapshot(
-    `nfl-bootstrap-${NFL_SNAPSHOT_VERSION}`,
-    () => buildNFLSnapshot(),
-    { ttlMs: SPORT_BOOTSTRAP_TTL, force },
-  );
+  return getGenericSportSnapshot('nfl', { force });
 }
 
 export async function warmNFLSnapshot(force = false) {
-  return warmSnapshot(
-    `nfl-bootstrap-${NFL_SNAPSHOT_VERSION}`,
-    () => buildNFLSnapshot(),
-    { ttlMs: SPORT_PLAYER_TTL, force },
-  );
+  return warmGenericSportSnapshot('nfl', force);
 }
 
 export async function getFootballLeagueSnapshot(leagueKey, { force = false } = {}) {

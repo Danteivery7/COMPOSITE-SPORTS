@@ -13,6 +13,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/nfl/warm",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cbb/warm",
       "schedule": "*/10 * * * *"
     }
