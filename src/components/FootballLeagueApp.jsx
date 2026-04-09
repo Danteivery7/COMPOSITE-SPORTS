@@ -192,7 +192,7 @@ function FootballOverview({ bootstrap, entityCopy, openGame, openTeam, openPlaye
                 <strong>{topTeam.displayName}</strong>
                 <span>#{topTeam.ovrRank} OVR</span>
                 <FootballRecordLine record={topTeam.record} fallback={topTeam.abbreviation} />
-                <p>{topTeam.clubPoints ?? topTeam.standingPoints ?? 0} pts • {topTeam.recentFormLabel || 'Recent pending'}</p>
+                <p>{topTeam.clubPoints ?? topTeam.standingPoints ?? 0} pts • {topTeam.recentFormLabel || 'Last 5 unavailable'}</p>
               </div>
             </button>
           ) : (
@@ -234,7 +234,7 @@ function FootballOverview({ bootstrap, entityCopy, openGame, openTeam, openPlaye
                   <div>
                     <strong>#{team.ovrRank} {team.displayName}</strong>
                     <FootballRecordLine record={team.record} fallback={team.abbreviation} />
-                    <span>{team.clubPoints ?? team.standingPoints ?? 0} pts • {team.recentFormLabel || 'Recent pending'}</span>
+                    <span>{team.clubPoints ?? team.standingPoints ?? 0} pts • {team.recentFormLabel || 'Last 5 unavailable'}</span>
                   </div>
                 </div>
                 <span>{team.ovrScore}</span>
@@ -290,7 +290,7 @@ function RankingsView({ rankings, entityCopy, openTeam }) {
                   <div>
                     <strong>{team.displayName}</strong>
                     <FootballRecordLine record={team.record} fallback={team.abbreviation} />
-                    <span>{team.recentFormLabel || 'Recent pending'}</span>
+                    <span>{team.recentFormLabel || 'Last 5 unavailable'}</span>
                   </div>
                 </div>
               </td>
@@ -322,7 +322,7 @@ function TeamsView({ teams, openTeam }) {
           <div className="football-chip-row">
             <span className="football-chip">#{team.ovrRank} OVR</span>
             <span className="football-chip">{team.clubPoints ?? team.standingPoints ?? 0} pts</span>
-            <span className="football-chip">{team.recentFormLabel || 'Recent pending'}</span>
+            <span className="football-chip">{team.recentFormLabel || 'Last 5 unavailable'}</span>
           </div>
         </button>
       ))}
@@ -494,7 +494,7 @@ function TeamDetailView({ detail, entityCopy, openPlayer, openStory, setPage }) 
           <span className="football-chip">{detail.team.clubPoints ?? detail.team.standingPoints ?? 0} pts</span>
           <span className="football-chip">OFF {detail.team.offScore}</span>
           <span className="football-chip">DEF {detail.team.defScore}</span>
-          <span className="football-chip">{detail.team.recentFormLabel || 'Recent pending'}</span>
+          <span className="football-chip">{detail.team.recentFormLabel || 'Last 5 unavailable'}</span>
         </div>
       </article>
 
@@ -726,20 +726,30 @@ function GameDetailView({ detail, predictors, setPage }) {
   );
 }
 
-export default function FootballLeagueApp({ leagueKey, initialEntry = null, theme = 'dark', toggleTheme = () => {} }) {
+function hasRenderableBootstrap(data) {
+  return Boolean(
+    data &&
+    Array.isArray(data?.rankings) &&
+    data.rankings.length &&
+    Array.isArray(data?.playersCatalog?.players) &&
+    data.playersCatalog.players.length,
+  );
+}
+
+export default function FootballLeagueApp({ leagueKey, initialEntry = null, initialBootstrap = null, theme = 'dark', toggleTheme = () => {} }) {
   const leagueConfig = getFootballLeagueConfig(leagueKey);
   const entityCopy = getFootballEntityCopy(leagueKey);
   const apiBase = `/api/football/${leagueKey}`;
   const [page, setPage] = useState('overview');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [bootstrap, setBootstrap] = useState(null);
+  const [bootstrap, setBootstrap] = useState(initialBootstrap);
   const [playersData, setPlayersData] = useState(null);
   const [teamDetail, setTeamDetail] = useState(null);
   const [playerDetail, setPlayerDetail] = useState(null);
   const [gameDetail, setGameDetail] = useState(null);
   const [storyDetail, setStoryDetail] = useState(null);
   const [playersQuery, setPlayersQuery] = useState('');
-  const [loadingBootstrap, setLoadingBootstrap] = useState(true);
+  const [loadingBootstrap, setLoadingBootstrap] = useState(!hasRenderableBootstrap(initialBootstrap));
   const [loadingPlayers, setLoadingPlayers] = useState(false);
   const [hubOriginPlayer, setHubOriginPlayer] = useState(false);
   const [selectedHomeTeamId, setSelectedHomeTeamId] = useState('');
@@ -772,10 +782,14 @@ export default function FootballLeagueApp({ leagueKey, initialEntry = null, them
   }
 
   useEffect(() => {
-    fetchBootstrap();
+    const hasInitialBootstrap = hasRenderableBootstrap(initialBootstrap);
+    const bootstrapTimer = hasInitialBootstrap ? window.setTimeout(fetchBootstrap, 12_000) : window.setTimeout(fetchBootstrap, 0);
     const timer = setInterval(fetchBootstrap, 45_000);
-    return () => clearInterval(timer);
-  }, [apiBase]);
+    return () => {
+      window.clearTimeout(bootstrapTimer);
+      clearInterval(timer);
+    };
+  }, [apiBase, initialBootstrap]);
 
   useEffect(() => {
     if (page !== 'players') return;

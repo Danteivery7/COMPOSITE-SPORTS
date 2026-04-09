@@ -6,7 +6,7 @@ import FootballLeagueApp from '@/src/components/FootballLeagueApp';
 import useCompositeTheme from '@/src/hooks/useCompositeTheme';
 import { getFootballLeagueConfig } from '@/src/lib/football';
 
-export default function FootballLeagueRoute({ leagueKey, initialEntry = null }) {
+export default function FootballLeagueRoute({ leagueKey, initialEntry = null, initialBootstrap = null }) {
   const config = getFootballLeagueConfig(leagueKey);
   const { theme, toggleTheme } = useCompositeTheme(`football-${leagueKey}`);
 
@@ -25,7 +25,7 @@ export default function FootballLeagueRoute({ leagueKey, initialEntry = null }) 
       accent={config.accent}
       accentAlt={config.accentAlt}
     >
-      <FootballLeagueApp leagueKey={leagueKey} initialEntry={initialEntry} theme={theme} toggleTheme={toggleTheme} />
+      <FootballLeagueApp leagueKey={leagueKey} initialEntry={initialEntry} initialBootstrap={initialBootstrap} theme={theme} toggleTheme={toggleTheme} />
     </FootballIntroGate>
   );
 }

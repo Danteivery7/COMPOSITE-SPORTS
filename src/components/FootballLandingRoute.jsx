@@ -55,13 +55,24 @@ function FootballRecordLine({ record, fallback }) {
   );
 }
 
-export default function FootballLandingRoute() {
+function hasRenderableLanding(data) {
+  return Boolean(
+    data &&
+    Array.isArray(data?.leagues) &&
+    data.leagues.length &&
+    Array.isArray(data?.topPlayers) &&
+    data.topPlayers.length,
+  );
+}
+
+export default function FootballLandingRoute({ initialData = null }) {
   const { theme, toggleTheme } = useCompositeTheme('football');
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState(initialData);
+  const [loading, setLoading] = useState(!hasRenderableLanding(initialData));
 
   useEffect(() => {
     document.body.dataset.compositeRoute = 'football';
+    const hasInitialData = hasRenderableLanding(initialData);
 
     async function load() {
       try {
@@ -85,14 +96,15 @@ export default function FootballLandingRoute() {
       }
     }
 
-    load();
+    const bootstrapTimer = hasInitialData ? window.setTimeout(load, 12_000) : window.setTimeout(load, 0);
     const timer = setInterval(load, 45_000);
 
     return () => {
+      window.clearTimeout(bootstrapTimer);
       clearInterval(timer);
       delete document.body.dataset.compositeRoute;
     };
-  }, []);
+  }, [initialData]);
 
   const topMatches = data?.topMatches || [];
   const topPlayers = data?.topPlayers || [];

@@ -123,6 +123,27 @@ export const FOOTBALL_LEAGUES = {
 
 const CLUB_FOOTBALL_LEAGUES = [...PRIMARY_FOOTBALL_LEAGUE_KEYS];
 const WORLD_CUP_MARKERS = ['fifa world cup', 'world cup'];
+const FOOTBALL_SIDE_ALIASES = {
+  usa: ['unitedstates', 'unitedstatesofamerica'],
+  unitedstates: ['usa', 'unitedstatesofamerica'],
+  unitedstatesofamerica: ['usa', 'unitedstates'],
+  turkiye: ['turkey'],
+  turkey: ['turkiye'],
+  korearepublic: ['southkorea'],
+  southkorea: ['korearepublic'],
+  iriran: ['iran', 'islamicrepublicofiran'],
+  iran: ['iriran', 'islamicrepublicofiran'],
+  islamicrepublicofiran: ['iran', 'iriran'],
+  ivorycoast: ['cotedivoire'],
+  cotedivoire: ['ivorycoast'],
+  drcongo: ['congodr', 'democraticrepublicofthecongo'],
+  congodr: ['drcongo', 'democraticrepublicofthecongo'],
+  democraticrepublicofthecongo: ['drcongo', 'congodr'],
+  capeverde: ['caboverde'],
+  caboverde: ['capeverde'],
+  bosniaandherzegovina: ['bosniaherzegovina'],
+  bosniaherzegovina: ['bosniaandherzegovina'],
+};
 
 function cacheKey(scope, league, extra = '') {
   return `${scope}:${league}:${extra}`;
@@ -363,9 +384,95 @@ function clampNumber(value, min, max) {
 
 function normalizeFootballSideName(value = '') {
   return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/&amp;/g, 'and')
     .replace(/[^a-z0-9]/g, '');
+}
+
+function addFootballSideAliasKeys(set, normalized) {
+  if (!normalized) return;
+  set.add(normalized);
+  (FOOTBALL_SIDE_ALIASES[normalized] || []).forEach((alias) => {
+    if (alias) set.add(alias);
+  });
+}
+
+function getFifaLookupKeys(team = {}) {
+  const keys = new Set();
+  [
+    team.displayName,
+    team.shortDisplayName,
+    team.abbreviation,
+    team.location,
+    team.name,
+  ].forEach((value) => addFootballSideAliasKeys(keys, normalizeFootballSideName(value)));
+  return Array.from(keys);
+}
+
+function resolveFifaRankingEntry(team, fifaData) {
+  if (!fifaData?.rankingsByKey) return null;
+  const lookupKeys = getFifaLookupKeys(team);
+  for (const key of lookupKeys) {
+    const entry = fifaData.rankingsByKey[key];
+    if (entry) return entry;
+  }
+  return null;
+}
+
+function extractNextDataPayload(html = '') {
+  const match = String(html || '').match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/i);
+  if (!match?.[1]) return null;
+  try {
+    return JSON.parse(match[1]);
+  } catch (_error) {
+    return null;
+  }
+}
+
+function collectMatchingStrings(node, pattern, bucket = [], seen = new WeakSet()) {
+  if (!node || typeof node !== 'object') return bucket;
+  if (seen.has(node)) return bucket;
+  seen.add(node);
+
+  if (Array.isArray(node)) {
+    node.forEach((entry) => collectMatchingStrings(entry, pattern, bucket, seen));
+    return bucket;
+  }
+
+  Object.values(node).forEach((value) => {
+    if (typeof value === 'string' && pattern.test(value)) {
+      bucket.push(value);
+      return;
+    }
+    if (value && typeof value === 'object') {
+      collectMatchingStrings(value, pattern, bucket, seen);
+    }
+  });
+
+  return bucket;
+}
+
+function getCurrentFifaScheduleId(nextData, html = '') {
+  const nestedId = nextData?.props?.pageProps?.pageData?.ranking?.dates?.[0]?.dates?.find((entry) =>
+    /^FRS_Male_Football_\d{8}$/.test(String(entry?.id || '')))?.id;
+  if (nestedId) return nestedId;
+
+  const discovered = collectMatchingStrings(nextData, /^FRS_Male_Football_\d{8}$/);
+  if (discovered.length) return discovered[0];
+
+  const htmlMatch = String(html || '').match(/FRS_Male_Football_\d{8}/);
+  return htmlMatch?.[0] || '';
+}
+
+function pickFifaTeamName(teamName = []) {
+  return (
+    teamName.find((entry) => entry?.Locale === 'en-GB')?.Description ||
+    teamName.find((entry) => entry?.Locale === 'en')?.Description ||
+    teamName[0]?.Description ||
+    ''
+  );
 }
 
 function isExpiredFinalGame(startTime, state, { durationHours = MATCH_DURATION_HOURS, visibilityHours = FINAL_VISIBILITY_HOURS } = {}) {
@@ -508,6 +615,11 @@ function summarizeScheduleResults(payload, teamId) {
     if (game.teamScore === game.opponentScore) return total + 1;
     return total;
   }, 0);
+  const recentFormSequence = recent.map((game) => {
+    if (game.teamScore > game.opponentScore) return 'W';
+    if (game.teamScore === game.opponentScore) return 'D';
+    return 'L';
+  }).join('-');
 
   return {
     wins,
@@ -521,7 +633,10 @@ function summarizeScheduleResults(payload, teamId) {
     cleanSheets,
     record: `${wins}-${ties}-${losses}`,
     recentFormPoints,
-    recentFormLabel: recent.length ? `${recentFormPoints} pts last ${recent.length}` : 'Recent pending',
+    recentFormSequence,
+    recentFormPointsLabel: recent.length ? `${recentFormPoints} pts last ${recent.length}` : 'Last 5 unavailable',
+    recentFormCountryLabel: recent.length ? `Last ${recent.length}: ${recentFormSequence}` : 'Last 5 unavailable',
+    recentFormLabel: recent.length ? `${recentFormPoints} pts last ${recent.length}` : 'Last 5 unavailable',
     recentResults: recent
       .slice()
       .reverse()
@@ -587,6 +702,9 @@ async function getStandings(leagueKey) {
     const parsedRecord = parseRecordSummary(stats.recordSummary);
     const schedulePayload = scheduleMap[team.id];
     const scheduleSummary = summarizeScheduleResults(schedulePayload, team.id);
+    const recentFormLabel = leagueKey === 'international-play'
+      ? scheduleSummary.recentFormCountryLabel
+      : scheduleSummary.recentFormPointsLabel;
 
     const wins = parsedRecord.gamesPlayed ? parsedRecord.wins : scheduleSummary.wins;
     const ties = parsedRecord.gamesPlayed ? parsedRecord.ties : scheduleSummary.ties;
@@ -607,9 +725,10 @@ async function getStandings(leagueKey) {
       pointsAgainst: scheduleSummary.pointsAgainst,
       differential: scheduleSummary.differential,
       cleanSheets: scheduleSummary.cleanSheets,
-      streak: scheduleSummary.recentFormLabel,
+      streak: recentFormLabel,
       recentFormPoints: scheduleSummary.recentFormPoints,
-      recentFormLabel: scheduleSummary.recentFormLabel,
+      recentFormSequence: scheduleSummary.recentFormSequence,
+      recentFormLabel,
       recentResults: scheduleSummary.recentResults,
       standingPoints,
       pointsPerMatch: gamesPlayed ? standingPoints / gamesPlayed : 0,
@@ -662,26 +781,58 @@ async function fetchFifaMenRankings() {
 
   try {
     const html = await fetchText('https://inside.fifa.com/fifa-world-ranking/men', 12 * 60 * 60 * 1000);
-    const decoded = html
-      .replace(/&quot;/g, '"')
-      .replace(/&#x27;/g, "'")
-      .replace(/&amp;/g, '&');
-    const rankings = {};
-    const matches = decoded.matchAll(/([A-Z][A-Za-z.'\-& ]{2,40})\s*\((\d+)(?:st|nd|rd|th)\)/g);
-
-    for (const match of matches) {
-      const country = String(match[1] || '').trim();
-      const rank = Number(match[2]);
-      if (!country || !Number.isFinite(rank) || rank < 1 || rank > 250) continue;
-      if (/fifa|world ranking|world cup|organisation|football/i.test(country)) continue;
-      const normalized = normalizeFootballSideName(country);
-      if (!normalized) continue;
-      rankings[normalized] = Math.min(rankings[normalized] || rank, rank);
+    const nextData = extractNextDataPayload(html);
+    const scheduleId = getCurrentFifaScheduleId(nextData, html);
+    if (!scheduleId) {
+      return writeCache(key, { rankingsByKey: {}, ordered: [], scheduleId: '', lastUpdated: null }, 30 * 60 * 1000);
     }
 
-    return writeCache(key, rankings, 12 * 60 * 60 * 1000);
+    const payload = await fetchJson(
+      `https://api.fifa.com/api/v3/fifarankings/rankings/rankingsbyschedule?rankingScheduleId=${scheduleId}&language=en`,
+      12 * 60 * 60 * 1000,
+    );
+    const ordered = (payload?.Results || [])
+      .map((row) => {
+        const name = pickFifaTeamName(row.TeamName || []);
+        const rank = toFiniteNumber(row.Rank, NaN);
+        if (!name || !Number.isFinite(rank)) return null;
+        return {
+          name,
+          code: String(row.IdCountry || '').trim().toUpperCase(),
+          rank,
+          points: toFiniteNumber(row.TotalPoints, 0),
+          prevRank: toFiniteNumber(row.PrevRank, rank),
+          movement: toFiniteNumber(row.RankingMovement, 0),
+          confederation: pickFifaTeamName(row.ConfederationName || []),
+          ratedMatches: toFiniteNumber(row.RatedMatches, 0),
+        };
+      })
+      .filter(Boolean)
+      .sort((left, right) => left.rank - right.rank);
+
+    const rankingsByKey = {};
+    ordered.forEach((entry) => {
+      const nameKey = normalizeFootballSideName(entry.name);
+      const keys = new Set();
+      addFootballSideAliasKeys(keys, nameKey);
+      addFootballSideAliasKeys(keys, normalizeFootballSideName(entry.code));
+      keys.forEach((lookupKey) => {
+        if (lookupKey) rankingsByKey[lookupKey] = entry;
+      });
+    });
+
+    return writeCache(
+      key,
+      {
+        rankingsByKey,
+        ordered,
+        scheduleId,
+        lastUpdated: nextData?.props?.pageProps?.pageData?.ranking?.rankingLastUpdated || null,
+      },
+      12 * 60 * 60 * 1000,
+    );
   } catch (_error) {
-    return writeCache(key, {}, 30 * 60 * 1000);
+    return writeCache(key, { rankingsByKey: {}, ordered: [], scheduleId: '', lastUpdated: null }, 30 * 60 * 1000);
   }
 }
 
@@ -694,7 +845,9 @@ async function computeRankings(leagueKey) {
     getTeams(leagueKey),
     getStandings(leagueKey),
     getPlayerCatalog(leagueKey),
-    leagueKey === 'international-play' ? fetchFifaMenRankings() : Promise.resolve({}),
+    leagueKey === 'international-play'
+      ? fetchFifaMenRankings()
+      : Promise.resolve({ rankingsByKey: {}, ordered: [], scheduleId: '', lastUpdated: null }),
   ]);
   const standingsMap = Object.fromEntries(standings.map((entry) => [entry.teamId, entry]));
   const rosterMap = (playersCatalog.players || []).reduce((map, player) => {
@@ -738,7 +891,7 @@ async function computeRankings(leagueKey) {
     return {
       ...team,
       record: standing.record || '0-0-0',
-      streak: standing.recentFormLabel || 'Recent pending',
+      streak: standing.recentFormLabel || 'Last 5 unavailable',
       wins: standing.wins || 0,
       losses: standing.losses || 0,
       ties: standing.ties || 0,
@@ -752,7 +905,8 @@ async function computeRankings(leagueKey) {
       goalsAgainstPerMatch: context.goalsAgainstPer90,
       cleanSheets: standing.cleanSheets || 0,
       recentFormPoints: standing.recentFormPoints || 0,
-      recentFormLabel: standing.recentFormLabel || 'Recent pending',
+      recentFormSequence: standing.recentFormSequence || '',
+      recentFormLabel: standing.recentFormLabel || 'Last 5 unavailable',
       recentResults: standing.recentResults || [],
       standingRank: standing.standingRank || null,
       startingXI,
@@ -781,37 +935,49 @@ async function computeRankings(leagueKey) {
     const recentScore = recentScale(team.recentPct);
     const underlyingScore = underlyingScale(team.underlyingProxy);
     const leagueAdj = clampNumber((leagueMeta(leagueKey).competitionWeight - 1.0) * 6, -2, 2);
-    const fifaRank = leagueKey === 'international-play'
-      ? fifaRankings[normalizeFootballSideName(team.displayName || team.shortDisplayName || team.abbreviation || '')] || null
+    const fifaEntry = leagueKey === 'international-play' ? resolveFifaRankingEntry(team, fifaRankings) : null;
+    const fifaRank = fifaEntry?.rank || null;
+    const fifaPoints = fifaEntry?.points || 0;
+    const fifaPercentile = leagueKey === 'international-play' && fifaRank && fifaRankings.ordered.length
+      ? clampNumber(((fifaRankings.ordered.length - fifaRank) / Math.max(1, fifaRankings.ordered.length - 1)) * 100, 1, 100)
       : null;
-    const fifaAdj = leagueKey === 'international-play' && fifaRank
-      ? clampNumber(((210 - fifaRank) / 210) * 3, 0.2, 3)
-      : 0;
     const hotnessNerf = recentScore * 0.10;
-    const finalPercentile = clampNumber(
-      squadScore * 0.26 +
-        offScore * 0.16 +
-        defScore * 0.16 +
-        team.standingPointsPct * 0.12 +
-        hotnessNerf +
-        underlyingScore * 0.06 +
-        leagueAdj +
-        fifaAdj,
-      1,
-      100,
-    );
+    const finalPercentile = leagueKey === 'international-play'
+      ? clampNumber(
+        (fifaPercentile ?? 50) * 0.88 +
+          recentScore * 0.06 +
+          offScore * 0.03 +
+          defScore * 0.03,
+        1,
+        100,
+      )
+      : clampNumber(
+        squadScore * 0.26 +
+          offScore * 0.16 +
+          defScore * 0.16 +
+          team.standingPointsPct * 0.12 +
+          hotnessNerf +
+          underlyingScore * 0.06 +
+          leagueAdj,
+        1,
+        100,
+      );
     const ovrScore = clampNumber(Math.round((60 + finalPercentile * 0.39) * 10) / 10, 50, 99);
     const globalScore = ovrScore;
 
     return {
       ...team,
-      resultsScore: Math.round(team.standingPointsPct * 10) / 10,
+      standingRank: leagueKey === 'international-play' && fifaRank ? fifaRank : team.standingRank,
+      standingPoints: leagueKey === 'international-play' && fifaPoints ? Math.round(fifaPoints) : team.standingPoints,
+      clubPoints: leagueKey === 'international-play' && fifaPoints ? Math.round(fifaPoints) : team.clubPoints,
+      resultsScore: Math.round((leagueKey === 'international-play' && fifaPercentile != null ? fifaPercentile : team.standingPointsPct) * 10) / 10,
       offScore: Math.round(offScore * 10) / 10,
       defScore: Math.round(defScore * 10) / 10,
       squadScore: Math.round(squadScore * 10) / 10,
       recentScore: Math.round(recentScore * 10) / 10,
       underlyingScore: Math.round(underlyingScore * 10) / 10,
       fifaRank,
+      fifaPoints: Math.round(fifaPoints),
       ovrScore,
       globalScore,
       groupLabel: team.location || team.abbreviation,
@@ -819,7 +985,15 @@ async function computeRankings(leagueKey) {
     };
   });
 
-  ranked.sort((left, right) => right.ovrScore - left.ovrScore || right.clubPoints - left.clubPoints || right.winPct - left.winPct);
+  if (leagueKey === 'international-play') {
+    ranked.sort((left, right) =>
+      (left.fifaRank || Number.MAX_SAFE_INTEGER) - (right.fifaRank || Number.MAX_SAFE_INTEGER) ||
+      right.recentFormPoints - left.recentFormPoints ||
+      right.ovrScore - left.ovrScore,
+    );
+  } else {
+    ranked.sort((left, right) => right.ovrScore - left.ovrScore || right.clubPoints - left.clubPoints || right.winPct - left.winPct);
+  }
   ranked.forEach((team, index) => {
     team.ovrRank = index + 1;
   });
@@ -1942,6 +2116,8 @@ async function getFootballLanding() {
       if (list.some((entry) => String(entry.id) === String(player.id))) return list;
       const clubKey = String(player.canonicalTeamId || player.team?.id || '');
       if (clubKey && list.some((entry) => String(entry.canonicalTeamId || entry.team?.id || '') === clubKey)) return list;
+      const leagueKey = String(player.canonicalLeagueKey || player.leagueKey || '');
+      if (leagueKey && list.some((entry) => String(entry.canonicalLeagueKey || entry.leagueKey || '') === leagueKey)) return list;
       list.push(player);
       return list;
     }, [])
