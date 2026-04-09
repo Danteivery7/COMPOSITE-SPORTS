@@ -540,9 +540,9 @@ function renderPlayers(state) {
         team: syncedCard.team || player.team,
         resolvedPosition: syncedCard.resolvedPosition || player.resolvedPosition,
         jersey: syncedCard.jersey || player.jersey,
-        overall: syncedCard.overall ?? player.overall,
-        overallPercentile: syncedCard.overallPercentile ?? player.overallPercentile,
-        hotnessScore: syncedCard.hotnessScore ?? player.hotnessScore,
+        overall: Math.max(Number(player.overall || 0), Number(syncedCard.overall || 0)),
+        overallPercentile: Number.isFinite(syncedCard.overallPercentile) ? syncedCard.overallPercentile : player.overallPercentile,
+        hotnessScore: Number.isFinite(syncedCard.hotnessScore) ? syncedCard.hotnessScore : player.hotnessScore,
         tone: syncedCard.tone || player.tone,
       };
     })

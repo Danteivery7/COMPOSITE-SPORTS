@@ -1333,8 +1333,8 @@ export function buildFeaturedPlayers(leaderEntries = [], teamsById = {}, advance
       team: teamsById[player.teamId] || null,
       resolvedPosition: normalizeNhlPosition(player.resolvedPosition || "W"),
       featured: player.featured.sort((a, b) => a.rank - b.rank).slice(0, 3),
-      provisionalOvr: clamp(round(58 + player.provisionalScore / 18, 0), 55, 94),
-      overall: clamp(round(58 + player.provisionalScore / 18, 0), 55, 94),
+      provisionalOvr: clamp(round(66 + player.provisionalScore / 13, 0), 60, 97),
+      overall: clamp(round(66 + player.provisionalScore / 13, 0), 60, 97),
       headshot: player.headshot || resolveNhlHeadshot(player.playerId),
       tone: { label: "Steady", className: "tone-steady" },
       statLine: {},
@@ -1361,13 +1361,13 @@ function fallbackPlayerOverall(profile, seasonStats, careerStats, resolvedPositi
   if (resolvedPosition === "G") {
     const winRate = wins / gp;
     const raw = 70 + ((savePct - 0.89) * 300) + ((2.9 - gaa) * 8) + (winRate * 8);
-    return clamp(round(raw, 0), 60, 95);
+    return clamp(round(raw, 0), 60, 97);
   }
 
   let raw = 68 + (seasonPointsPerGame * 12) + (seasonGoalsPerGame * 8) + (seasonAssistsPerGame * 5) + (shootingPct * 0.1);
   raw += clamp((seasonPointsPerGame - careerPointsPerGame) * 5, -2, 2.5);
   if (resolvedPosition === "C") raw += clamp(((Number(seasonStats.faceoffPercent?.value || 50) - 50) * 0.06), -1.2, 1.2);
-  return clamp(round(raw, 0), 60, 96);
+  return clamp(round(raw, 0), 60, 97);
 }
 
 export function buildPlayerCard(bundle, teamsById = {}, context = {}) {

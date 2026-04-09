@@ -245,9 +245,9 @@ function recomputeDerivedState() {
         position: livePlayer.resolvedPosition || existingCard.position,
         resolvedPosition: livePlayer.resolvedPosition || existingCard.resolvedPosition,
         headshot: livePlayer.headshot || existingCard.headshot,
-        overall: livePlayer.overall,
-        overallPercentile: livePlayer.overallPercentile,
-        hotnessScore: livePlayer.hotnessScore,
+        overall: Math.max(Number(existingCard.overall || 0), Number(livePlayer.overall || 0)),
+        overallPercentile: Number.isFinite(livePlayer.overallPercentile) ? livePlayer.overallPercentile : existingCard.overallPercentile,
+        hotnessScore: Number.isFinite(livePlayer.hotnessScore) ? livePlayer.hotnessScore : existingCard.hotnessScore,
         tone: livePlayer.tone || existingCard.tone,
         sampleTrust: livePlayer.reliability ?? existingCard.sampleTrust,
         modelReasons: livePlayer.modelReasons || existingCard.modelReasons,
@@ -284,7 +284,7 @@ function recomputeDerivedState() {
   }
 }
 
-function prefetchFeaturedPlayerCards(limit = 6) {
+function prefetchFeaturedPlayerCards(limit = 18) {
   state.featuredPlayers.slice(0, limit).forEach((player) => {
     if (!state.playerCards[player.playerId]) {
       void ensurePlayerCard(player.playerId);
