@@ -1,6 +1,4 @@
 'use client';
-
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import FootballIntroGate from '@/src/components/FootballIntroGate';
 import RouteSiteMenu from '@/src/components/RouteSiteMenu';
@@ -232,10 +230,11 @@ export default function FootballLandingRoute({ initialData = null }) {
               [...Array(3)].map((_, index) => <div className="football-card football-loading-card" key={index} />)
             ) : (
               topPlayers.map((player, index) => (
-                <Link
+                <a
                   href={`/football/${player.leagueKey}?player=${encodeURIComponent(player.id)}`}
                   className="football-card football-top-player-card"
                   key={`${player.leagueKey}-${player.id}`}
+                  target="_top"
                 >
                   <div className="football-top-player-head">
                     <span className="football-rank-badge">#{index + 1}</span>
@@ -259,7 +258,7 @@ export default function FootballLandingRoute({ initialData = null }) {
                       <p>{player.positionLabel || player.position} • {player.rating} OVR</p>
                     </div>
                   </div>
-                </Link>
+                </a>
               ))
             )}
           </div>
@@ -323,9 +322,9 @@ export default function FootballLandingRoute({ initialData = null }) {
                       </div>
                     </div>
                   </div>
-                  <Link href={`/football/${match.leagueKey}`} className="football-inline-link">
+                  <a href={`/football/${match.leagueKey}`} className="football-inline-link" target="_top">
                     Open {match.leagueLabel}
-                  </Link>
+                  </a>
                 </article>
               ))}
             </div>
@@ -342,10 +341,11 @@ export default function FootballLandingRoute({ initialData = null }) {
           </div>
           <div className="football-league-grid">
             {leagues.map((league) => (
-              <Link
+              <a
                 href={league.path}
                 key={league.key}
                 className="football-card football-league-card"
+                target="_top"
                 style={{
                   '--league-accent': league.accent,
                   '--league-accent-alt': league.accentAlt,
@@ -367,7 +367,7 @@ export default function FootballLandingRoute({ initialData = null }) {
                   {league.topTeam ? <span className="football-chip">#{league.topTeam.ovrRank} {league.topTeam.abbreviation}</span> : null}
                 </div>
                 <span className="football-card-cta">Open {league.label}</span>
-              </Link>
+              </a>
             ))}
           </div>
         </section>

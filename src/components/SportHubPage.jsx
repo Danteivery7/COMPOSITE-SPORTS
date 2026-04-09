@@ -47,6 +47,22 @@ function ensureHeadshotFallback(event) {
   currentTarget.src = 'https://a.espncdn.com/i/headshots/nophoto.png';
 }
 
+function SportRouteLink({ card, className, style, children, ...rest }) {
+  if (card?.key === 'football') {
+    return (
+      <a href={card.path} className={className} style={style} target="_top" {...rest}>
+        {children}
+      </a>
+    );
+  }
+
+  return (
+    <Link href={card.path} className={className} style={style} {...rest}>
+      {children}
+    </Link>
+  );
+}
+
 const ET_TIME_FORMATTER = new Intl.DateTimeFormat('en-US', {
   timeZone: 'America/New_York',
   hour: 'numeric',
@@ -406,9 +422,9 @@ export default function SportHubPage({ initialHero = null }) {
 
         <nav className="hub-status-strip" aria-label="COMPOSITE site navigation">
           {cards.map((card, index) => (
-            <Link
+            <SportRouteLink
               key={`${card.key}-pulse`}
-              href={card.path}
+              card={card}
               className={`hub-status-pill hub-status-link ${index === activeSportIndex ? 'is-active' : ''}`}
               style={{
                 '--pill-accent': card.theme?.hub?.accent || card.accent,
@@ -417,7 +433,7 @@ export default function SportHubPage({ initialHero = null }) {
             >
               {card.hubTile?.icon ? <img src={card.hubTile.icon} alt="" className="hub-status-icon" /> : null}
               {card.label}
-            </Link>
+            </SportRouteLink>
           ))}
         </nav>
       </section>
@@ -440,9 +456,9 @@ export default function SportHubPage({ initialHero = null }) {
         </div>
         <div className="hub-sport-rail" ref={sportRailRef}>
           {cards.map((card) => (
-            <Link
+            <SportRouteLink
               key={card.key}
-              href={card.path}
+              card={card}
               className="hub-card hub-card-compact"
               data-sport={card.key}
               data-motif={card.motif}
@@ -471,7 +487,7 @@ export default function SportHubPage({ initialHero = null }) {
                 <span className="hub-card-hover-label">{card.hoverLabel || card.theme?.hoverCue}</span>
                 <span className="hub-card-cta">Open Site</span>
               </div>
-            </Link>
+            </SportRouteLink>
           ))}
         </div>
         <div className="hub-sport-rail-pager" aria-label="Composite sites pages">

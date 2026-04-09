@@ -1,6 +1,4 @@
 'use client';
-
-import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import StoryDetailCard from '@/src/components/StoryDetailCard';
 import RouteThemeToggle from '@/src/components/RouteThemeToggle';
@@ -1086,9 +1084,9 @@ export default function FootballLeagueApp({ leagueKey, initialEntry = null, init
           ))}
         </nav>
         <div className="football-sidebar-footer">
-          <Link href="/football" className="football-hub-link football-site-home-link">
+          <a href="/football" className="football-hub-link football-site-home-link" target="_top">
             Football Hub
-          </Link>
+          </a>
           <a href="/" className="football-hub-link secondary" target="_top">
             Back To Hub
           </a>
