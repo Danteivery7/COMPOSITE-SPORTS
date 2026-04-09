@@ -1,6 +1,7 @@
 import { getHotSnapshot, warmSnapshot } from '@/src/lib/snapshot-store';
 import { getSportBootstrap, getPlayerCatalog, isGenericSport } from '@/src/lib/generic-sports';
 import { getCBBBootstrap, getCBBPlayerCatalog } from '@/src/lib/cbb';
+import { getNFLBootstrap, getNFLPlayerCatalog } from '@/src/lib/nfl';
 import {
   getFootballBootstrap,
   getFootballFeaturedPlayers,
@@ -13,6 +14,7 @@ const SPORT_BOOTSTRAP_TTL = 2 * 60 * 1000;
 const SPORT_PLAYER_TTL = 10 * 60 * 1000;
 const FOOTBALL_LANDING_TTL = 2 * 60 * 1000;
 const CBB_SNAPSHOT_VERSION = 'v3';
+const NFL_SNAPSHOT_VERSION = 'v1';
 const FOOTBALL_SNAPSHOT_VERSION = 'v11';
 const FOOTBALL_LANDING_VERSION = 'v7';
 
@@ -43,6 +45,9 @@ function makeSportSnapshotKey(sport) {
   if (sport === 'cbb') {
     return `cbb-snapshot-${CBB_SNAPSHOT_VERSION}`;
   }
+  if (sport === 'nfl') {
+    return `nfl-snapshot-${NFL_SNAPSHOT_VERSION}`;
+  }
   return `generic-sport-${sport}`;
 }
 
@@ -67,6 +72,23 @@ async function buildGenericSportSnapshot(sport) {
     };
   }
 
+  if (sport === 'nfl') {
+    const [bootstrap, playersCatalog] = await Promise.all([
+      getNFLBootstrap(),
+      getNFLPlayerCatalog(),
+    ]);
+
+    return {
+      ...bootstrap,
+      playersCatalog,
+      playerMeta: {
+        totalPlayers: playersCatalog?.players?.length || 0,
+        lastUpdated: playersCatalog?.lastUpdated || bootstrap?.lastUpdated || null,
+      },
+      lastUpdated: bootstrap?.lastUpdated || new Date().toISOString(),
+    };
+  }
+
   const [bootstrap, playersCatalog] = await Promise.all([
     getSportBootstrap(sport),
     getPlayerCatalog(sport),
@@ -80,6 +102,14 @@ async function buildGenericSportSnapshot(sport) {
       lastUpdated: playersCatalog?.lastUpdated || null,
     },
     lastUpdated: new Date().toISOString(),
+  };
+}
+
+async function buildNFLSnapshot() {
+  const bootstrap = await getNFLBootstrap();
+  return {
+    ...bootstrap,
+    lastUpdated: bootstrap?.lastUpdated || new Date().toISOString(),
   };
 }
 
@@ -130,6 +160,22 @@ export async function warmGenericSportSnapshot(sport, force = false) {
   return warmSnapshot(
     makeSportSnapshotKey(sport),
     () => buildGenericSportSnapshot(sport),
+    { ttlMs: SPORT_PLAYER_TTL, force },
+  );
+}
+
+export async function getNFLSnapshot({ force = false } = {}) {
+  return getHotSnapshot(
+    `nfl-bootstrap-${NFL_SNAPSHOT_VERSION}`,
+    () => buildNFLSnapshot(),
+    { ttlMs: SPORT_BOOTSTRAP_TTL, force },
+  );
+}
+
+export async function warmNFLSnapshot(force = false) {
+  return warmSnapshot(
+    `nfl-bootstrap-${NFL_SNAPSHOT_VERSION}`,
+    () => buildNFLSnapshot(),
     { ttlMs: SPORT_PLAYER_TTL, force },
   );
 }

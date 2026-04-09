@@ -67,10 +67,14 @@ function IntroScene({ motif }) {
         <div className="sport-intro-spotlight spotlight-b" />
         <div className="sport-intro-playbook" />
         <div className="sport-intro-banner" />
-        <div className="sport-intro-object">
-          <span className="sport-intro-detail detail-a" />
-          <span className="sport-intro-detail detail-b" />
-          <span className="sport-intro-detail detail-c" />
+        <div className="sport-intro-tunnel-glow" />
+        <div className="sport-intro-runner">
+          <span className="runner-head" />
+          <span className="runner-torso" />
+          <span className="runner-arm arm-a" />
+          <span className="runner-arm arm-b" />
+          <span className="runner-leg leg-a" />
+          <span className="runner-leg leg-b" />
         </div>
       </div>
     );
