@@ -12,8 +12,8 @@ const SPORT_BOOTSTRAP_TTL = 2 * 60 * 1000;
 const SPORT_PLAYER_TTL = 10 * 60 * 1000;
 const FOOTBALL_LANDING_TTL = 2 * 60 * 1000;
 const CBB_SNAPSHOT_VERSION = 'v3';
-const NFL_SNAPSHOT_VERSION = 'v3';
-const FOOTBALL_SNAPSHOT_VERSION = 'v12';
+const NFL_SNAPSHOT_VERSION = 'v4';
+const FOOTBALL_SNAPSHOT_VERSION = 'v13';
 const FOOTBALL_LANDING_VERSION = 'v8';
 
 function footballRecordHasGames(record) {

@@ -474,6 +474,43 @@ function getStatValue(stats, keys, fallback = 0) {
   return fallback;
 }
 
+function parseNflRecordSummary(summary = '') {
+  const parts = String(summary || '')
+    .split('-')
+    .map((part) => Number(String(part).trim()))
+    .filter((part) => Number.isFinite(part));
+
+  if (parts.length >= 3) {
+    const [wins, losses, ties] = parts;
+    return {
+      wins,
+      losses,
+      ties,
+      gamesPlayed: wins + losses + ties,
+      display: `${wins}-${losses}-${ties}`,
+    };
+  }
+
+  if (parts.length === 2) {
+    const [wins, losses] = parts;
+    return {
+      wins,
+      losses,
+      ties: 0,
+      gamesPlayed: wins + losses,
+      display: `${wins}-${losses}`,
+    };
+  }
+
+  return {
+    wins: 0,
+    losses: 0,
+    ties: 0,
+    gamesPlayed: 0,
+    display: '0-0',
+  };
+}
+
 async function getStandings() {
   const seasonYear = getNFLSeasonYear();
   const offseasonLock = shouldUsePreviousSeasonBoard();
@@ -538,8 +575,33 @@ async function getStandings() {
     }),
     (entry) => entry.teamId,
   );
+  if (standings.some((entry) => Number(entry.gamesPlayed || 0) > 0)) {
+    return writeCache(key, standings, 30 * 60 * 1000);
+  }
 
-  return writeCache(key, standings, 30 * 60 * 1000);
+  const teams = await getTeams();
+  const derivedStandings = uniqBy(
+    (await mapLimit(
+      teams,
+      async (team) => summarizeSeasonSchedule(await fetchTeamSchedule(team.espnId), team.id),
+      8,
+    ))
+      .filter((entry) => entry?.teamId)
+      .map((entry) => ({
+        ...entry,
+        team: entry.team || teams.find((team) => team.id === entry.teamId) || null,
+      })),
+    (entry) => entry.teamId,
+  );
+
+  derivedStandings.sort((left, right) =>
+    right.winPct - left.winPct ||
+    right.wins - left.wins ||
+    right.differential - left.differential ||
+    right.pointsFor - left.pointsFor,
+  );
+
+  return writeCache(key, derivedStandings, 30 * 60 * 1000);
 }
 
 function flattenStatisticsPayload(payload) {
@@ -588,6 +650,81 @@ async function fetchTeamSchedule(teamId) {
     }
     return writeCache(key, { events: [] }, 15 * 60 * 1000);
   }
+}
+
+function summarizeSeasonSchedule(schedulePayload, teamId) {
+  const events = schedulePayload?.events || schedulePayload?.games || [];
+  const completed = events
+    .filter((event) => event?.competitions?.[0]?.status?.type?.state === 'post')
+    .sort((left, right) => new Date(left?.date || 0) - new Date(right?.date || 0));
+
+  let wins = 0;
+  let losses = 0;
+  let ties = 0;
+  let pointsFor = 0;
+  let pointsAgainst = 0;
+  const outcomes = [];
+
+  completed.forEach((event) => {
+    const competitors = event.competitions?.[0]?.competitors || [];
+    const team = competitors.find((item) => String(item.team?.id) === String(teamId));
+    const opponent = competitors.find((item) => String(item.team?.id) !== String(teamId));
+    if (!team || !opponent) return;
+
+    const teamScore = numericCompetitorScore(team.score);
+    const opponentScore = numericCompetitorScore(opponent.score);
+    pointsFor += teamScore;
+    pointsAgainst += opponentScore;
+
+    if (teamScore > opponentScore) {
+      wins += 1;
+      outcomes.push('W');
+    } else if (teamScore < opponentScore) {
+      losses += 1;
+      outcomes.push('L');
+    } else {
+      ties += 1;
+      outcomes.push('T');
+    }
+  });
+
+  const rootRecord = parseNflRecordSummary(schedulePayload?.team?.recordSummary || '');
+  const summary = rootRecord.gamesPlayed
+    ? rootRecord
+    : {
+        wins,
+        losses,
+        ties,
+        gamesPlayed: wins + losses + ties,
+        display: ties ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`,
+      };
+
+  let streak = 'Even';
+  if (outcomes.length) {
+    const lastResult = outcomes[outcomes.length - 1];
+    let count = 0;
+    for (let index = outcomes.length - 1; index >= 0; index -= 1) {
+      if (outcomes[index] !== lastResult) break;
+      count += 1;
+    }
+    streak = `${lastResult}${count}`;
+  }
+
+  return {
+    teamId: String(teamId),
+    team: schedulePayload?.team ? parseTeam(schedulePayload.team) : null,
+    wins: summary.wins,
+    losses: summary.losses,
+    ties: summary.ties,
+    gamesPlayed: summary.gamesPlayed,
+    record: summary.display,
+    pointsFor,
+    pointsAgainst,
+    differential: pointsFor - pointsAgainst,
+    streak,
+    standingPoints: summary.wins * 2 + summary.ties,
+    winPct: summary.gamesPlayed ? (summary.wins + summary.ties * 0.5) / summary.gamesPlayed : 0,
+  };
 }
 
 function parseScoreboardGames(payload = {}) {

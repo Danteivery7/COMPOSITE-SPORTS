@@ -495,6 +495,8 @@ function getCurrentFifaScheduleId(nextData, html = '') {
 }
 
 function pickFifaTeamName(teamName = []) {
+  if (typeof teamName === 'string') return teamName;
+  if (!Array.isArray(teamName)) return '';
   return (
     teamName.find((entry) => entry?.Locale === 'en-GB')?.Description ||
     teamName.find((entry) => entry?.Locale === 'en')?.Description ||
@@ -680,6 +682,49 @@ async function fetchScoreboardPayload(leagueKey) {
   return writeCache(key, payload, 45 * 1000);
 }
 
+function summarizeInternationalForm(form = '') {
+  const cleaned = String(form || '').toUpperCase().replace(/[^WDL]/g, '');
+  if (!cleaned) {
+    return {
+      recentFormPoints: 0,
+      recentFormSequence: '',
+      recentFormLabel: 'Last 5 unavailable',
+    };
+  }
+
+  const letters = cleaned.slice(-5).split('');
+  const recentFormPoints = letters.reduce((total, value) => {
+    if (value === 'W') return total + 3;
+    if (value === 'D') return total + 1;
+    return total;
+  }, 0);
+
+  return {
+    recentFormPoints,
+    recentFormSequence: letters.join('-'),
+    recentFormLabel: `Last ${letters.length}: ${letters.join('-')}`,
+  };
+}
+
+async function getInternationalFormMap() {
+  const payload = await fetchScoreboardPayload('international-play');
+  const map = {};
+
+  (payload?.events || []).forEach((event) => {
+    const competitors = event?.competitions?.[0]?.competitors || [];
+    competitors.forEach((competitor) => {
+      const teamId = String(competitor?.team?.id || competitor?.id || '');
+      if (!teamId || map[teamId]) return;
+      const summary = summarizeInternationalForm(competitor?.form);
+      if (summary.recentFormSequence) {
+        map[teamId] = summary;
+      }
+    });
+  });
+
+  return map;
+}
+
 async function getLeagueBrand(leagueKey) {
   const meta = leagueMeta(leagueKey);
   const payload = await fetchScoreboardPayload(leagueKey);
@@ -705,6 +750,7 @@ async function getStandings(leagueKey) {
   const cached = readCache(key);
   if (cached) return cached;
   const teams = await getTeams(leagueKey);
+  const internationalFormMap = leagueKey === 'international-play' ? await getInternationalFormMap() : {};
   const teamStatsPayloads = await mapLimit(
     teams,
     async (team) => ({
@@ -730,9 +776,18 @@ async function getStandings(leagueKey) {
     const parsedRecord = parseRecordSummary(stats.recordSummary);
     const schedulePayload = scheduleMap[team.id];
     const scheduleSummary = summarizeScheduleResults(schedulePayload, team.id);
+    const internationalForm = leagueKey === 'international-play' ? internationalFormMap[team.id] : null;
     const recentFormLabel = leagueKey === 'international-play'
-      ? scheduleSummary.recentFormCountryLabel
+      ? (scheduleSummary.recentFormSequence
+          ? scheduleSummary.recentFormCountryLabel
+          : internationalForm?.recentFormLabel || 'Last 5 unavailable')
       : scheduleSummary.recentFormPointsLabel;
+    const recentFormPoints = leagueKey === 'international-play' && !scheduleSummary.recentFormSequence
+      ? internationalForm?.recentFormPoints || 0
+      : scheduleSummary.recentFormPoints;
+    const recentFormSequence = leagueKey === 'international-play' && !scheduleSummary.recentFormSequence
+      ? internationalForm?.recentFormSequence || ''
+      : scheduleSummary.recentFormSequence;
 
     const wins = parsedRecord.gamesPlayed ? parsedRecord.wins : scheduleSummary.wins;
     const ties = parsedRecord.gamesPlayed ? parsedRecord.ties : scheduleSummary.ties;
@@ -754,8 +809,8 @@ async function getStandings(leagueKey) {
       differential: scheduleSummary.differential,
       cleanSheets: scheduleSummary.cleanSheets,
       streak: recentFormLabel,
-      recentFormPoints: scheduleSummary.recentFormPoints,
-      recentFormSequence: scheduleSummary.recentFormSequence,
+      recentFormPoints,
+      recentFormSequence,
       recentFormLabel,
       recentResults: scheduleSummary.recentResults,
       standingPoints,
