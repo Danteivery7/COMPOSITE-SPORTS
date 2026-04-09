@@ -876,6 +876,72 @@ async function fetchNews() {
   }
 }
 
+function extractEspnFittPayload(html = '') {
+  const token = "window['__espnfitt__']=";
+  const start = String(html || '').indexOf(token);
+  if (start === -1) return null;
+  const jsonStart = start + token.length;
+  const jsonEnd = String(html || '').indexOf(';</script>', jsonStart);
+  if (jsonEnd === -1) return null;
+  try {
+    return JSON.parse(String(html || '').slice(jsonStart, jsonEnd));
+  } catch (_error) {
+    return null;
+  }
+}
+
+function parseEspnStatPageLeaders(payload = {}) {
+  const rows = payload?.page?.content?.stats?.leaders || [];
+  return rows.flatMap((row) => {
+    const athleteId = String(row?.athlete?.uid || row?.athlete?.href || '').match(/a:(\d+)|\/id\/(\d+)\//)?.slice(1).find(Boolean) || '';
+    if (!athleteId) return [];
+    return (row?.stats || [])
+      .filter((stat) => stat?.name)
+      .map((stat) => {
+        const parsedRank = parseNumeric(stat.rank);
+        return {
+          athleteId,
+          label: stat.name || 'Leader',
+          metricKey: normalizeKey(stat.name || ''),
+          rank: Number.isFinite(parsedRank) ? parsedRank : Number(row?.athlete?.rank || 999),
+          value: parseNumeric(stat.value),
+          displayValue: String(stat.value ?? ''),
+          athlete: {
+            id: athleteId,
+            displayName: row?.athlete?.name || row?.athlete?.shortName || 'Player',
+            shortName: row?.athlete?.shortName || row?.athlete?.name || 'Player',
+            headshot: buildNflHeadshot(athleteId, ''),
+            position: row?.athlete?.position || '',
+          },
+          teamId: '',
+        };
+      });
+  });
+}
+
+async function fetchHtmlLeaders(seasonYear) {
+  const pages = [
+    `https://www.espn.com/nfl/stats/player/_/season/${seasonYear}/seasontype/2/table/passing/sort/passingYards/dir/desc`,
+    `https://www.espn.com/nfl/stats/player/_/season/${seasonYear}/seasontype/2/table/rushing/sort/rushingYards/dir/desc`,
+    `https://www.espn.com/nfl/stats/player/_/season/${seasonYear}/seasontype/2/table/receiving/sort/receivingYards/dir/desc`,
+    `https://www.espn.com/nfl/stats/player/_/view/defense/season/${seasonYear}/seasontype/2/table/defensive/sort/sacks/dir/desc`,
+    `https://www.espn.com/nfl/stats/player/_/view/scoring/season/${seasonYear}/seasontype/2/table/scoring/sort/totalTouchdowns/dir/desc`,
+    `https://www.espn.com/nfl/stats/player/_/view/special/season/${seasonYear}/seasontype/2/table/kicking/sort/fieldGoalsMade/dir/desc`,
+    `https://www.espn.com/nfl/stats/player/_/view/special/season/${seasonYear}/seasontype/2/table/punting/sort/netPuntingYards/dir/desc`,
+  ];
+
+  const payloads = await mapLimit(
+    pages,
+    async (url) => {
+      const html = await fetchText(url, 6 * 60 * 60 * 1000);
+      return parseEspnStatPageLeaders(extractEspnFittPayload(html) || {});
+    },
+    3,
+  );
+
+  return uniqBy(payloads.flat().filter((entry) => entry?.athleteId && entry?.metricKey), (leader) => `${leader.athleteId}:${leader.metricKey}`);
+}
+
 async function fetchLeaders() {
   const seasonYear = getNFLSeasonYear();
   const offseasonLock = shouldUsePreviousSeasonBoard();
@@ -883,32 +949,41 @@ async function fetchLeaders() {
   const cached = readCache(key);
   if (cached) return cached;
 
-  let payload = await fetchJson(withQuery(`${NFL_SITE}/leaders`, { season: seasonYear, seasontype: 2 }), 60 * 60 * 1000);
-  if (!(payload?.leaders || payload?.categories || payload?.items) && !offseasonLock) {
-    payload = await fetchJson(`${NFL_SITE}/leaders`, 60 * 60 * 1000);
+  let leaders = [];
+  try {
+    let payload = await fetchJson(withQuery(`${NFL_SITE}/leaders`, { season: seasonYear, seasontype: 2 }), 60 * 60 * 1000);
+    if (!(payload?.leaders || payload?.categories || payload?.items) && !offseasonLock) {
+      payload = await fetchJson(`${NFL_SITE}/leaders`, 60 * 60 * 1000);
+    }
+
+    walk(payload, (node) => {
+      if (node?.athlete?.id && (node.rank || node.displayValue || node.value)) {
+        leaders.push({
+          athleteId: String(node.athlete.id),
+          label: node.name || node.displayName || node.shortDisplayName || 'Leader',
+          metricKey: normalizeKey(node.name || node.displayName || node.shortDisplayName || ''),
+          rank: Number(node.rank || 999),
+          value: parseNumeric(node.value ?? node.displayValue),
+          displayValue: node.displayValue || String(node.value || ''),
+          athlete: {
+            id: String(node.athlete.id),
+            displayName: node.athlete.displayName || node.athlete.shortName || 'Player',
+            shortName: node.athlete.shortName || node.athlete.displayName || 'Player',
+            headshot: node.athlete.headshot?.href || '',
+            position: node.athlete.position?.abbreviation || '',
+          },
+          teamId: node.team?.id ? String(node.team.id) : '',
+        });
+      }
+    });
+  } catch (_error) {
+    leaders = [];
   }
 
-  const leaders = [];
-  walk(payload, (node) => {
-    if (node?.athlete?.id && (node.rank || node.displayValue || node.value)) {
-      leaders.push({
-        athleteId: String(node.athlete.id),
-        label: node.name || node.displayName || node.shortDisplayName || 'Leader',
-        metricKey: normalizeKey(node.name || node.displayName || node.shortDisplayName || ''),
-        rank: Number(node.rank || 999),
-        value: parseNumeric(node.value ?? node.displayValue),
-        displayValue: node.displayValue || String(node.value || ''),
-        athlete: {
-          id: String(node.athlete.id),
-          displayName: node.athlete.displayName || node.athlete.shortName || 'Player',
-          shortName: node.athlete.shortName || node.athlete.displayName || 'Player',
-          headshot: node.athlete.headshot?.href || '',
-          position: node.athlete.position?.abbreviation || '',
-        },
-        teamId: node.team?.id ? String(node.team.id) : '',
-      });
-    }
-  });
+  if (!leaders.length) {
+    leaders = await fetchHtmlLeaders(seasonYear);
+  }
+
   return writeCache(key, uniqBy(leaders, (leader) => `${leader.athleteId}:${leader.metricKey}`), 60 * 60 * 1000);
 }
 
@@ -1254,6 +1329,7 @@ export async function getNFLPlayerCatalog() {
     .map((player) => {
       const weights = POSITION_WEIGHTS[player.positionGroup] || POSITION_WEIGHTS.WR;
       const groupScales = scales[player.positionGroup] || {};
+      const leaderCount = player.leaders?.length || 0;
       let weightedTotal = 0;
       let weightTotal = 0;
 
@@ -1265,8 +1341,10 @@ export async function getNFLPlayerCatalog() {
       });
 
       const basePercentile = weightTotal ? weightedTotal / weightTotal : 50;
-      const teamContext = ((player.team?.ovrScore || 75) - 75) * 0.06;
-      const roleDifficulty = player.positionGroup === 'QB' ? 1.6 : player.positionGroup === 'CB' || player.positionGroup === 'EDGE' ? 1.1 : 0.4;
+      const teamContext = leaderCount ? ((player.team?.ovrScore || 75) - 75) * 0.03 : 0;
+      const roleDifficulty = leaderCount
+        ? (player.positionGroup === 'QB' ? 1.6 : player.positionGroup === 'CB' || player.positionGroup === 'EDGE' ? 1.1 : 0.4)
+        : 0;
       const ageAdj =
         player.age == null
           ? 0
@@ -1276,10 +1354,23 @@ export async function getNFLPlayerCatalog() {
               ? 0.4
               : player.age >= 32
                 ? -0.8
-                : 0;
+              : 0;
       const experienceAdj = Number.isFinite(player.experience) ? Math.min(1, player.experience * 0.14) : 0;
-      const recentAdj = ((player.team?.recentScore || 50) - 50) * 0.04;
-      const finalPercentile = Math.max(1, Math.min(99.9, basePercentile + teamContext + roleDifficulty + ageAdj + experienceAdj + recentAdj));
+      const recentAdj = leaderCount ? ((player.team?.recentScore || 50) - 50) * 0.02 : 0;
+      const bestRank = Math.min(...(player.leaders || []).map((entry) => Number(entry.rank || 999)), 999);
+      const leaderboardBonus = leaderCount ? Math.max(0, (40 - bestRank) * 0.18) : 0;
+      const noDataPenalty =
+        leaderCount > 0
+          ? 0
+          : player.positionGroup === 'OL'
+            ? -18
+            : player.positionGroup === 'K/P'
+              ? -12
+              : -9;
+      const finalPercentile = Math.max(
+        1,
+        Math.min(99.9, basePercentile + teamContext + roleDifficulty + ageAdj + experienceAdj + recentAdj + leaderboardBonus + noDataPenalty),
+      );
       const rating = roundOvr(convertPercentileToOvr(finalPercentile));
 
       return {
