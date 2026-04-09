@@ -14,6 +14,7 @@ const SPORT_BOOTSTRAP_TTL = 2 * 60 * 1000;
 const SPORT_PLAYER_TTL = 10 * 60 * 1000;
 const FOOTBALL_LANDING_TTL = 2 * 60 * 1000;
 const CBB_SNAPSHOT_VERSION = 'v3';
+const NFL_SNAPSHOT_VERSION = 'v2';
 const FOOTBALL_SNAPSHOT_VERSION = 'v11';
 const FOOTBALL_LANDING_VERSION = 'v7';
 
@@ -72,10 +73,10 @@ async function buildGenericSportSnapshot(sport) {
   }
 
   if (sport === 'nfl') {
-    const [bootstrap, playersCatalog] = await Promise.all([
-      getNFLBootstrap(),
-      getNFLPlayerCatalog(),
-    ]);
+    const bootstrap = await getNFLBootstrap();
+    const playersCatalog = bootstrap?.playersCatalog?.players?.length
+      ? bootstrap.playersCatalog
+      : await getNFLPlayerCatalog();
 
     return {
       ...bootstrap,

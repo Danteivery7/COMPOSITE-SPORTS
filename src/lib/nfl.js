@@ -192,6 +192,11 @@ export function getNFLSeasonYear(date = new Date()) {
   return month > 7 || (month === 7 && day >= 31) ? year : year - 1;
 }
 
+function shouldUsePreviousSeasonBoard(date = new Date()) {
+  const { month, day } = easternDateParts(date);
+  return month < 7 || (month === 7 && day < 31);
+}
+
 async function fetchJson(url, ttlMs = 60_000) {
   const key = cacheKey('json', url);
   const cached = readCache(key);
@@ -408,6 +413,78 @@ async function fetchTeamSchedule(teamId) {
   }
 }
 
+function parseScoreboardGames(payload = {}) {
+  return (payload.events || [])
+    .map((event) => {
+      const competition = event.competitions?.[0];
+      const competitors = competition?.competitors || [];
+      const away = competitors.find((item) => item.homeAway === 'away');
+      const home = competitors.find((item) => item.homeAway === 'home');
+      const status = competition?.status?.type || event.status?.type || {};
+      if (!home || !away) return null;
+      return {
+        id: String(event.id),
+        name: event.name || event.shortName,
+        state: status.state || 'pre',
+        statusLabel: status.detail || status.shortDetail || status.description || 'Scheduled',
+        startTime: event.date,
+        startLabel: event.date
+          ? new Date(event.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+          : 'TBD',
+        broadcast: competition?.broadcasts?.[0]?.names?.[0] || '',
+        odds: extractEspnOdds(competition, event?.pickcenter?.[0] || null),
+        situation: competition?.situation || null,
+        home: {
+          teamId: home?.team?.id ? String(home.team.id) : '',
+          abbreviation: home?.team?.abbreviation || 'HOME',
+          displayName: home?.team?.displayName || 'Home',
+          logo: home?.team?.logo || home?.team?.logos?.[0]?.href || '',
+          score: home?.score || '0',
+          record: home?.records?.[0]?.summary || '',
+          winner: Boolean(home?.winner),
+        },
+        away: {
+          teamId: away?.team?.id ? String(away.team.id) : '',
+          abbreviation: away?.team?.abbreviation || 'AWAY',
+          displayName: away?.team?.displayName || 'Away',
+          logo: away?.team?.logo || away?.team?.logos?.[0]?.href || '',
+          score: away?.score || '0',
+          record: away?.records?.[0]?.summary || '',
+          winner: Boolean(away?.winner),
+        },
+      };
+    })
+    .filter(Boolean);
+}
+
+async function buildPreviousSeasonScoreboard(seasonYear) {
+  const teams = await getTeams();
+  const schedules = await mapLimit(
+    teams,
+    async (team) => fetchTeamSchedule(team.espnId),
+    8,
+  );
+
+  const eventMap = new Map();
+  schedules.forEach((schedule) => {
+    (schedule?.events || []).forEach((event) => {
+      const competition = event?.competitions?.[0];
+      const status = competition?.status?.type || event?.status?.type || {};
+      if (!competition || status.state !== 'post' || !event?.id || eventMap.has(String(event.id))) return;
+      eventMap.set(String(event.id), event);
+    });
+  });
+
+  const payload = {
+    events: Array.from(eventMap.values()).sort((left, right) => new Date(right?.date || 0) - new Date(left?.date || 0)),
+  };
+  const games = parseScoreboardGames(payload);
+  return games.slice(0, 12).map((game, index) => ({
+    ...game,
+    statusLabel: index === 0 ? `${game.statusLabel} • Latest final from ${seasonYear}` : game.statusLabel,
+  }));
+}
+
 function summarizeRecentForm(schedulePayload, teamId) {
   const events = schedulePayload?.events || schedulePayload?.games || [];
   const completed = events
@@ -445,46 +522,19 @@ function summarizeRecentForm(schedulePayload, teamId) {
 }
 
 async function fetchScoreboard() {
-  const key = cacheKey('scoreboard');
+  const seasonYear = getNFLSeasonYear();
+  const usePreviousSeasonBoard = shouldUsePreviousSeasonBoard();
+  const key = cacheKey('scoreboard', `${seasonYear}:${usePreviousSeasonBoard ? 'archive' : 'live'}`);
   const cached = readCache(key);
   if (cached) return cached;
+  if (usePreviousSeasonBoard) {
+    const archivedGames = await buildPreviousSeasonScoreboard(seasonYear);
+    if (archivedGames.length) {
+      return writeCache(key, archivedGames, 10 * 60 * 1000);
+    }
+  }
   const payload = await fetchJson(`${NFL_SITE}/scoreboard`, 45 * 1000);
-  const games = (payload.events || []).map((event) => {
-    const competition = event.competitions?.[0];
-    const competitors = competition?.competitors || [];
-    const away = competitors.find((item) => item.homeAway === 'away');
-    const home = competitors.find((item) => item.homeAway === 'home');
-    const status = competition?.status?.type || event.status?.type || {};
-    return {
-      id: String(event.id),
-      name: event.name || event.shortName,
-      state: status.state || 'pre',
-      statusLabel: status.detail || status.shortDetail || status.description || 'Scheduled',
-      startTime: event.date,
-      startLabel: new Date(event.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-      broadcast: competition?.broadcasts?.[0]?.names?.[0] || '',
-      odds: extractEspnOdds(competition, event?.pickcenter?.[0] || null),
-      situation: competition?.situation || null,
-      home: {
-        teamId: home?.team?.id ? String(home.team.id) : '',
-        abbreviation: home?.team?.abbreviation || 'HOME',
-        displayName: home?.team?.displayName || 'Home',
-        logo: home?.team?.logo || home?.team?.logos?.[0]?.href || '',
-        score: home?.score || '0',
-        record: home?.records?.[0]?.summary || '',
-        winner: Boolean(home?.winner),
-      },
-      away: {
-        teamId: away?.team?.id ? String(away.team.id) : '',
-        abbreviation: away?.team?.abbreviation || 'AWAY',
-        displayName: away?.team?.displayName || 'Away',
-        logo: away?.team?.logo || away?.team?.logos?.[0]?.href || '',
-        score: away?.score || '0',
-        record: away?.records?.[0]?.summary || '',
-        winner: Boolean(away?.winner),
-      },
-    };
-  });
+  const games = parseScoreboardGames(payload);
   return writeCache(key, games, 45 * 1000);
 }
 
@@ -935,22 +985,16 @@ function fantasySeasonBlend() {
   return month < 9 ? { currentWeight: 0.15, lastWeight: 0.85 } : { currentWeight: 0.55, lastWeight: 0.45 };
 }
 
-export async function getNFLFantasyRankings() {
-  const seasonYear = getNFLSeasonYear();
-  const key = cacheKey('fantasy', seasonYear);
-  const cached = readCache(key);
-  if (cached) return cached;
-
-  const [catalog, news] = await Promise.all([getNFLPlayerCatalog(), fetchNews()]);
+function buildFantasyPayload(catalog, news) {
   const { currentWeight, lastWeight } = fantasySeasonBlend();
-  const players = catalog.players
+  const players = (catalog?.players || [])
     .filter((player) => FANTASY_POSITIONS.has(player.positionGroup))
     .map((player) => {
       const metrics = player.rawComponents || {};
       const volume = (metrics.production || 0) * 0.34 + (metrics.targetCommand || 0) * 0.28 + (metrics.redZoneRole || 0) * 0.18 + (metrics.snapShare || 0) * 0.2;
       const ceiling = (metrics.explosivePassing || metrics.explosiveRuns || metrics.explosivePlays || metrics.touchdownRate || 0) * 0.46 + (metrics.efficiency || 0) * 0.26 + (metrics.redZoneRole || 0) * 0.28;
       const realSkill = (player.rating || 70) * 0.65;
-      const injuryPenalty = news.some((story) => normalizeKey(story.headline).includes(normalizeKey(player.displayName)) && /injur|out|surgery|questionable/i.test(story.headline || '')) ? -6 : 0;
+      const injuryPenalty = (news || []).some((story) => normalizeKey(story.headline).includes(normalizeKey(player.displayName)) && /injur|out|surgery|questionable/i.test(story.headline || '')) ? -6 : 0;
       const fantasyValue = roundOvr(lastWeight * (volume * 0.58 + ceiling * 0.24 + realSkill * 0.18) + currentWeight * player.rating + injuryPenalty);
       return {
         ...player,
@@ -964,22 +1008,28 @@ export async function getNFLFantasyRankings() {
       fantasyRank: index + 1,
     }));
 
-  const fantasyNews = news.filter((story) => {
+  const fantasyNews = (news || []).filter((story) => {
     const haystack = `${story.headline} ${story.description}`.toLowerCase();
     return FANTASY_KEYWORDS.some((keyword) => haystack.includes(keyword));
   });
 
-  return writeCache(
-    key,
-    {
-      players,
-      news: fantasyNews.slice(0, 8),
-      lastUpdated: new Date().toISOString(),
-      formula:
-        'Before Week 5 the board leans on previous-season volume, ceiling, and role context. After Week 5 current-season production takes over more aggressively.',
-    },
-    20 * 60 * 1000,
-  );
+  return {
+    players,
+    news: fantasyNews.slice(0, 8),
+    lastUpdated: new Date().toISOString(),
+    formula:
+      'Before Week 5 the board leans on previous-season volume, ceiling, and role context. After Week 5 current-season production takes over more aggressively.',
+  };
+}
+
+export async function getNFLFantasyRankings() {
+  const seasonYear = getNFLSeasonYear();
+  const key = cacheKey('fantasy', seasonYear);
+  const cached = readCache(key);
+  if (cached) return cached;
+
+  const [catalog, news] = await Promise.all([getNFLPlayerCatalog(), fetchNews()]);
+  return writeCache(key, buildFantasyPayload(catalog, news), 20 * 60 * 1000);
 }
 
 function filterTeamNews(news, team) {
@@ -1092,13 +1142,13 @@ export async function getNFLBootstrap() {
   const cached = readCache(key);
   if (cached) return cached;
 
-  const [scoreboard, rankings, news, catalog, fantasy] = await Promise.all([
+  const rankings = await computeRankings();
+  const [scoreboard, news, catalog] = await Promise.all([
     fetchScoreboard(),
-    computeRankings(),
     fetchNews(),
     getNFLPlayerCatalog(),
-    getNFLFantasyRankings(),
   ]);
+  const fantasy = buildFantasyPayload(catalog, news);
 
   const featuredPlayers = catalog.players.slice(0, 16);
   const predictors = buildPredictors(scoreboard, rankings, featuredPlayers);
@@ -1116,6 +1166,7 @@ export async function getNFLBootstrap() {
       news: news.slice(0, 8),
       fantasyNews: fantasy.news || [],
       featuredPlayers,
+      playersCatalog: catalog,
       predictors,
       fantasyRankings: fantasy.players.slice(0, 80),
       formulas: FORMULA_COPY,
