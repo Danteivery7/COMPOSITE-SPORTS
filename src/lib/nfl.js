@@ -250,6 +250,23 @@ function parseNumeric(value) {
   return Number.isFinite(numeric) ? numeric : NaN;
 }
 
+function normalizeCompetitorScore(score) {
+  if (score && typeof score === 'object') {
+    if (score.displayValue !== undefined && score.displayValue !== null && score.displayValue !== '') {
+      return String(score.displayValue);
+    }
+    if (score.value !== undefined && score.value !== null && score.value !== '') {
+      return String(score.value);
+    }
+  }
+  if (score === null || score === undefined || score === '') return '0';
+  return String(score);
+}
+
+function numericCompetitorScore(score) {
+  return parseNumeric(normalizeCompetitorScore(score)) || 0;
+}
+
 function scoreScale(values, higherIsBetter = true) {
   const usable = values.filter((value) => Number.isFinite(value));
   if (!usable.length) return () => 50;
@@ -475,7 +492,7 @@ function parseScoreboardGames(payload = {}) {
           abbreviation: home?.team?.abbreviation || 'HOME',
           displayName: home?.team?.displayName || 'Home',
           logo: home?.team?.logo || home?.team?.logos?.[0]?.href || '',
-          score: home?.score || '0',
+          score: normalizeCompetitorScore(home?.score),
           record: home?.records?.[0]?.summary || '',
           winner: Boolean(home?.winner),
         },
@@ -484,7 +501,7 @@ function parseScoreboardGames(payload = {}) {
           abbreviation: away?.team?.abbreviation || 'AWAY',
           displayName: away?.team?.displayName || 'Away',
           logo: away?.team?.logo || away?.team?.logos?.[0]?.href || '',
-          score: away?.score || '0',
+          score: normalizeCompetitorScore(away?.score),
           record: away?.records?.[0]?.summary || '',
           winner: Boolean(away?.winner),
         },
@@ -536,8 +553,8 @@ function summarizeRecentForm(schedulePayload, teamId) {
       const team = competitors.find((item) => String(item.team?.id) === String(teamId));
       const opponent = competitors.find((item) => String(item.team?.id) !== String(teamId));
       if (!team || !opponent) return null;
-      const teamScore = Number(team.score || 0);
-      const opponentScore = Number(opponent.score || 0);
+      const teamScore = numericCompetitorScore(team.score);
+      const opponentScore = numericCompetitorScore(opponent.score);
       if (teamScore > opponentScore) {
         wins += 1;
         points += 2;
