@@ -211,6 +211,20 @@ async function fetchJson(url, ttlMs = 60_000) {
   return writeCache(key, await response.json(), ttlMs);
 }
 
+async function fetchText(url, ttlMs = 60_000) {
+  const key = cacheKey('text', url);
+  const cached = readCache(key);
+  if (cached) return cached;
+  const response = await fetch(url, {
+    cache: 'no-store',
+    headers: { Accept: 'text/html,text/plain,*/*' },
+  });
+  if (!response.ok) {
+    throw new Error(`${response.status} ${response.statusText}`);
+  }
+  return writeCache(key, await response.text(), ttlMs);
+}
+
 async function mapLimit(items, mapper, concurrency = 8) {
   const results = new Array(items.length);
   let cursor = 0;
@@ -248,6 +262,99 @@ function parseNumeric(value) {
   const normalized = String(value).replace(/,/g, '').replace(/%/g, '');
   const numeric = Number(normalized);
   return Number.isFinite(numeric) ? numeric : NaN;
+}
+
+function decodeHtmlEntities(value = '') {
+  return String(value || '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&#39;|&apos;/gi, '\'')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>');
+}
+
+function normalizeFantasyLookupName(value = '') {
+  return normalizeKey(
+    String(value || '')
+      .replace(/\b(Jr\.?|Sr\.?|II|III|IV|V)\b/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim(),
+  );
+}
+
+function buildFantasyLookupKeys(name = '', teamAbbr = '') {
+  const keys = new Set();
+  const normalizedName = normalizeFantasyLookupName(name);
+  const team = normalizeKey(teamAbbr);
+  if (normalizedName) keys.add(normalizedName);
+  if (normalizedName && team) keys.add(`${normalizedName}:${team}`);
+  return Array.from(keys);
+}
+
+function fantasyRankToPercentile(rank, total = 200) {
+  if (!Number.isFinite(rank) || rank <= 0 || total <= 1) return 50;
+  return Math.max(1, Math.min(99, ((total - rank) / (total - 1)) * 100));
+}
+
+async function fetchOfficialFantasyRankings() {
+  const key = cacheKey('fantasy-source', getNFLSeasonYear());
+  const cached = readCache(key);
+  if (cached) return cached;
+
+  try {
+    const html = await fetchText('https://fantasy.nfl.com/research/rankings?leagueId=0&statType=draftStats', 6 * 60 * 60 * 1000);
+    const text = decodeHtmlEntities(
+      html
+        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    );
+
+    const players = [];
+    const pattern = /(?:^|\s)(\d{1,3})\s+([A-Z0-9][A-Za-z0-9.'\-]+(?:\s+[A-Z0-9][A-Za-z0-9.'\-]+){0,4})\s+(QB|RB|WR|TE)\s*-\s*([A-Z]{2,3})(?:\s+(?:IR|IA|SUS|O|Q|PUP|NFI-R))*\b/g;
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      const rank = Number(match[1]);
+      if (!Number.isFinite(rank) || rank <= 0 || rank > 250) continue;
+      const displayName = String(match[2] || '').trim();
+      const position = String(match[3] || '').trim();
+      const teamAbbr = String(match[4] || '').trim();
+      if (!displayName || !position || !teamAbbr) continue;
+      players.push({
+        rank,
+        displayName,
+        teamAbbr,
+        positionGroup: position,
+        source: 'NFL Fantasy',
+      });
+    }
+
+    const uniquePlayers = uniqBy(players, (player) => `${player.rank}:${normalizeFantasyLookupName(player.displayName)}:${player.teamAbbr}`);
+    return writeCache(
+      key,
+      {
+        source: 'NFL Fantasy',
+        players: uniquePlayers.slice(0, 200),
+        totalPlayers: uniquePlayers.length,
+        lastUpdated: new Date().toISOString(),
+      },
+      6 * 60 * 60 * 1000,
+    );
+  } catch (_error) {
+    return writeCache(
+      key,
+      {
+        source: 'NFL Fantasy',
+        players: [],
+        totalPlayers: 0,
+        lastUpdated: null,
+      },
+      30 * 60 * 1000,
+    );
+  }
 }
 
 function normalizeCompetitorScore(score) {
@@ -1054,8 +1161,21 @@ function fantasySeasonBlend() {
   return month < 9 ? { currentWeight: 0.15, lastWeight: 0.85 } : { currentWeight: 0.55, lastWeight: 0.45 };
 }
 
-function buildFantasyPayload(catalog, news) {
+function findFantasySourceEntry(player, sourcePlayers = []) {
+  const lookupKeys = buildFantasyLookupKeys(player.displayName, player.team?.abbreviation);
+  for (const sourcePlayer of sourcePlayers) {
+    const sourceKeys = buildFantasyLookupKeys(sourcePlayer.displayName, sourcePlayer.teamAbbr);
+    if (lookupKeys.some((key) => sourceKeys.includes(key))) {
+      return sourcePlayer;
+    }
+  }
+  return null;
+}
+
+function buildFantasyPayload(catalog, news, sourceRankings = { players: [], source: 'NFL Fantasy' }) {
   const { currentWeight, lastWeight } = fantasySeasonBlend();
+  const sourcePlayers = sourceRankings?.players || [];
+  const sourceTotal = Math.max(1, sourceRankings?.totalPlayers || sourcePlayers.length || 200);
   const players = (catalog?.players || [])
     .filter((player) => FANTASY_POSITIONS.has(player.positionGroup))
     .map((player) => {
@@ -1063,15 +1183,32 @@ function buildFantasyPayload(catalog, news) {
       const volume = (metrics.production || 0) * 0.34 + (metrics.targetCommand || 0) * 0.28 + (metrics.redZoneRole || 0) * 0.18 + (metrics.snapShare || 0) * 0.2;
       const ceiling = (metrics.explosivePassing || metrics.explosiveRuns || metrics.explosivePlays || metrics.touchdownRate || 0) * 0.46 + (metrics.efficiency || 0) * 0.26 + (metrics.redZoneRole || 0) * 0.28;
       const realSkill = (player.rating || 70) * 0.65;
+      const teamSituation = ((player.team?.ovrScore || 75) * 0.45) + ((player.team?.offScore || 70) * 0.35) + ((player.team?.recentScore || 50) * 0.20);
+      const historicalModel = (volume * 0.44) + (ceiling * 0.24) + (realSkill * 0.18) + (teamSituation * 0.14);
+      const sourceEntry = findFantasySourceEntry(player, sourcePlayers);
+      const sourcePercentile = sourceEntry ? fantasyRankToPercentile(sourceEntry.rank, sourceTotal) : null;
+      const sourceScore = sourcePercentile != null ? convertPercentileToOvr(sourcePercentile) : null;
       const injuryPenalty = (news || []).some((story) => normalizeKey(story.headline).includes(normalizeKey(player.displayName)) && /injur|out|surgery|questionable/i.test(story.headline || '')) ? -6 : 0;
-      const fantasyValue = roundOvr(lastWeight * (volume * 0.58 + ceiling * 0.24 + realSkill * 0.18) + currentWeight * player.rating + injuryPenalty);
+      const fantasyValue = roundOvr(
+        (sourceScore != null
+          ? (lastWeight * ((sourceScore * 0.54) + (historicalModel * 0.32) + ((player.rating || 70) * 0.14))) +
+            (currentWeight * (((player.rating || 70) * 0.60) + (historicalModel * 0.25) + (sourceScore * 0.15)))
+          : (lastWeight * historicalModel) + (currentWeight * (player.rating || 70))) +
+          injuryPenalty,
+      );
       return {
         ...player,
         fantasyValue,
         fantasyTier: bucketTier(fantasyValue),
+        fantasySource: sourceEntry?.source || sourceRankings?.source || 'Composite',
+        fantasySourceRank: sourceEntry?.rank || null,
       };
     })
-    .sort((left, right) => right.fantasyValue - left.fantasyValue || right.rating - left.rating)
+    .sort((left, right) =>
+      right.fantasyValue - left.fantasyValue ||
+      (left.fantasySourceRank || Number.MAX_SAFE_INTEGER) - (right.fantasySourceRank || Number.MAX_SAFE_INTEGER) ||
+      right.rating - left.rating
+    )
     .map((player, index) => ({
       ...player,
       fantasyRank: index + 1,
@@ -1087,7 +1224,8 @@ function buildFantasyPayload(catalog, news) {
     news: fantasyNews.slice(0, 8),
     lastUpdated: new Date().toISOString(),
     formula:
-      'Before Week 5 the board leans on previous-season volume, ceiling, and role context. After Week 5 current-season production takes over more aggressively.',
+      'Before Week 5 the board leans on official NFL Fantasy draft rankings plus previous-season volume, role, and team context. After Week 5 current-season production takes over more aggressively.',
+    source: sourceRankings?.source || 'NFL Fantasy',
   };
 }
 
@@ -1097,8 +1235,8 @@ export async function getNFLFantasyRankings() {
   const cached = readCache(key);
   if (cached) return cached;
 
-  const [catalog, news] = await Promise.all([getNFLPlayerCatalog(), fetchNews()]);
-  return writeCache(key, buildFantasyPayload(catalog, news), 20 * 60 * 1000);
+  const [catalog, news, sourceRankings] = await Promise.all([getNFLPlayerCatalog(), fetchNews(), fetchOfficialFantasyRankings()]);
+  return writeCache(key, buildFantasyPayload(catalog, news, sourceRankings), 20 * 60 * 1000);
 }
 
 function filterTeamNews(news, team) {

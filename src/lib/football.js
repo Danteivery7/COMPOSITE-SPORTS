@@ -971,14 +971,7 @@ async function computeRankings(leagueKey) {
       : null;
     const hotnessNerf = recentScore * 0.10;
     const finalPercentile = leagueKey === 'international-play'
-      ? clampNumber(
-        (fifaPercentile ?? 50) * 0.88 +
-          recentScore * 0.06 +
-          offScore * 0.03 +
-          defScore * 0.03,
-        1,
-        100,
-      )
+      ? clampNumber(fifaPercentile ?? 50, 1, 100)
       : clampNumber(
         squadScore * 0.26 +
           offScore * 0.16 +
@@ -990,7 +983,9 @@ async function computeRankings(leagueKey) {
         1,
         100,
       );
-    const ovrScore = clampNumber(Math.round((60 + finalPercentile * 0.39) * 10) / 10, 50, 99);
+    const ovrScore = leagueKey === 'international-play'
+      ? clampNumber(footballOverallFromPercentile(finalPercentile), 50, 99)
+      : clampNumber(Math.round((60 + finalPercentile * 0.39) * 10) / 10, 50, 99);
     const globalScore = ovrScore;
 
     return {
@@ -1203,9 +1198,9 @@ function footballOverallFromPercentile(percentile) {
     [40, 70, 75, 82],
     [70, 88, 82, 89],
     [88, 96, 89, 94],
-    [96, 99, 94, 97],
-    [99, 99.7, 97, 98.5],
-    [99.7, 100, 98.5, 99],
+    [96, 99, 94, 96.6],
+    [99, 99.7, 96.6, 97.9],
+    [99.7, 100, 97.9, 99],
   ];
 
   for (const [start, end, min, max] of segments) {
@@ -1217,6 +1212,22 @@ function footballOverallFromPercentile(percentile) {
   }
 
   return 99;
+}
+
+function applyFootballLeagueEliteCaps(players = []) {
+  return players.map((player, index) => {
+    const rawRating = Number(player.rating || 0);
+    const cappedRating =
+      index === 0 ? Math.min(rawRating, 99) :
+      index === 1 ? Math.min(rawRating, 98.9) :
+      Math.min(rawRating, 97.9);
+    const rating = Math.round(cappedRating * 10) / 10;
+    return {
+      ...player,
+      rating,
+      tier: toTierLabel(rating),
+    };
+  });
 }
 
 function buildTeamPerformanceContext(team = {}, leagueKey = '') {
@@ -1568,7 +1579,7 @@ function mergeFootballPlayerCatalog(rawCatalog, registryData, leagueKey) {
   const localRated = Object.fromEntries((rawCatalog.players || []).map((player) => [player.id, applyFootballRating(player, localScales, { includeLeagueAdjustment: true })]));
   const registry = registryData?.registry || {};
 
-  const players = (rawCatalog.players || [])
+  const players = applyFootballLeagueEliteCaps((rawCatalog.players || [])
     .map((player) => {
       const canonical = registry[player.id];
       const local = localRated[player.id];
@@ -1593,7 +1604,7 @@ function mergeFootballPlayerCatalog(rawCatalog, registryData, leagueKey) {
       };
     })
     .sort((left, right) => Number(right.rating || 0) - Number(left.rating || 0) || left.displayName.localeCompare(right.displayName))
-    .map((player, index) => ({ ...player, rank: index + 1 }));
+    .map((player, index) => ({ ...player, rank: index + 1 })));
 
   return {
     league: leagueKey,
