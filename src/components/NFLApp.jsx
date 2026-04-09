@@ -362,6 +362,17 @@ function hotnessLabel(value) {
   return `${Math.max(1, Math.min(5, Number(value || 0)))}/5`;
 }
 
+async function fetchJsonSafe(url, fallback = null) {
+  try {
+    const response = await fetch(url, { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok) return fallback;
+    return data;
+  } catch (_error) {
+    return fallback;
+  }
+}
+
 function PlayersView({ players, query, setQuery, loading, openPlayer }) {
   return (
     <section className="nfl-stack">
@@ -851,9 +862,10 @@ export default function NFLApp({ initialEntry = null, initialBootstrap = null, t
 
   async function fetchBootstrap(force = false) {
     try {
-      const response = await fetch(`${apiBase}/bootstrap${force ? '?force=1' : ''}`, { cache: 'no-store' });
-      const data = await response.json();
-      setBootstrap(data);
+      const data = await fetchJsonSafe(`${apiBase}/bootstrap${force ? '?force=1' : ''}`, null);
+      if (data) {
+        setBootstrap(data);
+      }
     } finally {
       setLoadingBootstrap(false);
     }
@@ -894,8 +906,7 @@ export default function NFLApp({ initialEntry = null, initialBootstrap = null, t
       setLoadingPlayers(true);
       try {
         const query = playersQuery.trim() ? `?q=${encodeURIComponent(playersQuery.trim())}` : '';
-        const response = await fetch(`${apiBase}/players${query}`, { cache: 'no-store' });
-        const data = await response.json();
+        const data = await fetchJsonSafe(`${apiBase}/players${query}`, { players: [] });
         if (!ignore) setPlayersData(data);
       } finally {
         if (!ignore) setLoadingPlayers(false);
@@ -920,11 +931,10 @@ export default function NFLApp({ initialEntry = null, initialBootstrap = null, t
     async function fetchCustomPredictor() {
       setPredictorLoading(true);
       try {
-        const response = await fetch(
+        const data = await fetchJsonSafe(
           `${apiBase}/predictor?homeTeamId=${encodeURIComponent(selectedHomeTeamId)}&awayTeamId=${encodeURIComponent(selectedAwayTeamId)}`,
-          { cache: 'no-store' },
+          { predictors: [] },
         );
-        const data = await response.json();
         if (!ignore) setCustomPredictor(data.predictors || []);
       } finally {
         if (!ignore) setPredictorLoading(false);
@@ -938,16 +948,16 @@ export default function NFLApp({ initialEntry = null, initialBootstrap = null, t
   }, [apiBase, page, selectedHomeTeamId, selectedAwayTeamId]);
 
   async function openTeam(teamId) {
-    const response = await fetch(`${apiBase}/teams/${teamId}`, { cache: 'no-store' });
-    const data = await response.json();
+    const data = await fetchJsonSafe(`${apiBase}/teams/${teamId}`, null);
+    if (!data) return;
     setTeamDetail(data);
     setPage('team-detail');
     setMobileNavOpen(false);
   }
 
   async function openPlayer(playerId, options = {}) {
-    const response = await fetch(`${apiBase}/players/${playerId}`, { cache: 'no-store' });
-    const data = await response.json();
+    const data = await fetchJsonSafe(`${apiBase}/players/${playerId}`, null);
+    if (!data) return;
     setHubOriginPlayer(Boolean(options.fromHub));
     setPlayerDetail(data);
     setPage('player-detail');
@@ -955,8 +965,8 @@ export default function NFLApp({ initialEntry = null, initialBootstrap = null, t
   }
 
   async function openGame(gameId) {
-    const response = await fetch(`${apiBase}/games/${gameId}`, { cache: 'no-store' });
-    const data = await response.json();
+    const data = await fetchJsonSafe(`${apiBase}/games/${gameId}`, null);
+    if (!data) return;
     setGameDetail(data);
     setPage('game-detail');
     setMobileNavOpen(false);
@@ -964,8 +974,8 @@ export default function NFLApp({ initialEntry = null, initialBootstrap = null, t
 
   async function openStory(story, fromPage = 'overview') {
     if (!story?.storyId) return;
-    const response = await fetch(`${apiBase}/news/${story.storyId}?apiHref=${encodeURIComponent(story.apiHref || '')}`, { cache: 'no-store' });
-    const data = await response.json();
+    const data = await fetchJsonSafe(`${apiBase}/news/${story.storyId}?apiHref=${encodeURIComponent(story.apiHref || '')}`, null);
+    if (!data) return;
     setStoryDetail({ ...data, previousPage: fromPage });
     setPage('story-detail');
     setMobileNavOpen(false);
