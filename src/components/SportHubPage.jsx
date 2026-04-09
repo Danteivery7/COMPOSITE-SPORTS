@@ -22,10 +22,29 @@ function getSportRailStep(rail) {
   return card.getBoundingClientRect().width + gap;
 }
 
+function getSportHeadshotFallbackUrl(player) {
+  const id = String(player?.playerId || player?.id || '').trim();
+  if (!id) return '';
+  if (player?.sportKey === 'football') return `https://a.espncdn.com/i/headshots/soccer/players/full/${id}.png`;
+  if (player?.sportKey === 'mlb') return `https://a.espncdn.com/i/headshots/mlb/players/full/${id}.png`;
+  if (player?.sportKey === 'nba') return `https://a.espncdn.com/i/headshots/nba/players/full/${id}.png`;
+  if (player?.sportKey === 'nhl') return `https://a.espncdn.com/i/headshots/nhl/players/full/${id}.png`;
+  if (player?.sportKey === 'nfl') return `https://a.espncdn.com/i/headshots/nfl/players/full/${id}.png`;
+  if (player?.sportKey === 'cbb') return `https://a.espncdn.com/i/headshots/mens-college-basketball/players/full/${id}.png`;
+  return '';
+}
+
 function ensureHeadshotFallback(event) {
-  if (event.currentTarget.dataset.fallbackApplied === '1') return;
-  event.currentTarget.dataset.fallbackApplied = '1';
-  event.currentTarget.src = 'https://a.espncdn.com/i/headshots/nophoto.png';
+  const { currentTarget } = event;
+  const fallbackSrc = currentTarget.dataset.fallbackSrc;
+  if (fallbackSrc && currentTarget.dataset.fallbackApplied !== 'primary') {
+    currentTarget.dataset.fallbackApplied = 'primary';
+    currentTarget.src = fallbackSrc;
+    return;
+  }
+  if (currentTarget.dataset.fallbackApplied === 'final') return;
+  currentTarget.dataset.fallbackApplied = 'final';
+  currentTarget.src = 'https://a.espncdn.com/i/headshots/nophoto.png';
 }
 
 const ET_TIME_FORMATTER = new Intl.DateTimeFormat('en-US', {
@@ -487,7 +506,13 @@ export default function SportHubPage({ initialHero = null }) {
                 <Link className="hub-world-card" key={player.id} href={player.href || '#'}>
                   <div className="hub-world-rank">#{player.worldRank}</div>
                   {player.headshot ? (
-                    <img src={player.headshot} alt={player.displayName} className="hub-world-headshot" onError={ensureHeadshotFallback} />
+                    <img
+                      src={player.headshot}
+                      alt={player.displayName}
+                      className="hub-world-headshot"
+                      data-fallback-src={getSportHeadshotFallbackUrl(player)}
+                      onError={ensureHeadshotFallback}
+                    />
                   ) : (
                     <div className="hub-world-headshot hub-world-headshot-fallback">{player.displayName?.slice(0, 2)?.toUpperCase() || 'PL'}</div>
                   )}

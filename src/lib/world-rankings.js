@@ -3,7 +3,11 @@ import {
   getCachedTopPlayers,
   getStaleTopPlayers,
 } from '@/src/mlb/lib/topPlayers';
-import { FOOTBALL_LEAGUES } from '@/src/lib/football';
+import {
+  FOOTBALL_LEAGUES,
+  FOOTBALL_ROUTE_ORDER,
+  PRIMARY_FOOTBALL_LEAGUE_KEYS,
+} from '@/src/lib/football';
 import { getFootballLeagueSnapshot, getGenericSportSnapshot } from '@/src/lib/live-sports-backend';
 import { getNbaBootstrapSnapshot } from '@/src/lib/nba-backend';
 import { getExactNbaRatedPlayers } from '@/src/lib/nba-site-ratings';
@@ -22,7 +26,7 @@ import {
 } from '@/public/vendor/nhl/src/analytics.js';
 
 const CACHE = new Map();
-const WORLD_CACHE_VERSION = 'v9';
+const WORLD_CACHE_VERSION = 'v10';
 const DEFAULT_HEADSHOT = 'https://a.espncdn.com/i/headshots/nophoto.png';
 const MAX_PLAYERS_PER_SPORT = 2;
 const THIRD_PLAYER_CLEAR_MARGIN = 3;
@@ -71,9 +75,14 @@ function uniqBy(items, getKey) {
   return Array.from(map.values());
 }
 
+function isGenericHeadshot(source = '') {
+  const value = String(source || '').toLowerCase();
+  return !value || value.includes('nophoto') || value.endsWith('/default.jpg');
+}
+
 function resolveHeadshot(...sources) {
   for (const source of sources) {
-    if (typeof source === 'string' && source.trim()) {
+    if (typeof source === 'string' && source.trim() && !isGenericHeadshot(source)) {
       return source;
     }
   }
@@ -94,6 +103,12 @@ function getSportHeadshotUrl(sportKey, playerId) {
 
 function resolveSportHeadshot(sportKey, playerId, ...sources) {
   return resolveHeadshot(...sources, getSportHeadshotUrl(sportKey, playerId));
+}
+
+function getFootballLeagueStrengthBonus(leagueKey) {
+  const index = PRIMARY_FOOTBALL_LEAGUE_KEYS.indexOf(leagueKey);
+  if (index === -1) return 0.15;
+  return 2.1 - (index * 0.35);
 }
 
 function positionDifficulty(position = '') {
@@ -363,7 +378,7 @@ function includeDiversityPicks(sorted) {
 }
 
 async function getHubCandidates() {
-  const footballLeagueKeys = Object.keys(FOOTBALL_LEAGUES);
+  const footballLeagueKeys = FOOTBALL_ROUTE_ORDER;
   const [mlbResult, nflResult, cbbResult, nbaResult, nhlResult, ...footballResults] = await Promise.allSettled([
     getMlbTopPlayersSnapshot(50),
     getGenericSportSnapshot('nfl'),
@@ -428,26 +443,43 @@ async function getHubCandidates() {
 
   const footballCandidates = footballBoards.flatMap(({ leagueKey, board }) => {
     const league = FOOTBALL_LEAGUES[leagueKey];
+    const fifaRankByTeamId = Object.fromEntries(
+      (board?.rankings || [])
+        .filter((team) => team?.id && Number.isFinite(Number(team?.fifaRank)))
+        .map((team) => [String(team.id), Number(team.fifaRank)]),
+    );
     return (board?.playersCatalog?.players || board?.featuredPlayers || []).slice(0, 12).map((player, index) => ({
-      id: `${player.canonicalLeagueKey || leagueKey}-${player.id}`,
+      id: `football-${player.id}`,
       playerId: String(player.id),
       displayName: player.displayName,
       headshot: resolveSportHeadshot('football', player.id, player.headshot),
       position: player.position || 'Football',
-      leagueLabel: league.label,
+      leagueLabel: (FOOTBALL_LEAGUES[player.canonicalLeagueKey || leagueKey] || league).label,
       sportKey: 'football',
       leagueKey: player.canonicalLeagueKey || leagueKey,
       overall: Number(player.rating || 72),
       overallLabel: String(Number(player.rating || 72)),
       signalCount: (player.leaders || []).length ? 2 : 1,
+      fifaRank: fifaRankByTeamId[String(player.team?.id || '')] || null,
       contextScore: clamp(
         Number(player.rating || 72) +
-          ((league.competitionWeight || 1) * 4.8) +
-          Math.max(0, 4 - index),
+          getFootballLeagueStrengthBonus(player.canonicalLeagueKey || leagueKey) +
+          (Number.isFinite(fifaRankByTeamId[String(player.team?.id || '')])
+            ? clamp(((210 - fifaRankByTeamId[String(player.team?.id || '')]) / 210) * 0.9, 0.05, 0.9)
+            : 0) +
+          Math.max(0, 4 - index) * 0.35,
         48,
         96,
       ),
-      formScore: clamp(Number(player.rating || 72) + Math.max(0, 5 - index), 48, 96),
+      formScore: clamp(
+        Number(player.rating || 72) +
+          Math.max(0, 5 - index) * 0.45 +
+          (Number.isFinite(fifaRankByTeamId[String(player.team?.id || '')])
+            ? clamp(((210 - fifaRankByTeamId[String(player.team?.id || '')]) / 210) * 0.45, 0.03, 0.45)
+            : 0),
+        48,
+        96,
+      ),
       teamAbbr: player.team?.abbreviation || '',
       teamLogo: player.team?.logo || '',
     })).filter((player) => player.playerId && Number.isFinite(player.overall));
@@ -457,8 +489,20 @@ async function getHubCandidates() {
       list.push(player);
       return list;
     }
-    if (Number(player.overall || 0) > Number(list[existingIndex].overall || 0)) {
+    const existing = list[existingIndex];
+    const shouldReplace =
+      Number(player.overall || 0) > Number(existing.overall || 0) ||
+      (
+        Number(player.overall || 0) === Number(existing.overall || 0) &&
+        (
+          Number(player.contextScore || 0) > Number(existing.contextScore || 0) ||
+          getFootballLeagueStrengthBonus(player.leagueKey) > getFootballLeagueStrengthBonus(existing.leagueKey)
+        )
+      );
+    if (shouldReplace) {
       list[existingIndex] = player;
+    } else if (!existing.fifaRank && player.fifaRank) {
+      list[existingIndex] = { ...existing, fifaRank: player.fifaRank };
     }
     return list;
   }, []);

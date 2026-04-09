@@ -61,6 +61,19 @@ function TeamLogo({ team }) {
   return <img src={team.logo} alt={team.displayName || team.abbreviation} className="football-team-logo" />;
 }
 
+function applyFootballHeadshotFallback(event) {
+  const { currentTarget } = event;
+  const fallbackSrc = currentTarget.dataset.fallbackSrc;
+  if (fallbackSrc && currentTarget.dataset.fallbackApplied !== 'primary') {
+    currentTarget.dataset.fallbackApplied = 'primary';
+    currentTarget.src = fallbackSrc;
+    return;
+  }
+  if (currentTarget.dataset.fallbackApplied === 'final') return;
+  currentTarget.dataset.fallbackApplied = 'final';
+  currentTarget.src = 'https://a.espncdn.com/i/headshots/nophoto.png';
+}
+
 function PlayerVisual({ player }) {
   if (!player?.headshot) {
     return <span className="football-logo-fallback">{player?.displayName?.slice(0, 2)?.toUpperCase() || 'PL'}</span>;
@@ -70,11 +83,8 @@ function PlayerVisual({ player }) {
       src={player.headshot}
       alt={player.displayName}
       className="football-player-headshot"
-      onError={(event) => {
-        if (event.currentTarget.dataset.fallbackApplied === '1') return;
-        event.currentTarget.dataset.fallbackApplied = '1';
-        event.currentTarget.src = 'https://a.espncdn.com/i/headshots/nophoto.png';
-      }}
+      data-fallback-src={`https://a.espncdn.com/i/headshots/soccer/players/full/${player.id}.png`}
+      onError={applyFootballHeadshotFallback}
     />
   );
 }

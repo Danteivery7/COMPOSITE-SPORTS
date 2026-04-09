@@ -7,26 +7,29 @@ const DEFAULT_HEADSHOT = 'https://a.espncdn.com/i/headshots/nophoto.png';
 const FINAL_VISIBILITY_HOURS = 12;
 const MATCH_DURATION_HOURS = 2.5;
 
+export const PRIMARY_FOOTBALL_LEAGUE_KEYS = [
+  'premier-league',
+  'la-liga',
+  'serie-a',
+  'ligue-1',
+  'bundesliga',
+  'mls',
+];
+
+export const FOOTBALL_ROUTE_ORDER = [
+  ...PRIMARY_FOOTBALL_LEAGUE_KEYS,
+  'champions-league',
+  'international-play',
+];
+
 export const FOOTBALL_LEAGUES = {
-  mls: {
-    key: 'mls',
-    slug: 'usa.1',
-    label: 'MLS',
-    shortLabel: 'MLS',
-    region: 'North America',
-    competitionWeight: 0.96,
-    accent: '#ff5f95',
-    accentAlt: '#ffc7da',
-    surface: 'radial-gradient(circle at top, rgba(255, 97, 149, 0.34), rgba(10, 8, 14, 0.97) 72%)',
-    cardBlurb: 'Pink match-night energy, live MLS boards, and a league-specific composite inside the larger Football shell.',
-  },
   'premier-league': {
     key: 'premier-league',
     slug: 'eng.1',
     label: 'Premier League',
     shortLabel: 'Premier League',
     region: 'England',
-    competitionWeight: 1.22,
+    competitionWeight: 1.2,
     accent: '#86ff67',
     accentAlt: '#d8ffd1',
     surface: 'radial-gradient(circle at top, rgba(56, 157, 91, 0.32), rgba(7, 12, 9, 0.97) 72%)',
@@ -38,7 +41,7 @@ export const FOOTBALL_LEAGUES = {
     label: 'La Liga',
     shortLabel: 'La Liga',
     region: 'Spain',
-    competitionWeight: 1.14,
+    competitionWeight: 1.15,
     accent: '#ffd24f',
     accentAlt: '#fff0bf',
     surface: 'radial-gradient(circle at top, rgba(255, 193, 58, 0.32), rgba(12, 8, 6, 0.97) 72%)',
@@ -62,11 +65,35 @@ export const FOOTBALL_LEAGUES = {
     label: 'Ligue 1',
     shortLabel: 'Ligue 1',
     region: 'France',
-    competitionWeight: 1.04,
+    competitionWeight: 1.05,
     accent: '#8ef1ff',
     accentAlt: '#dbfbff',
     surface: 'radial-gradient(circle at top, rgba(77, 188, 210, 0.32), rgba(6, 11, 14, 0.97) 72%)',
     cardBlurb: 'French pace, youth, transition threats, and a clean league-wide composite.',
+  },
+  bundesliga: {
+    key: 'bundesliga',
+    slug: 'ger.1',
+    label: 'Bundesliga',
+    shortLabel: 'Bundesliga',
+    region: 'Germany',
+    competitionWeight: 1.02,
+    accent: '#ff8762',
+    accentAlt: '#ffe1d4',
+    surface: 'radial-gradient(circle at top, rgba(238, 92, 61, 0.34), rgba(14, 7, 7, 0.97) 72%)',
+    cardBlurb: 'German tempo, pressing energy, and a full league composite built from live club form and squad quality.',
+  },
+  mls: {
+    key: 'mls',
+    slug: 'usa.1',
+    label: 'MLS',
+    shortLabel: 'MLS',
+    region: 'North America',
+    competitionWeight: 0.96,
+    accent: '#ff5f95',
+    accentAlt: '#ffc7da',
+    surface: 'radial-gradient(circle at top, rgba(255, 97, 149, 0.34), rgba(10, 8, 14, 0.97) 72%)',
+    cardBlurb: 'Pink match-night energy, live MLS boards, and a league-specific composite inside the larger Football shell.',
   },
   'champions-league': {
     key: 'champions-league',
@@ -74,11 +101,11 @@ export const FOOTBALL_LEAGUES = {
     label: 'Champions League',
     shortLabel: 'Champions League',
     region: 'Europe',
-    competitionWeight: 1.35,
+    competitionWeight: 0.94,
     accent: '#8db1ff',
     accentAlt: '#edf3ff',
     surface: 'radial-gradient(circle at top, rgba(95, 126, 255, 0.36), rgba(7, 8, 18, 0.98) 74%)',
-    cardBlurb: 'The biggest European nights, elite clubs, and the highest-weighted match board in Football.',
+    cardBlurb: 'Big European nights, knockout drama, and a secondary competition context layered below the core club-league board.',
   },
   'international-play': {
     key: 'international-play',
@@ -86,7 +113,7 @@ export const FOOTBALL_LEAGUES = {
     label: 'International Play',
     shortLabel: 'International',
     region: 'Global',
-    competitionWeight: 1.12,
+    competitionWeight: 0.92,
     accent: '#72ffd6',
     accentAlt: '#e8fff8',
     surface: 'radial-gradient(circle at top, rgba(52, 196, 147, 0.34), rgba(6, 12, 17, 0.98) 74%)',
@@ -94,7 +121,7 @@ export const FOOTBALL_LEAGUES = {
   },
 };
 
-const CLUB_FOOTBALL_LEAGUES = Object.keys(FOOTBALL_LEAGUES).filter((leagueKey) => leagueKey !== 'international-play');
+const CLUB_FOOTBALL_LEAGUES = [...PRIMARY_FOOTBALL_LEAGUE_KEYS];
 const WORLD_CUP_MARKERS = ['fifa world cup', 'world cup'];
 
 function cacheKey(scope, league, extra = '') {
@@ -273,6 +300,11 @@ function leagueMeta(leagueKey) {
   const meta = FOOTBALL_LEAGUES[leagueKey];
   if (!meta) throw new Error(`Unsupported football league "${leagueKey}"`);
   return meta;
+}
+
+function getFootballLeagueOrderIndex(leagueKey) {
+  const index = FOOTBALL_ROUTE_ORDER.indexOf(leagueKey);
+  return index === -1 ? FOOTBALL_ROUTE_ORDER.length : index;
 }
 
 function siteBase(leagueKey) {
@@ -1297,7 +1329,11 @@ async function getFootballSharedPlayerRegistry() {
   const cached = readCache(key);
   if (cached) return cached;
 
-  const rawCatalogs = await Promise.all(CLUB_FOOTBALL_LEAGUES.map((leagueKey) => getRawFootballPlayerCatalog(leagueKey)));
+  const rawCatalogs = (await Promise.allSettled(
+    CLUB_FOOTBALL_LEAGUES.map((leagueKey) => getRawFootballPlayerCatalog(leagueKey)),
+  ))
+    .filter((result) => result.status === 'fulfilled' && Array.isArray(result.value?.players))
+    .map((result) => result.value);
   const rawPlayers = rawCatalogs.flatMap((catalog) => catalog.players || []);
   const scales = buildFootballMetricScales(rawPlayers);
   const rated = rawPlayers.map((player) => applyFootballRating(player, scales));
@@ -1859,8 +1895,8 @@ function timeProximityBoost(startTime) {
 }
 
 async function getFootballLanding() {
-  const leagueKeys = Object.keys(FOOTBALL_LEAGUES);
-  const leagueData = await Promise.all(
+  const leagueKeys = FOOTBALL_ROUTE_ORDER;
+  const leagueData = (await Promise.allSettled(
     leagueKeys.map(async (leagueKey) => {
       const [brand, rankings, scoreboard, playersCatalog] = await Promise.all([
         getLeagueBrand(leagueKey),
@@ -1870,7 +1906,9 @@ async function getFootballLanding() {
       ]);
       return { leagueKey, brand, rankings, scoreboard, playersCatalog };
     }),
-  );
+  ))
+    .filter((result) => result.status === 'fulfilled')
+    .map((result) => result.value);
 
   const leagueCards = leagueData.map(({ leagueKey, brand, rankings, scoreboard }) => ({
     key: leagueKey,
@@ -1891,14 +1929,19 @@ async function getFootballLanding() {
     .flatMap(({ leagueKey, brand, playersCatalog }) =>
       (playersCatalog?.players || []).slice(0, 5).map((player) => ({
         ...player,
-        leagueKey,
-        leagueLabel: brand.label,
+        leagueKey: player.canonicalLeagueKey || leagueKey,
+        leagueLabel: FOOTBALL_LEAGUES[player.canonicalLeagueKey || leagueKey]?.label || brand.label,
       })),
     )
-    .sort((left, right) => Number(right.rating || 0) - Number(left.rating || 0))
+    .sort((left, right) =>
+      Number(right.rating || 0) - Number(left.rating || 0) ||
+      getFootballLeagueOrderIndex(left.canonicalLeagueKey || left.leagueKey) - getFootballLeagueOrderIndex(right.canonicalLeagueKey || right.leagueKey) ||
+      left.displayName.localeCompare(right.displayName)
+    )
     .reduce((list, player) => {
       if (list.some((entry) => String(entry.id) === String(player.id))) return list;
-      if (list.some((entry) => String(entry.team?.id || '') === String(player.team?.id || ''))) return list;
+      const clubKey = String(player.canonicalTeamId || player.team?.id || '');
+      if (clubKey && list.some((entry) => String(entry.canonicalTeamId || entry.team?.id || '') === clubKey)) return list;
       list.push(player);
       return list;
     }, [])
@@ -1932,8 +1975,6 @@ async function getFootballLanding() {
     .sort((left, right) => {
       if (left.isWorldCupMatch && !right.isWorldCupMatch) return -1;
       if (right.isWorldCupMatch && !left.isWorldCupMatch) return 1;
-      if (left.leagueKey === 'champions-league' && right.leagueKey !== 'champions-league' && !right.isWorldCupMatch) return -1;
-      if (right.leagueKey === 'champions-league' && left.leagueKey !== 'champions-league' && !left.isWorldCupMatch) return 1;
       if (right.matchScore !== left.matchScore) return right.matchScore - left.matchScore;
       return compareByStartTime(left.startTime, right.startTime);
     })

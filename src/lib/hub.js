@@ -11,7 +11,7 @@ import {
   getFootballLandingSnapshot,
   getGenericSportSnapshot,
 } from '@/src/lib/live-sports-backend';
-import { FOOTBALL_LEAGUES } from '@/src/lib/football';
+import { FOOTBALL_LEAGUES, FOOTBALL_ROUTE_ORDER } from '@/src/lib/football';
 import { americanToDecimal, buildParlayOdds, calculateReturn, extractEspnOdds, formatAmericanOdds } from '@/src/lib/odds';
 import { getHotSnapshot, warmSnapshot } from '@/src/lib/snapshot-store';
 import {
@@ -27,7 +27,7 @@ import {
 const STORY_TTL_MS = 5 * 60 * 1000;
 const BETS_TTL_MS = 90 * 1000;
 const HERO_TTL_MS = 2 * 60 * 1000;
-const HUB_CACHE_VERSION = 'v14';
+const HUB_CACHE_VERSION = 'v15';
 export const HUB_HERO_SNAPSHOT_KEY = `hub-hero-${HUB_CACHE_VERSION}`;
 
 const EXTERNAL_NEWS_SOURCES = [
@@ -51,7 +51,7 @@ const SPORT_KEYWORDS = {
   nhl: ['nhl', 'hockey', 'stanley cup', 'puck', 'goalie', 'ice', 'rangers', 'bruins', 'maple leafs'],
   nfl: ['nfl', 'football', 'quarterback', 'touchdown', 'super bowl', 'chiefs', 'cowboys', 'eagles', 'ravens'],
   cbb: ['college basketball', 'ncaa', 'march madness', 'bracket', 'final four', 'men\'s college basketball'],
-  football: ['premier league', 'la liga', 'serie a', 'ligue 1', 'champions league', 'mls', 'football', 'soccer', 'goal', 'striker'],
+  football: ['premier league', 'la liga', 'serie a', 'ligue 1', 'bundesliga', 'champions league', 'mls', 'football', 'soccer', 'goal', 'striker'],
 };
 
 function settledValue(result, fallback) {
@@ -438,7 +438,7 @@ async function buildTrendingStoriesSnapshot() {
       fetchNhlNewsStories(),
       getGenericSportSnapshot('nfl'),
       getGenericSportSnapshot('cbb'),
-      Promise.allSettled(Object.keys(FOOTBALL_LEAGUES).map((leagueKey) => getFootballLeagueSnapshot(leagueKey))),
+      Promise.allSettled(FOOTBALL_ROUTE_ORDER.map((leagueKey) => getFootballLeagueSnapshot(leagueKey))),
       fetchExternalStories(),
     ]);
 
@@ -805,7 +805,7 @@ function buildLiveTickerBundle({ mlbScoreboard, nbaSnapshot, nhlGames, nflBoard,
 }
 
 async function buildCardSpotlights() {
-  const footballLeagueKeys = Object.keys(FOOTBALL_LEAGUES);
+  const footballLeagueKeys = FOOTBALL_ROUTE_ORDER;
   const [
     mlbResult,
     nbaResult,
@@ -867,7 +867,7 @@ async function buildCardSpotlights() {
 async function buildTopBetsSnapshot() {
   const [nflBoardResult, footballBoardsResult, mlbCandidatesResult, nbaSnapshotResult, footballLandingResult, nhlCandidatesResult, cbbBoardResult] = await Promise.allSettled([
     getGenericSportSnapshot('nfl'),
-    Promise.allSettled(Object.keys(FOOTBALL_LEAGUES).map((leagueKey) => getFootballLeagueSnapshot(leagueKey))),
+    Promise.allSettled(FOOTBALL_ROUTE_ORDER.map((leagueKey) => getFootballLeagueSnapshot(leagueKey))),
     buildMlbBetCandidates(),
     getNbaBootstrapSnapshot(),
     getFootballLandingSnapshot(),
@@ -1018,7 +1018,7 @@ const getCachedTopBetsSnapshot = unstable_cache(
 );
 
 async function buildHubHeroSnapshot() {
-  const footballLeagueKeys = Object.keys(FOOTBALL_LEAGUES);
+  const footballLeagueKeys = FOOTBALL_ROUTE_ORDER;
   const [storiesResult, betsResult, worldBoardResult, mlbScoreboardResult, nbaSnapshotResult, nhlGamesResult, nflBoardResult, cbbBoardResult, footballBoardsResult] = await Promise.allSettled([
     getHubTrendingStories(),
     getHubTopBets(),
@@ -1177,7 +1177,7 @@ export async function getHubHero({ force = false } = {}) {
 }
 
 export async function warmHubSnapshots() {
-  const leagueKeys = Object.keys(FOOTBALL_LEAGUES);
+  const leagueKeys = FOOTBALL_ROUTE_ORDER;
 
   const results = await Promise.allSettled([
     warmSnapshot(
