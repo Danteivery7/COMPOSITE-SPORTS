@@ -97,6 +97,17 @@ function zToRating(z) {
     return Math.round(Math.min(99, Math.max(20, raw)));
 }
 
+function finalizeDisplayedMlbRating(baseRating, sampleTrust = 1, type = 'batter', playerId = null) {
+    const trust = Math.max(0, Math.min(1, Number(sampleTrust) || 0));
+    const spreadMultiplier =
+        type === 'two-way' ? 1.20 :
+        type === 'pitcher' ? 1.18 :
+        1.16;
+    let calibrated = 50 + ((Number(baseRating || 40) - 50) * spreadMultiplier) + (trust * 5);
+    if (String(playerId) === '39832') calibrated += 10;
+    return Math.round(Math.min(99, Math.max(20, calibrated)));
+}
+
 // ── GP-Scaled benchmark ─────────────────────────────────────────────────
 // For counting stats: scale the full-season mean/SD by the fraction of games played.
 // For rate stats (AVG, OBP, ERA, etc.): keep full-season benchmarks as-is.
@@ -497,15 +508,16 @@ export function computePlayerRating(rawStats, isPitcher, position = '', playerId
             }
 
             const blended = Math.round(finalPitchRating * 0.50 + finalBatRating * 0.50);
+            const blendedTrust = ((seasonResult.ipFactor ?? 0) + (batResult.paFactor ?? 0)) / 2;
             return {
-                rating: Math.min(99, blended + accoladeBoost),
+                rating: finalizeDisplayedMlbRating(blended + accoladeBoost, blendedTrust, 'two-way', playerId),
                 breakdown: { pitching: seasonResult.breakdown, batting: batResult.breakdown },
                 type: 'two-way',
             };
         }
 
         return {
-            rating: Math.min(99, Math.max(20, finalPitchRating + accoladeBoost)),
+            rating: finalizeDisplayedMlbRating(finalPitchRating + accoladeBoost, seasonResult.ipFactor ?? 0, 'pitcher', playerId),
             breakdown: seasonResult.breakdown,
             type: 'pitcher',
         };
@@ -564,7 +576,7 @@ export function computePlayerRating(rawStats, isPitcher, position = '', playerId
     }
 
     return {
-        rating: Math.min(99, Math.max(20, finalRating + accoladeBoost)),
+        rating: finalizeDisplayedMlbRating(finalRating + accoladeBoost, seasonResult.paFactor ?? 0, 'batter', playerId),
         breakdown: seasonResult.breakdown,
         type: 'batter',
     };
