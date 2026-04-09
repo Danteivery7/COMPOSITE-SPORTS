@@ -50,7 +50,7 @@ export async function computeTopPlayers(limit = 50) {
         const isRosterTwoWay = (player.position === 'SP/DH' || player.position === 'DH/SP') && isOhtani;
         const ratingData = computePlayerRating(
             stats,
-            isRosterTwoWay ? 'two-way' : (player.isPitcher || player.position === 'DH'),
+            isRosterTwoWay ? 'two-way' : player.isPitcher,
             player.position,
             player.id,
             careerRaw,

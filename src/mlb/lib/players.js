@@ -99,13 +99,23 @@ function zToRating(z) {
 
 function finalizeDisplayedMlbRating(baseRating, sampleTrust = 1, type = 'batter', playerId = null) {
     const trust = Math.max(0, Math.min(1, Number(sampleTrust) || 0));
-    const spreadMultiplier =
-        type === 'two-way' ? 1.20 :
-        type === 'pitcher' ? 1.18 :
-        1.16;
-    let calibrated = 50 + ((Number(baseRating || 40) - 50) * spreadMultiplier) + (trust * 5);
-    if (String(playerId) === '39832') calibrated += 10;
-    return Math.round(Math.min(99, Math.max(20, calibrated)));
+    const isOhtani = String(playerId) === '39832';
+    const profile =
+        type === 'two-way'
+            ? { spreadMultiplier: 1.14, trustBoost: 5.5, bias: 4.5, max: 99 }
+            : type === 'pitcher'
+                ? { spreadMultiplier: 1.04, trustBoost: 3.5, bias: -1.5, max: 98 }
+                : { spreadMultiplier: 1.12, trustBoost: 4.5, bias: 4, max: 98 };
+
+    let calibrated =
+        50 +
+        ((Number(baseRating || 40) - 50) * profile.spreadMultiplier) +
+        (trust * profile.trustBoost) +
+        profile.bias;
+
+    if (isOhtani) calibrated += 10;
+
+    return Math.round(Math.min(isOhtani ? 99 : profile.max, Math.max(20, calibrated)));
 }
 
 // ── GP-Scaled benchmark ─────────────────────────────────────────────────
