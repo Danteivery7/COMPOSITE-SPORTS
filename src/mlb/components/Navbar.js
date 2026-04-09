@@ -45,6 +45,11 @@ export default function Navbar({ currentPage, onNavigate, theme, toggleTheme }) 
                             </a>
                         </li>
                     ))}
+                    <li className="nav-mobile-hub-item">
+                        <a href="/" className="nav-mobile-hub-link" target="_top">
+                            <span>Back To Hub</span>
+                        </a>
+                    </li>
                 </ul>
 
                 <div className="navbar-controls">

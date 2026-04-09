@@ -397,6 +397,10 @@
   border-radius: 2px;
 }
 
+.nav-mobile-hub-item {
+  display: none;
+}
+
 .nav-mobile-toggle {
   display: none;
   background: none;
@@ -558,6 +562,31 @@
 
   .nav-links a {
     padding: 12px 16px;
+  }
+
+  .nav-mobile-hub-item {
+    display: block;
+    list-style: none;
+    margin-top: 6px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .nav-mobile-hub-link {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .nav-mobile-hub-link:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.06);
   }
 }
 

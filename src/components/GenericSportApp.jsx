@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import RouteThemeToggle from '@/src/components/RouteThemeToggle';
 import { getSportConfig } from '@/src/data/sports';
 import StoryDetailCard from '@/src/components/StoryDetailCard';
 
@@ -750,7 +751,7 @@ function SportGameDetailView({ sportKey, gameDetail, setPage, predictors }) {
   );
 }
 
-export default function GenericSportApp({ sportKey, initialEntry = null }) {
+export default function GenericSportApp({ sportKey, initialEntry = null, theme = 'dark', toggleTheme = () => {} }) {
   const config = getSportConfig(sportKey);
   const apiBase = `/api/${sportKey}`;
   const [page, setPage] = useState('overview');
@@ -1004,10 +1005,11 @@ export default function GenericSportApp({ sportKey, initialEntry = null }) {
           </div>
           <div className="generic-inline-stats">
             <span>{bootstrap?.lastUpdated ? `Updated ${new Date(bootstrap.lastUpdated).toLocaleTimeString()}` : 'Sync pending'}</span>
+            <RouteThemeToggle theme={theme} onToggle={toggleTheme} compact />
             <button className="generic-menu-button" type="button" onClick={() => setMobileNavOpen((value) => !value)}>
               Menu
             </button>
-            <button type="button" onClick={fetchBootstrap}>
+            <button className="generic-refresh-button" type="button" onClick={fetchBootstrap}>
               Refresh
             </button>
           </div>

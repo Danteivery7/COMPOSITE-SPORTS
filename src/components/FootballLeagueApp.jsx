@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import RouteSiteMenu from '@/src/components/RouteSiteMenu';
 import StoryDetailCard from '@/src/components/StoryDetailCard';
 import RouteThemeToggle from '@/src/components/RouteThemeToggle';
 import { getFootballLeagueConfig } from '@/src/lib/football';
@@ -837,7 +836,7 @@ export default function FootballLeagueApp({ leagueKey, initialEntry = null, them
           ))}
         </nav>
         <div className="football-sidebar-footer">
-          <Link href="/football" className="football-hub-link">
+          <Link href="/football" className="football-hub-link football-site-home-link">
             Football Hub
           </Link>
           <a href="/" className="football-hub-link secondary" target="_top">
@@ -854,12 +853,11 @@ export default function FootballLeagueApp({ leagueKey, initialEntry = null, them
           </div>
           <div className="football-chip-row">
             <span className="football-chip">{bootstrap?.lastUpdated ? `Updated ${new Date(bootstrap.lastUpdated).toLocaleTimeString()}` : 'Sync pending'}</span>
+            <RouteThemeToggle theme={theme} onToggle={toggleTheme} compact />
             <button className="football-refresh football-menu-button" type="button" onClick={() => setMobileNavOpen((value) => !value)}>
               Menu
             </button>
-            <RouteSiteMenu theme={theme} onToggleTheme={toggleTheme} />
-            <RouteThemeToggle theme={theme} onToggle={toggleTheme} compact />
-            <button className="football-refresh" type="button" onClick={fetchBootstrap}>
+            <button className="football-refresh football-refresh-button" type="button" onClick={fetchBootstrap}>
               Refresh
             </button>
           </div>

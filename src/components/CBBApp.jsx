@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import RouteThemeToggle from '@/src/components/RouteThemeToggle';
 import StoryDetailCard from '@/src/components/StoryDetailCard';
 
 const NAV_ITEMS = [
@@ -782,7 +783,7 @@ function GameDetail({ gameDetail, predictor, onBack }) {
   );
 }
 
-export default function CBBApp({ initialEntry = null }) {
+export default function CBBApp({ initialEntry = null, theme = 'dark', toggleTheme = () => {} }) {
   const apiBase = '/api/cbb';
   const [page, setPage] = useState('overview');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -1077,10 +1078,11 @@ export default function CBBApp({ initialEntry = null }) {
           </div>
           <div className="generic-inline-stats">
             <span>{formatUpdateTime(bootstrap?.lastUpdated)}</span>
+            <RouteThemeToggle theme={theme} onToggle={toggleTheme} compact />
             <button className="generic-menu-button" type="button" onClick={() => setMobileNavOpen((value) => !value)}>
               Menu
             </button>
-            <button type="button" onClick={() => fetchBootstrap(true)}>
+            <button className="generic-refresh-button" type="button" onClick={() => fetchBootstrap(true)}>
               Refresh
             </button>
           </div>

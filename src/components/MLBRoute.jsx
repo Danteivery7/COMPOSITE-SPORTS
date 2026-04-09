@@ -1,9 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect } from 'react';
 import SportIntroGate from '@/src/components/SportIntroGate';
-import RouteSiteMenu from '@/src/components/RouteSiteMenu';
 import RouteThemeToggle from '@/src/components/RouteThemeToggle';
 import useCompositeTheme from '@/src/hooks/useCompositeTheme';
 import { getSportConfig } from '@/src/data/sports';
@@ -31,7 +29,6 @@ export default function MLBRoute({ initialEntry = null }) {
             <h1>Composite MLB</h1>
           </div>
           <div className="route-shell-actions">
-            <RouteSiteMenu theme={theme} onToggleTheme={toggleTheme} />
             <RouteThemeToggle theme={theme} onToggle={toggleTheme} compact />
             <a href="/" className="hub-back-link" target="_top">
               Back To Hub

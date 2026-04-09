@@ -1967,6 +1967,11 @@ body[data-composite-route='hub'] {
   gap: 16px;
 }
 
+.generic-stage-header .route-theme-toggle,
+.football-stage-header .route-theme-toggle {
+  display: none;
+}
+
 .generic-stage-header h1,
 .generic-card h3 {
   margin: 6px 0 0;
@@ -6755,18 +6760,22 @@ body[data-composite-route='football'] {
 }
 
 @media (max-width: 980px) {
-  .vendor-shell[data-sport='nhl'] .route-shell-actions {
+  .vendor-shell .route-shell-actions,
+  .generic-route-topbar .route-shell-actions,
+  .mlb-route-topbar .route-shell-actions {
     display: none;
   }
 
-  .route-site-menu {
-    display: inline-flex;
-    align-items: center;
+  .generic-route-shell .route-site-menu,
+  .vendor-shell .route-site-menu,
+  .mlb-route-shell .route-site-menu,
+  .football-landing-shell .route-site-menu,
+  .football-league-shell .route-site-menu {
+    display: none !important;
   }
 
   .route-shell-actions .route-theme-toggle,
-  .route-shell-actions-hub .route-theme-toggle,
-  .football-stage-header .route-theme-toggle {
+  .route-shell-actions-hub .route-theme-toggle {
     display: none;
   }
 
@@ -6825,6 +6834,20 @@ body[data-composite-route='football'] {
     justify-content: center;
   }
 
+  .generic-stage-header .route-theme-toggle,
+  .football-stage-header .route-theme-toggle {
+    display: inline-flex;
+  }
+
+  .generic-refresh-button,
+  .football-refresh-button {
+    display: none;
+  }
+
+  .football-site-home-link {
+    display: none;
+  }
+
   .generic-mobile-overlay,
   .football-mobile-overlay {
     position: fixed;
@@ -6870,6 +6893,11 @@ body[data-composite-route='football'] {
   .generic-stage,
   .football-stage {
     min-width: 0;
+  }
+
+  .generic-inline-stats,
+  .football-chip-row {
+    align-items: center;
   }
 
   .hub-hero-story-card,

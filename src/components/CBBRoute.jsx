@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect } from 'react';
 import SportIntroGate from '@/src/components/SportIntroGate';
 import RouteSiteMenu from '@/src/components/RouteSiteMenu';
@@ -36,7 +35,7 @@ export default function CBBRoute({ initialEntry = null }) {
             </a>
           </div>
         </div>
-        <CBBApp initialEntry={initialEntry} />
+        <CBBApp initialEntry={initialEntry} theme={theme} toggleTheme={toggleTheme} />
       </section>
     </SportIntroGate>
   );

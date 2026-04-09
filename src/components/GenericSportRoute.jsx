@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect } from 'react';
 import SportIntroGate from '@/src/components/SportIntroGate';
 import RouteSiteMenu from '@/src/components/RouteSiteMenu';
@@ -36,7 +35,7 @@ export default function GenericSportRoute({ sportKey, initialEntry = null }) {
             </a>
           </div>
         </div>
-        <GenericSportApp sportKey={sportKey} initialEntry={initialEntry} />
+        <GenericSportApp sportKey={sportKey} initialEntry={initialEntry} theme={theme} toggleTheme={toggleTheme} />
       </section>
     </SportIntroGate>
   );
