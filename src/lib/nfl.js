@@ -299,6 +299,42 @@ async function getTeams() {
   return writeCache(key, parseTeamsFromPayload(payload), 12 * 60 * 60 * 1000);
 }
 
+function buildFallbackRankings(teams = []) {
+  return teams.map((team, index) => ({
+    ...team,
+    record: '0-0',
+    streak: 'Even',
+    wins: 0,
+    losses: 0,
+    ties: 0,
+    gamesPlayed: 0,
+    winPct: 0,
+    differential: 0,
+    pointsFor: 0,
+    pointsAgainst: 0,
+    standingPoints: 0,
+    clubPoints: 0,
+    recentFormPoints: 0,
+    recentFormLabel: 'Last 5 pending',
+    recentRecord: '0-0',
+    recentResults: [],
+    pointsPerGame: 0,
+    pointsAllowedPerGame: 0,
+    yardsPerGame: 0,
+    yardsAllowedPerGame: 0,
+    turnovers: 0,
+    giveaways: 0,
+    sackRate: 0,
+    successScore: 75,
+    offScore: 75,
+    defScore: 75,
+    recentScore: 75,
+    groupLabel: team.nickname || team.abbreviation,
+    ovrScore: 75,
+    ovrRank: index + 1,
+  }));
+}
+
 function getStatValue(stats, keys, fallback = 0) {
   for (const key of keys) {
     const value = stats[normalizeKey(key)];
@@ -528,26 +564,38 @@ async function fetchScoreboard() {
   const cached = readCache(key);
   if (cached) return cached;
   if (usePreviousSeasonBoard) {
-    const archivedGames = await buildPreviousSeasonScoreboard(seasonYear);
-    if (archivedGames.length) {
-      return writeCache(key, archivedGames, 10 * 60 * 1000);
+    try {
+      const archivedGames = await buildPreviousSeasonScoreboard(seasonYear);
+      if (archivedGames.length) {
+        return writeCache(key, archivedGames, 10 * 60 * 1000);
+      }
+    } catch (_error) {
+      // Fall through to the live scoreboard endpoint if the archived build path fails.
     }
   }
-  const payload = await fetchJson(`${NFL_SITE}/scoreboard`, 45 * 1000);
-  const games = parseScoreboardGames(payload);
-  return writeCache(key, games, 45 * 1000);
+  try {
+    const payload = await fetchJson(`${NFL_SITE}/scoreboard`, 45 * 1000);
+    const games = parseScoreboardGames(payload);
+    return writeCache(key, games, 45 * 1000);
+  } catch (_error) {
+    return writeCache(key, [], 2 * 60 * 1000);
+  }
 }
 
 async function fetchNews() {
   const key = cacheKey('news');
   const cached = readCache(key);
   if (cached) return cached;
-  const payload = await fetchJson(`${NFL_SITE}/news`, 30 * 60 * 1000);
-  const articles = (payload.articles || [])
-    .slice(0, 12)
-    .map((article, index) => normalizeEspnNewsArticle(article, { fallbackSource: 'NFL', fallbackId: `nfl-news-${index}` }))
-    .filter((article) => article.storyId);
-  return writeCache(key, articles, 30 * 60 * 1000);
+  try {
+    const payload = await fetchJson(`${NFL_SITE}/news`, 30 * 60 * 1000);
+    const articles = (payload.articles || [])
+      .slice(0, 12)
+      .map((article, index) => normalizeEspnNewsArticle(article, { fallbackSource: 'NFL', fallbackId: `nfl-news-${index}` }))
+      .filter((article) => article.storyId);
+    return writeCache(key, articles, 30 * 60 * 1000);
+  } catch (_error) {
+    return writeCache(key, [], 5 * 60 * 1000);
+  }
 }
 
 async function fetchLeaders() {
@@ -898,7 +946,11 @@ export async function getNFLPlayerCatalog() {
   const cached = readCache(key);
   if (cached) return cached;
 
-  const [teams, rankings, leaders] = await Promise.all([getTeams(), computeRankings(), fetchLeaders()]);
+  const teams = await getTeams();
+  const [rankings, leaders] = await Promise.all([
+    computeRankings().catch(() => buildFallbackRankings(teams)),
+    fetchLeaders().catch(() => []),
+  ]);
   const rankingMap = Object.fromEntries(rankings.map((team) => [team.id, team]));
   const leaderMap = buildLeaderMetricMap(leaders);
 
@@ -1142,11 +1194,17 @@ export async function getNFLBootstrap() {
   const cached = readCache(key);
   if (cached) return cached;
 
-  const rankings = await computeRankings();
+  const teams = await getTeams().catch(() => []);
+  const rankings = await computeRankings().catch(() => buildFallbackRankings(teams));
   const [scoreboard, news, catalog] = await Promise.all([
-    fetchScoreboard(),
-    fetchNews(),
-    getNFLPlayerCatalog(),
+    fetchScoreboard().catch(() => []),
+    fetchNews().catch(() => []),
+    getNFLPlayerCatalog().catch(() => ({
+      sport: 'nfl',
+      players: [],
+      lastUpdated: new Date().toISOString(),
+      totalPlayers: 0,
+    })),
   ]);
   const fantasy = buildFantasyPayload(catalog, news);
 

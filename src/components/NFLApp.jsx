@@ -16,6 +16,17 @@ const NAV_ITEMS = [
   { key: 'settings', label: 'Settings' },
 ];
 
+function hasRenderableBootstrap(bootstrap) {
+  if (!bootstrap || bootstrap.error) return false;
+  return Boolean(
+    (bootstrap.scoreboard && bootstrap.scoreboard.length) ||
+    (bootstrap.rankings && bootstrap.rankings.length) ||
+    (bootstrap.news && bootstrap.news.length) ||
+    (bootstrap.featuredPlayers && bootstrap.featuredPlayers.length) ||
+    (bootstrap.fantasyRankings && bootstrap.fantasyRankings.length)
+  );
+}
+
 function applyHeadshotFallback(event) {
   const { currentTarget } = event;
   const fallbackSrc = currentTarget.dataset.fallbackSrc;
@@ -823,7 +834,7 @@ export default function NFLApp({ initialEntry = null, initialBootstrap = null, t
   const [gameDetail, setGameDetail] = useState(null);
   const [storyDetail, setStoryDetail] = useState(null);
   const [playersQuery, setPlayersQuery] = useState('');
-  const [loadingBootstrap, setLoadingBootstrap] = useState(!initialBootstrap);
+  const [loadingBootstrap, setLoadingBootstrap] = useState(!hasRenderableBootstrap(initialBootstrap));
   const [loadingPlayers, setLoadingPlayers] = useState(false);
   const [hubOriginPlayer, setHubOriginPlayer] = useState(false);
   const [selectedHomeTeamId, setSelectedHomeTeamId] = useState('');
@@ -851,10 +862,11 @@ export default function NFLApp({ initialEntry = null, initialBootstrap = null, t
     let ignore = false;
     const refresh = () => {
       if (ignore) return;
-      fetchBootstrap(Boolean(!initialBootstrap && !bootstrapRef.current));
+      const shouldForce = !hasRenderableBootstrap(bootstrapRef.current);
+      fetchBootstrap(shouldForce);
     };
 
-    if (!initialBootstrap) {
+    if (!hasRenderableBootstrap(initialBootstrap)) {
       refresh();
     } else {
       const interval = window.setInterval(() => {
