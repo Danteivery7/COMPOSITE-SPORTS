@@ -429,14 +429,14 @@ async function getHubCandidates() {
   const footballCandidates = footballBoards.flatMap(({ leagueKey, board }) => {
     const league = FOOTBALL_LEAGUES[leagueKey];
     return (board?.playersCatalog?.players || board?.featuredPlayers || []).slice(0, 12).map((player, index) => ({
-      id: `${leagueKey}-${player.id}`,
+      id: `${player.canonicalLeagueKey || leagueKey}-${player.id}`,
       playerId: String(player.id),
       displayName: player.displayName,
       headshot: resolveSportHeadshot('football', player.id, player.headshot),
       position: player.position || 'Football',
       leagueLabel: league.label,
       sportKey: 'football',
-      leagueKey,
+      leagueKey: player.canonicalLeagueKey || leagueKey,
       overall: Number(player.rating || 72),
       overallLabel: String(Number(player.rating || 72)),
       signalCount: (player.leaders || []).length ? 2 : 1,
@@ -451,7 +451,17 @@ async function getHubCandidates() {
       teamAbbr: player.team?.abbreviation || '',
       teamLogo: player.team?.logo || '',
     })).filter((player) => player.playerId && Number.isFinite(player.overall));
-  });
+  }).reduce((list, player) => {
+    const existingIndex = list.findIndex((entry) => entry.playerId === player.playerId);
+    if (existingIndex === -1) {
+      list.push(player);
+      return list;
+    }
+    if (Number(player.overall || 0) > Number(list[existingIndex].overall || 0)) {
+      list[existingIndex] = player;
+    }
+    return list;
+  }, []);
 
   return {
     mlb: mlbCandidates,

@@ -116,7 +116,7 @@ export default function FootballLandingRoute() {
             <p>{data?.subtitle || 'The global football selector is syncing the marquee board and league hubs.'}</p>
             <div className="football-chip-row football-landing-chip-row">
               <span className="football-chip">{liveMatchCount} live now</span>
-              <span className="football-chip">{leagues.length} league hubs</span>
+              <span className="football-chip">{leagues.length} football boards</span>
               <span className="football-chip">{topPlayers.length} elite players tracked</span>
             </div>
           </div>
@@ -237,7 +237,7 @@ export default function FootballLandingRoute() {
                     <div>
                       <strong>{player.displayName}</strong>
                       <span>{player.team?.displayName || player.team?.abbreviation || player.leagueLabel}</span>
-                      <p>{player.position} • {player.rating} OVR</p>
+                      <p>{player.positionLabel || player.position} • {player.rating} OVR</p>
                     </div>
                   </div>
                 </Link>

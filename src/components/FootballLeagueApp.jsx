@@ -10,12 +10,24 @@ const NAV_ITEMS = [
   { key: 'overview', label: 'Overview' },
   { key: 'scores', label: 'Scores' },
   { key: 'rankings', label: 'Rankings' },
-  { key: 'teams', label: 'Teams' },
+  { key: 'teams', label: 'Clubs' },
   { key: 'players', label: 'Players' },
   { key: 'predictor', label: 'Predictor' },
   { key: 'news', label: 'News' },
   { key: 'settings', label: 'Settings' },
 ];
+
+function getFootballEntityCopy(leagueKey) {
+  const isInternational = leagueKey === 'international-play';
+  return {
+    singular: isInternational ? 'National Side' : 'Club',
+    plural: isInternational ? 'National Sides' : 'Clubs',
+    singularLower: isInternational ? 'national side' : 'club',
+    pluralLower: isInternational ? 'national sides' : 'clubs',
+    identityLabel: isInternational ? 'National Side Identity' : 'Club Identity',
+    newsLabel: isInternational ? 'National Side News' : 'Club News',
+  };
+}
 
 function recordParts(record) {
   const match = String(record || '').match(/(\d+)\s*-\s*(\d+)\s*-\s*(\d+)/);
@@ -92,7 +104,7 @@ function GameCard({ game, onOpen }) {
   );
 }
 
-function FootballOverview({ bootstrap, openGame, openTeam, openPlayer, openStory, setPage }) {
+function FootballOverview({ bootstrap, entityCopy, openGame, openTeam, openPlayer, openStory, setPage }) {
   const leadMatch = bootstrap.scoreboard?.[0];
   const topTeam = bootstrap.rankings?.[0];
   const topPlayer = bootstrap.featuredPlayers?.[0];
@@ -108,7 +120,7 @@ function FootballOverview({ bootstrap, openGame, openTeam, openPlayer, openStory
           <p>{bootstrap.headline}</p>
           <div className="football-chip-row">
             <span className="football-chip">{bootstrap.meta?.liveGames || 0} live matches</span>
-            <span className="football-chip">{bootstrap.rankings?.length || 0} clubs tracked</span>
+            <span className="football-chip">{bootstrap.rankings?.length || 0} {entityCopy.pluralLower} tracked</span>
             <span className="football-chip">{bootstrap.featuredPlayers?.length || 0} featured players</span>
           </div>
           <div className="football-hero-mini-board">
@@ -160,7 +172,7 @@ function FootballOverview({ bootstrap, openGame, openTeam, openPlayer, openStory
 
         <article className="football-panel">
           <div className="football-section-head">
-            <h3>Top Club</h3>
+            <h3>Top {entityCopy.singular}</h3>
             <button type="button" onClick={() => topTeam && openTeam(topTeam.id)}>Open</button>
           </div>
           {topTeam ? (
@@ -170,11 +182,11 @@ function FootballOverview({ bootstrap, openGame, openTeam, openPlayer, openStory
                 <strong>{topTeam.displayName}</strong>
                 <span>#{topTeam.ovrRank} OVR</span>
                 <FootballRecordLine record={topTeam.record} fallback={topTeam.abbreviation} />
-                <p>{topTeam.recentFormLabel || topTeam.streak}</p>
+                <p>{topTeam.clubPoints ?? topTeam.standingPoints ?? 0} pts • {topTeam.recentFormLabel || 'Recent pending'}</p>
               </div>
             </button>
           ) : (
-            <p className="football-empty-copy">Top club is still syncing.</p>
+            <p className="football-empty-copy">{`Top ${entityCopy.singularLower} is still syncing.`}</p>
           )}
         </article>
 
@@ -188,7 +200,7 @@ function FootballOverview({ bootstrap, openGame, openTeam, openPlayer, openStory
               <PlayerVisual player={topPlayer} />
               <div>
                 <strong>{topPlayer.displayName}</strong>
-                <span>{topPlayer.position} • {topPlayer.team?.abbreviation || bootstrap.league?.shortLabel}</span>
+                <span>{topPlayer.positionLabel || topPlayer.position} • {topPlayer.team?.abbreviation || bootstrap.league?.shortLabel}</span>
                 <p>{topPlayer.rating} OVR • {topPlayer.leaderSummary}</p>
               </div>
             </button>
@@ -201,7 +213,7 @@ function FootballOverview({ bootstrap, openGame, openTeam, openPlayer, openStory
       <div className="football-overview-lower">
         <article className="football-panel football-panel-wide">
           <div className="football-section-head">
-            <h3>Top Clubs</h3>
+            <h3>Top {entityCopy.plural}</h3>
             <button type="button" onClick={() => setPage('rankings')}>League table</button>
           </div>
           <div className="football-rank-list">
@@ -212,7 +224,7 @@ function FootballOverview({ bootstrap, openGame, openTeam, openPlayer, openStory
                   <div>
                     <strong>#{team.ovrRank} {team.displayName}</strong>
                     <FootballRecordLine record={team.record} fallback={team.abbreviation} />
-                    <span>{team.recentFormLabel || team.streak}</span>
+                    <span>{team.clubPoints ?? team.standingPoints ?? 0} pts • {team.recentFormLabel || 'Recent pending'}</span>
                   </div>
                 </div>
                 <span>{team.ovrScore}</span>
@@ -243,14 +255,15 @@ function FootballOverview({ bootstrap, openGame, openTeam, openPlayer, openStory
   );
 }
 
-function RankingsView({ rankings, openTeam }) {
+function RankingsView({ rankings, entityCopy, openTeam }) {
   return (
     <div className="football-table-wrap">
       <table className="football-table">
         <thead>
           <tr>
             <th>RK</th>
-            <th>Club</th>
+            <th>{entityCopy.singular}</th>
+            <th>PTS</th>
             <th>OVR</th>
             <th>OFF</th>
             <th>DEF</th>
@@ -267,10 +280,11 @@ function RankingsView({ rankings, openTeam }) {
                   <div>
                     <strong>{team.displayName}</strong>
                     <FootballRecordLine record={team.record} fallback={team.abbreviation} />
-                    <span>{team.recentFormLabel || team.streak}</span>
+                    <span>{team.recentFormLabel || 'Recent pending'}</span>
                   </div>
                 </div>
               </td>
+              <td>{team.clubPoints ?? team.standingPoints ?? 0}</td>
               <td>{team.ovrScore}</td>
               <td>{team.offScore}</td>
               <td>{team.defScore}</td>
@@ -297,7 +311,8 @@ function TeamsView({ teams, openTeam }) {
           </div>
           <div className="football-chip-row">
             <span className="football-chip">#{team.ovrRank} OVR</span>
-            <span className="football-chip">{team.recentFormLabel || team.streak}</span>
+            <span className="football-chip">{team.clubPoints ?? team.standingPoints ?? 0} pts</span>
+            <span className="football-chip">{team.recentFormLabel || 'Recent pending'}</span>
           </div>
         </button>
       ))}
@@ -305,7 +320,7 @@ function TeamsView({ teams, openTeam }) {
   );
 }
 
-function PlayersView({ players, query, setQuery, loading, openPlayer }) {
+function PlayersView({ entityCopy, players, query, setQuery, loading, openPlayer }) {
   return (
     <section className="football-stack">
       <div className="football-toolbar">
@@ -325,7 +340,7 @@ function PlayersView({ players, query, setQuery, loading, openPlayer }) {
             <tr>
               <th>RK</th>
               <th>Player</th>
-              <th>Club</th>
+              <th>{entityCopy.singular}</th>
               <th>POS</th>
               <th>OVR</th>
               <th>Tier</th>
@@ -345,7 +360,7 @@ function PlayersView({ players, query, setQuery, loading, openPlayer }) {
                   </div>
                 </td>
                 <td>{player.team?.abbreviation || '-'}</td>
-                <td>{player.position || '-'}</td>
+                <td>{player.positionLabel || player.position || '-'}</td>
                 <td>{player.rating}</td>
                 <td>{player.tier}</td>
               </tr>
@@ -357,10 +372,44 @@ function PlayersView({ players, query, setQuery, loading, openPlayer }) {
   );
 }
 
-function PredictorView({ predictors }) {
+function PredictorView({
+  entityCopy,
+  predictors,
+  teams,
+  selectedHomeTeamId,
+  selectedAwayTeamId,
+  setSelectedHomeTeamId,
+  setSelectedAwayTeamId,
+  customPredictor,
+  predictorLoading,
+}) {
+  const activePredictors = customPredictor?.length ? customPredictor : predictors;
+
   return (
-    <div className="football-card-grid">
-      {predictors.map((game) => (
+    <div className="football-stack">
+      <article className="football-panel">
+        <div className="football-section-head">
+          <h3>Build Any {entityCopy.singular} Matchup</h3>
+          <span>{predictorLoading ? 'Updating live…' : `Pick any two ${entityCopy.pluralLower}`}</span>
+        </div>
+        <div className="football-predictor-builder">
+          <select className="football-search" value={selectedAwayTeamId} onChange={(event) => setSelectedAwayTeamId(event.target.value)}>
+            <option value="">{`Select away ${entityCopy.singularLower}`}</option>
+            {teams.map((team) => (
+              <option key={`away-${team.id}`} value={team.id}>{team.displayName}</option>
+            ))}
+          </select>
+          <select className="football-search" value={selectedHomeTeamId} onChange={(event) => setSelectedHomeTeamId(event.target.value)}>
+            <option value="">{`Select home ${entityCopy.singularLower}`}</option>
+            {teams.map((team) => (
+              <option key={`home-${team.id}`} value={team.id}>{team.displayName}</option>
+            ))}
+          </select>
+        </div>
+      </article>
+
+      <div className="football-card-grid">
+      {activePredictors.map((game) => (
         <article className="football-panel football-predictor-card" key={game.gameId}>
           <div className="football-card-head">
             <span>{game.away.abbreviation} at {game.home.abbreviation}</span>
@@ -372,11 +421,18 @@ function PredictorView({ predictors }) {
           <div className="football-chip-row">
             <span className="football-chip">{game.home.abbreviation} {game.homeWinProbability}%</span>
             <span className="football-chip">Proj {game.projectedAwayScore}-{game.projectedHomeScore}</span>
+            <span className="football-chip">{game.winner}</span>
             <span className="football-chip">{game.bettingLean || 'Model edge'}</span>
             {game.americanOdds != null ? <span className="football-chip">{game.americanOdds > 0 ? '+' : ''}{game.americanOdds}</span> : null}
           </div>
+          {game.reasons?.length ? (
+            <div className="football-chip-row">
+              {game.reasons.map((reason) => <span className="football-chip" key={reason}>{reason}</span>)}
+            </div>
+          ) : null}
         </article>
       ))}
+      </div>
     </div>
   );
 }
@@ -402,32 +458,33 @@ function StoryDetailView({ story, onBack, onOpenRelated }) {
     <StoryDetailCard
       story={story}
       onBack={onBack}
-      backLabel="Back to news"
+      backLabel={story?.previousPage === 'team-detail' ? 'Back to page' : 'Back to news'}
       onOpenRelated={onOpenRelated}
     />
   );
 }
 
-function TeamDetailView({ detail, openPlayer, setPage }) {
+function TeamDetailView({ detail, entityCopy, openPlayer, openStory, setPage }) {
   return (
     <section className="football-stack">
       <button className="football-back-button" type="button" onClick={() => setPage('teams')}>
-        Back to teams
+        {`Back to ${entityCopy.pluralLower}`}
       </button>
       <article className="football-panel football-detail-hero">
         <div className="football-row-team">
           <TeamLogo team={detail.team} />
           <div>
-            <p className="eyebrow">Club Identity</p>
+            <p className="eyebrow">{entityCopy.identityLabel}</p>
             <h2>{detail.team.displayName}</h2>
             <p>#{detail.team.ovrRank} OVR</p>
             <FootballRecordLine record={detail.team.record} fallback={detail.team.abbreviation} />
           </div>
         </div>
         <div className="football-chip-row">
+          <span className="football-chip">{detail.team.clubPoints ?? detail.team.standingPoints ?? 0} pts</span>
           <span className="football-chip">OFF {detail.team.offScore}</span>
           <span className="football-chip">DEF {detail.team.defScore}</span>
-          <span className="football-chip">{detail.team.recentFormLabel || detail.team.streak}</span>
+          <span className="football-chip">{detail.team.recentFormLabel || 'Recent pending'}</span>
         </div>
       </article>
 
@@ -443,7 +500,7 @@ function TeamDetailView({ detail, openPlayer, setPage }) {
                   <PlayerVisual player={player} />
                   <div>
                     <strong>{player.displayName}</strong>
-                    <span>{player.position} • {player.tier}</span>
+                    <span>{player.positionLabel || player.position} • {player.tier}</span>
                   </div>
                 </div>
                 <span>{player.rating}</span>
@@ -466,6 +523,21 @@ function TeamDetailView({ detail, openPlayer, setPage }) {
             ))}
           </div>
         </article>
+        <article className="football-panel">
+          <div className="football-section-head">
+            <h3>{entityCopy.newsLabel}</h3>
+          </div>
+          <div className="football-list">
+            {(detail.clubNews || []).map((story) => (
+              <button className="football-row-button" type="button" key={story.storyId || story.id} onClick={() => openStory(story, 'team-detail')}>
+                <div>
+                  <strong>{story.headline}</strong>
+                  <span>{story.description || `Latest ${entityCopy.singularLower} coverage`}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </article>
       </div>
     </section>
   );
@@ -483,31 +555,34 @@ function PlayerDetailView({ detail, setPage, onBack }) {
           <div>
             <p className="eyebrow">Match Influence</p>
             <h2>{detail.player.displayName}</h2>
-            <p>{detail.player.team?.displayName} • {detail.player.position}</p>
+            <p>{detail.player.team?.displayName} • {detail.player.positionLabel || detail.player.position}</p>
           </div>
         </div>
         <div className="football-chip-row">
           <span className="football-chip">{detail.player.rating} OVR</span>
           <span className="football-chip">{detail.player.tier}</span>
+          <span className="football-chip">{detail.resolvedPosition}</span>
         </div>
         <p className="football-detail-copy">{detail.analysis}</p>
       </article>
-      <article className="football-panel">
-        <div className="football-section-head">
-          <h3>Stat Feed</h3>
-        </div>
-        <div className="football-list">
-          {(detail.stats || []).map((stat) => (
-            <div className="football-row-button is-static" key={`${stat.group}-${stat.label}`}>
-              <div>
-                <strong>{stat.label}</strong>
-                <span>{stat.group}</span>
+      {(detail.statSections || []).map((section) => (
+        <article className="football-panel" key={section.title}>
+          <div className="football-section-head">
+            <h3>{section.title}</h3>
+          </div>
+          <div className="football-list">
+            {(section.stats || []).map((stat) => (
+              <div className="football-row-button is-static" key={`${section.title}-${stat.label}`}>
+                <div>
+                  <strong>{stat.label}</strong>
+                  <span>{stat.group || detail.player.positionLabel || detail.player.position}</span>
+                </div>
+                <span>{stat.value}</span>
               </div>
-              <span>{stat.value}</span>
-            </div>
-          ))}
-        </div>
-      </article>
+            ))}
+          </div>
+        </article>
+      ))}
     </section>
   );
 }
@@ -551,14 +626,14 @@ function GameDetailView({ detail, predictors, setPage }) {
       <div className="football-overview-lower">
         <article className="football-panel football-panel-wide">
           <div className="football-section-head">
-            <h3>Match Notes</h3>
+            <h3>Key Moments</h3>
           </div>
-          <div className="football-list">
-            {(detail.notes || []).map((note, index) => (
+          <div className="football-list football-scroll-list">
+            {(detail.keyMoments?.length ? detail.keyMoments : detail.notes || []).map((note, index) => (
               <div className="football-row-button is-static" key={`${note}-${index}`}>
                 <div>
-                  <strong>Board Note</strong>
-                  <span>{note}</span>
+                  <strong>{note.minute || 'Moment'}</strong>
+                  <span>{note.text || note}</span>
                 </div>
               </div>
             ))}
@@ -606,6 +681,36 @@ function GameDetailView({ detail, predictors, setPage }) {
             <p className="football-empty-copy">Predictor card is still syncing.</p>
           )}
         </article>
+        <article className="football-panel">
+          <div className="football-section-head">
+            <h3>Man of the Match</h3>
+          </div>
+          <div className="football-row-button is-static">
+            <div className="football-player-cell">
+              <PlayerVisual player={detail.manOfTheMatch} />
+              <div>
+                <strong>{detail.manOfTheMatch?.displayName || 'Pending'}</strong>
+                <span>{detail.manOfTheMatch?.note || 'Match-defining performance'}</span>
+              </div>
+            </div>
+          </div>
+        </article>
+        <article className="football-panel football-panel-wide">
+          <div className="football-section-head">
+            <h3>Box Score</h3>
+          </div>
+          <div className="football-list football-scroll-list">
+            {(detail.boxScore || []).map((row, index) => (
+              <div className="football-row-button is-static" key={`${row.team}-${row.label}-${index}`}>
+                <div>
+                  <strong>{row.label}</strong>
+                  <span>{row.team}</span>
+                </div>
+                <span>{row.value}</span>
+              </div>
+            ))}
+          </div>
+        </article>
       </div>
     </section>
   );
@@ -613,6 +718,7 @@ function GameDetailView({ detail, predictors, setPage }) {
 
 export default function FootballLeagueApp({ leagueKey, initialEntry = null, theme = 'dark', toggleTheme = () => {} }) {
   const leagueConfig = getFootballLeagueConfig(leagueKey);
+  const entityCopy = getFootballEntityCopy(leagueKey);
   const apiBase = `/api/football/${leagueKey}`;
   const [page, setPage] = useState('overview');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -626,6 +732,10 @@ export default function FootballLeagueApp({ leagueKey, initialEntry = null, them
   const [loadingBootstrap, setLoadingBootstrap] = useState(true);
   const [loadingPlayers, setLoadingPlayers] = useState(false);
   const [hubOriginPlayer, setHubOriginPlayer] = useState(false);
+  const [selectedHomeTeamId, setSelectedHomeTeamId] = useState('');
+  const [selectedAwayTeamId, setSelectedAwayTeamId] = useState('');
+  const [customPredictor, setCustomPredictor] = useState([]);
+  const [predictorLoading, setPredictorLoading] = useState(false);
   const initialEntryHandledRef = useRef(false);
 
   async function fetchBootstrap() {
@@ -684,6 +794,35 @@ export default function FootballLeagueApp({ leagueKey, initialEntry = null, them
     };
   }, [apiBase, page, playersQuery, bootstrap]);
 
+  useEffect(() => {
+    if (page !== 'predictor') return;
+    if (!selectedHomeTeamId || !selectedAwayTeamId || selectedHomeTeamId === selectedAwayTeamId) {
+      setCustomPredictor([]);
+      setPredictorLoading(false);
+      return;
+    }
+    let ignore = false;
+
+    async function fetchCustomPredictor() {
+      setPredictorLoading(true);
+      try {
+        const response = await fetch(
+          `${apiBase}/predictor?homeTeamId=${encodeURIComponent(selectedHomeTeamId)}&awayTeamId=${encodeURIComponent(selectedAwayTeamId)}`,
+          { cache: 'no-store' },
+        );
+        const data = await response.json();
+        if (!ignore) setCustomPredictor(data.predictors || []);
+      } finally {
+        if (!ignore) setPredictorLoading(false);
+      }
+    }
+
+    fetchCustomPredictor();
+    return () => {
+      ignore = true;
+    };
+  }, [apiBase, page, selectedHomeTeamId, selectedAwayTeamId]);
+
   async function openTeam(teamId) {
     const response = await fetch(`${apiBase}/teams/${teamId}`, { cache: 'no-store' });
     const data = await response.json();
@@ -736,7 +875,7 @@ export default function FootballLeagueApp({ leagueKey, initialEntry = null, them
       return (
         <section className="football-loading">
           <p className="eyebrow">{leagueConfig.label} Sync</p>
-          <h2>Pulling match board, club power, player impact, and stories.</h2>
+          <h2>{`Pulling match board, ${entityCopy.singularLower} power, player impact, and stories.`}</h2>
         </section>
       );
     }
@@ -745,13 +884,25 @@ export default function FootballLeagueApp({ leagueKey, initialEntry = null, them
       case 'scores':
         return <div className="football-card-grid">{(bootstrap?.scoreboard || []).map((game) => <GameCard key={game.id} game={game} onOpen={openGame} />)}</div>;
       case 'rankings':
-        return <RankingsView rankings={rankings} openTeam={openTeam} />;
+        return <RankingsView rankings={rankings} entityCopy={entityCopy} openTeam={openTeam} />;
       case 'teams':
         return <TeamsView teams={teams} openTeam={openTeam} />;
       case 'players':
-        return <PlayersView players={playersData?.players || []} query={playersQuery} setQuery={setPlayersQuery} loading={loadingPlayers} openPlayer={openPlayer} />;
+        return <PlayersView entityCopy={entityCopy} players={playersData?.players || []} query={playersQuery} setQuery={setPlayersQuery} loading={loadingPlayers} openPlayer={openPlayer} />;
       case 'predictor':
-        return <PredictorView predictors={predictors} />;
+        return (
+          <PredictorView
+            entityCopy={entityCopy}
+            predictors={predictors}
+            teams={teams}
+            selectedHomeTeamId={selectedHomeTeamId}
+            selectedAwayTeamId={selectedAwayTeamId}
+            setSelectedHomeTeamId={setSelectedHomeTeamId}
+            setSelectedAwayTeamId={setSelectedAwayTeamId}
+            customPredictor={customPredictor}
+            predictorLoading={predictorLoading}
+          />
+        );
       case 'news':
         return <NewsView news={news} openStory={openStory} />;
       case 'settings':
@@ -765,10 +916,85 @@ export default function FootballLeagueApp({ leagueKey, initialEntry = null, them
               <h3>Refresh Window</h3>
               <p>Football boards repoll live matches every 45 seconds and reuse cached club crawls for heavier roster work.</p>
             </article>
+            <article className="football-panel">
+              <h3>Player Formulas</h3>
+              <div className="football-list">
+                <div className="football-row-button is-static">
+                  <div>
+                    <strong>GK</strong>
+                    <span>0.28 ShotStopping + 0.22 GoalsPrevented + 0.16 SavePct + 0.12 Distribution + 0.10 Claims + 0.06 Sweeping + 0.06 Consistency</span>
+                  </div>
+                </div>
+                <div className="football-row-button is-static">
+                  <div>
+                    <strong>CB / FB-WB</strong>
+                    <span>CB = 0.26 Defending + 0.18 Aerials + 0.16 Interceptions + 0.12 Clearances + 0.14 DuelWinPct + 0.08 Progression + 0.06 Discipline. FB/WB = 0.20 Defending + 0.14 RecoveryPace + 0.16 Crossing + 0.16 ChanceCreation + 0.14 BallProgression + 0.12 WorkRate + 0.08 DuelWinPct.</span>
+                  </div>
+                </div>
+                <div className="football-row-button is-static">
+                  <div>
+                    <strong>DM/CM</strong>
+                    <span>0.20 Passing + 0.20 Progression + 0.18 BallWinning + 0.16 PressResistance + 0.16 Control + 0.10 ChanceCreation</span>
+                  </div>
+                </div>
+                <div className="football-row-button is-static">
+                  <div>
+                    <strong>AM/W</strong>
+                    <span>0.20 Creativity + 0.16 Dribbling + 0.20 ChanceCreation + 0.16 BallProgression + 0.18 GoalsAssists + 0.10 WorkRate</span>
+                  </div>
+                </div>
+                <div className="football-row-button is-static">
+                  <div>
+                    <strong>ST</strong>
+                    <span>0.24 Finishing + 0.18 ShotQuality + 0.18 Movement + 0.10 Pressing + 0.12 LinkPlay + 0.18 NonPenaltyScoring</span>
+                  </div>
+                </div>
+              </div>
+            </article>
+            <article className="football-panel">
+              <h3>Context Adjustments</h3>
+              <div className="football-list">
+                <div className="football-row-button is-static">
+                  <div>
+                    <strong>League / Club / Minutes</strong>
+                    <span>leagueAdj = clamp((competitionWeight - 1.0) x 4, -2, 2); teamAdj = clamp((teamStrengthPct - 50) x 0.04, -2, 2); minutesAdj = clamp((minutesPct - 50) x 0.03, -1.5, 1.5).</span>
+                  </div>
+                </div>
+                <div className="football-row-button is-static">
+                  <div>
+                    <strong>Recent / Consistency / Prime</strong>
+                    <span>recentAdj = clamp((recentPct - seasonPct) x 0.10, -1.5, 1.5); consistencyAdj = clamp((consistencyPct - 50) x 0.03, -1, 1); prime years add +1.0 for ages 24-29.</span>
+                  </div>
+                </div>
+                <div className="football-row-button is-static">
+                  <div>
+                    <strong>Normalization</strong>
+                    <span>Position percentiles drive the base first. Final OVR compresses into 60-99 with very few 95+ and 99 reserved for elite percentile, minutes, and consistency cases.</span>
+                  </div>
+                </div>
+              </div>
+            </article>
+            <article className="football-panel">
+              <h3>{entityCopy.singular} Formula</h3>
+              <div className="football-list">
+                <div className="football-row-button is-static">
+                  <div>
+                    <strong>OFF / DEF</strong>
+                    <span>OFF = 0.40 GoalsPer90 + 0.35 xG proxy + 0.15 ShotsOnTargetPer90 + 0.10 ChanceCreation. DEF = 0.40 xGA inverse proxy + 0.30 GoalsAllowed inverse + 0.15 CleanSheetRate + 0.15 ShotsAllowed inverse.</span>
+                  </div>
+                </div>
+                <div className="football-row-button is-static">
+                  <div>
+                    <strong>Final OVR</strong>
+                    <span>0.26 StartingXI + 0.14 Depth + 0.16 OFF + 0.16 DEF + 0.12 StandingPointsPct + 0.10 Recent + 0.06 Underlying, plus small league adjustment and FIFA modifier for International Play only.</span>
+                  </div>
+                </div>
+              </div>
+            </article>
           </div>
         );
       case 'team-detail':
-        return teamDetail ? <TeamDetailView detail={teamDetail} openPlayer={openPlayer} setPage={setPage} /> : null;
+        return teamDetail ? <TeamDetailView detail={teamDetail} entityCopy={entityCopy} openPlayer={openPlayer} openStory={openStory} setPage={setPage} /> : null;
       case 'player-detail':
         return playerDetail ? (
           <PlayerDetailView
@@ -795,7 +1021,7 @@ export default function FootballLeagueApp({ leagueKey, initialEntry = null, them
         ) : null;
       case 'overview':
       default:
-        return <FootballOverview bootstrap={bootstrap} openGame={openGame} openTeam={openTeam} openPlayer={openPlayer} openStory={openStory} setPage={setPage} />;
+        return <FootballOverview bootstrap={bootstrap} entityCopy={entityCopy} openGame={openGame} openTeam={openTeam} openPlayer={openPlayer} openStory={openStory} setPage={setPage} />;
     }
   }
 
