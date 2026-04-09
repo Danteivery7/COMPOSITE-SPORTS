@@ -1,12 +1,13 @@
 import NFLRoute from '@/src/components/NFLRoute';
-import { getNFLSnapshot } from '@/src/lib/live-sports-backend';
+import { getSportSnapshotKey } from '@/src/lib/live-sports-backend';
+import { getStoredSnapshot } from '@/src/lib/snapshot-store';
 
 export default async function NFLPage({ searchParams }) {
   const query = await searchParams;
   let initialBootstrap = null;
 
   try {
-    initialBootstrap = await getNFLSnapshot();
+    initialBootstrap = await getStoredSnapshot(getSportSnapshotKey('nfl'));
   } catch (_error) {
     initialBootstrap = null;
   }

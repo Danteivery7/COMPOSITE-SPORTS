@@ -55,6 +55,16 @@ function makeFootballSnapshotKey(leagueKey) {
   return `football-league-${FOOTBALL_SNAPSHOT_VERSION}-${leagueKey}`;
 }
 
+export function getSportSnapshotKey(sport) {
+  return makeSportSnapshotKey(sport);
+}
+
+export function getFootballLeagueSnapshotKey(leagueKey) {
+  return makeFootballSnapshotKey(leagueKey);
+}
+
+export const FOOTBALL_LANDING_SNAPSHOT_KEY = `football-landing-${FOOTBALL_LANDING_VERSION}`;
+
 async function buildGenericSportSnapshot(sport) {
   if (sport === 'cbb') {
     const snapshot = await getCBBBootstrap({ force: true });
@@ -225,7 +235,7 @@ export async function warmFootballLeagueSnapshot(leagueKey, force = false) {
 
 export async function getFootballLandingSnapshot({ force = false } = {}) {
   return getHotSnapshot(
-    `football-landing-${FOOTBALL_LANDING_VERSION}`,
+    FOOTBALL_LANDING_SNAPSHOT_KEY,
     async () => ({
       ...(await getFootballLanding()),
       lastUpdated: new Date().toISOString(),
@@ -236,7 +246,7 @@ export async function getFootballLandingSnapshot({ force = false } = {}) {
 
 export async function warmFootballLandingSnapshot(force = false) {
   return warmSnapshot(
-    `football-landing-${FOOTBALL_LANDING_VERSION}`,
+    FOOTBALL_LANDING_SNAPSHOT_KEY,
     async () => ({
       ...(await getFootballLanding()),
       lastUpdated: new Date().toISOString(),

@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation';
 import FootballLeagueRoute from '@/src/components/FootballLeagueRoute';
 import { isFootballLeague } from '@/src/lib/football';
-import { getFootballLeagueSnapshot } from '@/src/lib/live-sports-backend';
+import { getFootballLeagueSnapshotKey } from '@/src/lib/live-sports-backend';
+import { getStoredSnapshot } from '@/src/lib/snapshot-store';
 
 export default async function FootballLeaguePage({ params, searchParams }) {
   const { league } = await params;
@@ -13,7 +14,7 @@ export default async function FootballLeaguePage({ params, searchParams }) {
 
   let initialBootstrap = null;
   try {
-    initialBootstrap = await getFootballLeagueSnapshot(league);
+    initialBootstrap = await getStoredSnapshot(getFootballLeagueSnapshotKey(league));
   } catch (_error) {
     initialBootstrap = null;
   }
