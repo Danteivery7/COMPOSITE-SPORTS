@@ -164,6 +164,34 @@ function writeCache(key, value, ttlMs) {
   return value;
 }
 
+function emptyFootballPlayerCatalog(leagueKey) {
+  return {
+    league: leagueKey,
+    players: [],
+    lastUpdated: null,
+    totalPlayers: 0,
+  };
+}
+
+function getCachedPlayerCatalog(leagueKey) {
+  return readCache(cacheKey('players', leagueKey)) || emptyFootballPlayerCatalog(leagueKey);
+}
+
+async function getBootstrapPlayersCatalog(leagueKey, timeoutMs = 900) {
+  const cached = getCachedPlayerCatalog(leagueKey);
+  if (cached.players?.length) return cached;
+
+  const timeout = new Promise((resolve) => {
+    setTimeout(() => resolve(cached), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([getPlayerCatalog(leagueKey), timeout]);
+  } catch (_error) {
+    return cached;
+  }
+}
+
 function normalizeKey(value) {
   return String(value || '')
     .toLowerCase()
@@ -1784,7 +1812,7 @@ async function getFootballBootstrap(leagueKey) {
     computeRankings(leagueKey),
     fetchNews(leagueKey),
     getLeagueBrand(leagueKey),
-    getPlayerCatalog(leagueKey),
+    getBootstrapPlayersCatalog(leagueKey),
   ]);
 
   const scoreboard = scoreboardResult.status === 'fulfilled' ? scoreboardResult.value : [];
@@ -1799,12 +1827,7 @@ async function getFootballBootstrap(leagueKey) {
       };
   const playersCatalog = playersCatalogResult.status === 'fulfilled'
     ? playersCatalogResult.value
-    : {
-        league: leagueKey,
-        players: [],
-        lastUpdated: new Date().toISOString(),
-        totalPlayers: 0,
-      };
+    : emptyFootballPlayerCatalog(leagueKey);
 
   const featuredPlayers = (playersCatalog.players || []).slice(0, 12);
   const sideLabel = leagueKey === 'international-play' ? 'national sides' : 'clubs';
@@ -2072,13 +2095,12 @@ async function getFootballLanding() {
   const leagueKeys = FOOTBALL_ROUTE_ORDER;
   const leagueData = (await Promise.allSettled(
     leagueKeys.map(async (leagueKey) => {
-      const [brand, rankings, scoreboard, playersCatalog] = await Promise.all([
+      const [brand, rankings, scoreboard] = await Promise.all([
         getLeagueBrand(leagueKey),
         computeRankings(leagueKey),
         fetchScoreboard(leagueKey),
-        getPlayerCatalog(leagueKey),
       ]);
-      return { leagueKey, brand, rankings, scoreboard, playersCatalog };
+      return { leagueKey, brand, rankings, scoreboard, playersCatalog: getCachedPlayerCatalog(leagueKey) };
     }),
   ))
     .filter((result) => result.status === 'fulfilled')

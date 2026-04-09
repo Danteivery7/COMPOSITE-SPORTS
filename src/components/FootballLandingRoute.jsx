@@ -57,9 +57,7 @@ function hasRenderableLanding(data) {
   return Boolean(
     data &&
     Array.isArray(data?.leagues) &&
-    data.leagues.length &&
-    Array.isArray(data?.topPlayers) &&
-    data.topPlayers.length,
+    data.leagues.length,
   );
 }
 
@@ -79,9 +77,7 @@ export default function FootballLandingRoute({ initialData = null }) {
         const invalidLanding =
           !response.ok ||
           !Array.isArray(json?.leagues) ||
-          !json.leagues.length ||
-          !Array.isArray(json?.topPlayers) ||
-          !json.topPlayers.length;
+          !json.leagues.length;
 
         if (invalidLanding) {
           response = await fetch('/api/football/landing?force=1', { cache: 'no-store' });
@@ -94,11 +90,11 @@ export default function FootballLandingRoute({ initialData = null }) {
       }
     }
 
-    const bootstrapTimer = hasInitialData ? window.setTimeout(load, 12_000) : window.setTimeout(load, 0);
-    const timer = setInterval(load, 45_000);
+    const bootstrapTimer = hasInitialData ? null : window.setTimeout(load, 0);
+    const timer = setInterval(load, 60_000);
 
     return () => {
-      window.clearTimeout(bootstrapTimer);
+      if (bootstrapTimer) window.clearTimeout(bootstrapTimer);
       clearInterval(timer);
       delete document.body.dataset.compositeRoute;
     };
@@ -228,6 +224,10 @@ export default function FootballLandingRoute({ initialData = null }) {
           <div className="football-top-player-grid">
             {loading ? (
               [...Array(3)].map((_, index) => <div className="football-card football-loading-card" key={index} />)
+            ) : !topPlayers.length ? (
+              <div className="football-panel football-empty-card">
+                <p className="football-empty-copy">Top player board is warming in the background.</p>
+              </div>
             ) : (
               topPlayers.map((player, index) => (
                 <a

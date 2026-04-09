@@ -4,9 +4,7 @@ import { getCBBBootstrap, getCBBPlayerCatalog } from '@/src/lib/cbb';
 import { getNFLBootstrap, getNFLPlayerCatalog } from '@/src/lib/nfl';
 import {
   getFootballBootstrap,
-  getFootballFeaturedPlayers,
   getFootballLanding,
-  getFootballPlayerCatalog,
   isFootballLeague,
 } from '@/src/lib/football';
 
@@ -15,8 +13,8 @@ const SPORT_PLAYER_TTL = 10 * 60 * 1000;
 const FOOTBALL_LANDING_TTL = 2 * 60 * 1000;
 const CBB_SNAPSHOT_VERSION = 'v3';
 const NFL_SNAPSHOT_VERSION = 'v3';
-const FOOTBALL_SNAPSHOT_VERSION = 'v11';
-const FOOTBALL_LANDING_VERSION = 'v7';
+const FOOTBALL_SNAPSHOT_VERSION = 'v12';
+const FOOTBALL_LANDING_VERSION = 'v8';
 
 function footballRecordHasGames(record) {
   const match = String(record || '').match(/(\d+)\s*-\s*(\d+)\s*-\s*(\d+)/);
@@ -26,19 +24,18 @@ function footballRecordHasGames(record) {
 
 function isHealthyFootballSnapshot(snapshot) {
   const rankings = snapshot?.rankings || [];
-  const players = snapshot?.playersCatalog?.players || [];
   const rankedTeams = Array.isArray(rankings) ? rankings.length : 0;
-  const playerCount = Array.isArray(players) ? players.length : 0;
+  const liveGames = snapshot?.scoreboard?.length || 0;
+  const newsCount = snapshot?.news?.length || 0;
   const hasRealRecords = rankings.some(
     (team) => footballRecordHasGames(team?.record) || Number(team?.gamesPlayed || 0) > 0 || Number(team?.standingPoints || 0) > 0,
   );
-  return rankedTeams >= 6 && playerCount >= 15 && hasRealRecords;
+  return rankedTeams >= 6 && (hasRealRecords || liveGames > 0 || newsCount > 0);
 }
 
 function isMeaningfulFootballSnapshot(snapshot) {
   const rankings = snapshot?.rankings || [];
-  const players = snapshot?.playersCatalog?.players || [];
-  return rankings.length >= 6 || players.length >= 15;
+  return rankings.length >= 6 || (snapshot?.scoreboard?.length || 0) > 0 || (snapshot?.news?.length || 0) > 0;
 }
 
 function makeSportSnapshotKey(sport) {
@@ -117,25 +114,22 @@ async function buildGenericSportSnapshot(sport) {
 
 async function buildFootballLeagueSnapshot(leagueKey) {
   const bootstrap = await getFootballBootstrap(leagueKey);
-  const playersCatalog = bootstrap?.playersCatalog?.players?.length ? bootstrap.playersCatalog : (await getFootballPlayerCatalog(leagueKey));
-  const featuredPlayers = bootstrap?.featuredPlayers?.length ? bootstrap.featuredPlayers : await getFootballFeaturedPlayers(leagueKey, bootstrap?.rankings || []);
   const snapshot = {
     ...bootstrap,
-    featuredPlayers,
-    playersCatalog,
+    featuredPlayers: bootstrap?.featuredPlayers || [],
+    playersCatalog: bootstrap?.playersCatalog || { league: leagueKey, players: [], lastUpdated: null, totalPlayers: 0 },
     playerMeta: {
-      totalPlayers: playersCatalog?.players?.length || 0,
-      lastUpdated: playersCatalog?.lastUpdated || null,
+      totalPlayers: bootstrap?.playersCatalog?.players?.length || 0,
+      lastUpdated: bootstrap?.playersCatalog?.lastUpdated || null,
     },
     lastUpdated: new Date().toISOString(),
   };
 
   if (!isHealthyFootballSnapshot(snapshot)) {
     const rankedTeams = snapshot?.rankings?.length || 0;
-    const playerCount = snapshot?.playersCatalog?.players?.length || 0;
     const nonZeroTeams = (snapshot?.rankings || []).filter((team) => footballRecordHasGames(team?.record)).length;
     throw new Error(
-      `Incomplete football snapshot for ${leagueKey}: ${rankedTeams} teams, ${playerCount} players, ${nonZeroTeams} clubs with live records`,
+      `Incomplete football snapshot for ${leagueKey}: ${rankedTeams} clubs, ${nonZeroTeams} clubs with live records`,
     );
   }
 
@@ -195,18 +189,13 @@ export async function getFootballLeagueSnapshot(leagueKey, { force = false } = {
 
   if (!isHealthyFootballSnapshot(snapshot)) {
     const directBootstrap = await getFootballBootstrap(leagueKey);
-    const directPlayers = directBootstrap?.playersCatalog?.players?.length
-      ? directBootstrap.playersCatalog
-      : await getFootballPlayerCatalog(leagueKey);
     const repaired = {
       ...directBootstrap,
-      featuredPlayers: directBootstrap?.featuredPlayers?.length
-        ? directBootstrap.featuredPlayers
-        : (directPlayers?.players || []).slice(0, 12),
-      playersCatalog: directPlayers,
+      featuredPlayers: directBootstrap?.featuredPlayers || [],
+      playersCatalog: directBootstrap?.playersCatalog || { league: leagueKey, players: [], lastUpdated: null, totalPlayers: 0 },
       playerMeta: {
-        totalPlayers: directPlayers?.players?.length || 0,
-        lastUpdated: directPlayers?.lastUpdated || directBootstrap?.lastUpdated || null,
+        totalPlayers: directBootstrap?.playersCatalog?.players?.length || 0,
+        lastUpdated: directBootstrap?.playersCatalog?.lastUpdated || directBootstrap?.lastUpdated || null,
       },
       lastUpdated: new Date().toISOString(),
     };

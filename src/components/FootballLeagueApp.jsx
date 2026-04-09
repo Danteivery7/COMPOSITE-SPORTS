@@ -728,9 +728,7 @@ function hasRenderableBootstrap(data) {
   return Boolean(
     data &&
     Array.isArray(data?.rankings) &&
-    data.rankings.length &&
-    Array.isArray(data?.playersCatalog?.players) &&
-    data.playersCatalog.players.length,
+    data.rankings.length,
   );
 }
 
@@ -764,9 +762,7 @@ export default function FootballLeagueApp({ leagueKey, initialEntry = null, init
       const invalidBoard =
         !response.ok ||
         !Array.isArray(data?.rankings) ||
-        !data.rankings.length ||
-        !Array.isArray(data?.playersCatalog?.players) ||
-        !data.playersCatalog.players.length;
+        !data.rankings.length;
 
       if (invalidBoard) {
         response = await fetch(`${apiBase}/bootstrap?force=1`, { cache: 'no-store' });
@@ -781,17 +777,17 @@ export default function FootballLeagueApp({ leagueKey, initialEntry = null, init
 
   useEffect(() => {
     const hasInitialBootstrap = hasRenderableBootstrap(initialBootstrap);
-    const bootstrapTimer = hasInitialBootstrap ? window.setTimeout(fetchBootstrap, 12_000) : window.setTimeout(fetchBootstrap, 0);
-    const timer = setInterval(fetchBootstrap, 45_000);
+    const bootstrapTimer = hasInitialBootstrap ? null : window.setTimeout(fetchBootstrap, 0);
+    const timer = setInterval(fetchBootstrap, 60_000);
     return () => {
-      window.clearTimeout(bootstrapTimer);
+      if (bootstrapTimer) window.clearTimeout(bootstrapTimer);
       clearInterval(timer);
     };
   }, [apiBase, initialBootstrap]);
 
   useEffect(() => {
     if (page !== 'players') return;
-    if (!playersQuery.trim() && bootstrap?.playersCatalog) {
+    if (!playersQuery.trim() && bootstrap?.playersCatalog?.players?.length) {
       setPlayersData(bootstrap.playersCatalog);
       setLoadingPlayers(false);
       return;
