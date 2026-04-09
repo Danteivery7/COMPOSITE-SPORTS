@@ -111,13 +111,14 @@ function NewsFeature({ story, onOpen, className = '' }) {
 }
 
 function OverviewView({ bootstrap, openGame, openTeam, openPlayer, openStory, setPage }) {
-  const leadGame = bootstrap.scoreboard?.[0];
-  const topTeam = bootstrap.rankings?.[0];
-  const topPlayer = bootstrap.featuredPlayers?.[0];
-  const leadStory = bootstrap.news?.[0];
-  const bestEdge = bootstrap.predictors?.[0];
-  const fantasyHeadliner = bootstrap.fantasyRankings?.[0];
-  const heroPlayers = (bootstrap.featuredPlayers || []).slice(0, 4);
+  const safeBootstrap = bootstrap || {};
+  const leadGame = safeBootstrap.scoreboard?.[0];
+  const topTeam = safeBootstrap.rankings?.[0];
+  const topPlayer = safeBootstrap.featuredPlayers?.[0];
+  const leadStory = safeBootstrap.news?.[0];
+  const bestEdge = safeBootstrap.predictors?.[0];
+  const fantasyHeadliner = safeBootstrap.fantasyRankings?.[0];
+  const heroPlayers = (safeBootstrap.featuredPlayers || []).slice(0, 4);
 
   return (
     <section className="nfl-overview-shell">
@@ -130,9 +131,9 @@ function OverviewView({ bootstrap, openGame, openTeam, openPlayer, openStory, se
             and news all up front without the generic clutter.
           </p>
           <div className="nfl-chip-row">
-            <span className="nfl-chip">{bootstrap.meta?.liveGames || 0} live games</span>
-            <span className="nfl-chip">{bootstrap.rankings?.length || 0} teams tracked</span>
-            <span className="nfl-chip">{bootstrap.featuredPlayers?.length || 0} featured players</span>
+            <span className="nfl-chip">{safeBootstrap.meta?.liveGames || 0} live games</span>
+            <span className="nfl-chip">{safeBootstrap.rankings?.length || 0} teams tracked</span>
+            <span className="nfl-chip">{safeBootstrap.featuredPlayers?.length || 0} featured players</span>
           </div>
         </div>
         <div className="nfl-hero-side">
@@ -187,7 +188,7 @@ function OverviewView({ bootstrap, openGame, openTeam, openPlayer, openStory, se
           <div className="nfl-news-rail">
             <NewsFeature story={leadStory} onOpen={(story) => openStory(story, 'overview')} />
             <div className="nfl-mini-news-list">
-              {(bootstrap.news || []).slice(1, 5).map((story) => (
+              {(safeBootstrap.news || []).slice(1, 5).map((story) => (
                 <button className="nfl-mini-news-item" key={story.id} type="button" onClick={() => openStory(story, 'overview')}>
                   {story.image ? <img src={story.image} alt={story.headline} className="nfl-mini-news-image" /> : null}
                   <div>
@@ -255,7 +256,7 @@ function OverviewView({ bootstrap, openGame, openTeam, openPlayer, openStory, se
             <button type="button" onClick={() => setPage('scores')}>All scores</button>
           </div>
           <div className="nfl-list">
-            {(bootstrap.scoreboard || []).slice(0, 4).map((game) => (
+            {(safeBootstrap.scoreboard || []).slice(0, 4).map((game) => (
               <GameCard key={game.id} game={game} onOpen={openGame} />
             ))}
           </div>
@@ -282,7 +283,7 @@ function OverviewView({ bootstrap, openGame, openTeam, openPlayer, openStory, se
             <p className="nfl-empty-copy">Fantasy board is still syncing.</p>
           )}
           <div className="nfl-fantasy-news-list">
-            {(bootstrap.fantasyNews || []).slice(0, 4).map((story) => (
+            {(safeBootstrap.fantasyNews || []).slice(0, 4).map((story) => (
               <button className="nfl-mini-note" key={story.id} type="button" onClick={() => openStory(story, 'overview')}>
                 <strong>{story.headline}</strong>
                 <span>{story.source || 'ESPN Fantasy'}</span>
@@ -991,6 +992,15 @@ export default function NFLApp({ initialEntry = null, initialBootstrap = null, t
         <section className="nfl-loading">
           <p className="eyebrow">NFL Sync</p>
           <h2>Pulling power board, scores, fantasy signals, and the latest stories.</h2>
+        </section>
+      );
+    }
+
+    if (!hasRenderableBootstrap(bootstrap)) {
+      return (
+        <section className="nfl-loading">
+          <p className="eyebrow">NFL Sync</p>
+          <h2>Refreshing the board from the latest stored season snapshot.</h2>
         </section>
       );
     }
