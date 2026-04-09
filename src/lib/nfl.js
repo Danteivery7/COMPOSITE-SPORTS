@@ -298,12 +298,16 @@ function fantasyRankToPercentile(rank, total = 200) {
 }
 
 async function fetchOfficialFantasyRankings() {
-  const key = cacheKey('fantasy-source', getNFLSeasonYear());
+  const seasonYear = getNFLSeasonYear();
+  const key = cacheKey('fantasy-source', seasonYear);
   const cached = readCache(key);
   if (cached) return cached;
 
   try {
-    const html = await fetchText('https://fantasy.nfl.com/research/rankings?leagueId=0&statType=draftStats', 6 * 60 * 60 * 1000);
+    const html = await fetchText(
+      `https://fantasy.nfl.com/research/players?leagueId=0&position=O&statCategory=stats&statSeason=${seasonYear}&statType=seasonStats`,
+      6 * 60 * 60 * 1000,
+    );
     const text = decodeHtmlEntities(
       html
         .replace(/<script[\s\S]*?<\/script>/gi, ' ')
@@ -314,29 +318,29 @@ async function fetchOfficialFantasyRankings() {
     );
 
     const players = [];
-    const pattern = /(?:^|\s)(\d{1,3})\s+([A-Z0-9][A-Za-z0-9.'\-]+(?:\s+[A-Z0-9][A-Za-z0-9.'\-]+){0,4})\s+(QB|RB|WR|TE)\s*-\s*([A-Z]{2,3})(?:\s+(?:IR|IA|SUS|O|Q|PUP|NFI-R))*\b/g;
+    const pattern = /([A-Z0-9][A-Za-z0-9.'\-]+(?:\s+[A-Z0-9][A-Za-z0-9.'\-]+){0,4})\s+(QB|RB|WR|TE)\s*-\s*([A-Z]{2,3})(?:\s+(?:IR|IA|SUS|O|Q|PUP|NFI-R))*\b/g;
     let match;
+    let inferredRank = 1;
     while ((match = pattern.exec(text)) !== null) {
-      const rank = Number(match[1]);
-      if (!Number.isFinite(rank) || rank <= 0 || rank > 250) continue;
-      const displayName = String(match[2] || '').trim();
-      const position = String(match[3] || '').trim();
-      const teamAbbr = String(match[4] || '').trim();
+      const displayName = String(match[1] || '').trim();
+      const position = String(match[2] || '').trim();
+      const teamAbbr = String(match[3] || '').trim();
       if (!displayName || !position || !teamAbbr) continue;
       players.push({
-        rank,
+        rank: inferredRank,
         displayName,
         teamAbbr,
         positionGroup: position,
         source: 'NFL Fantasy',
       });
+      inferredRank += 1;
     }
 
-    const uniquePlayers = uniqBy(players, (player) => `${player.rank}:${normalizeFantasyLookupName(player.displayName)}:${player.teamAbbr}`);
+    const uniquePlayers = uniqBy(players, (player) => `${normalizeFantasyLookupName(player.displayName)}:${player.teamAbbr}`);
     return writeCache(
       key,
       {
-        source: 'NFL Fantasy',
+        source: `NFL Fantasy ${seasonYear} Season`,
         players: uniquePlayers.slice(0, 200),
         totalPlayers: uniquePlayers.length,
         lastUpdated: new Date().toISOString(),
@@ -472,6 +476,7 @@ function getStatValue(stats, keys, fallback = 0) {
 
 async function getStandings() {
   const seasonYear = getNFLSeasonYear();
+  const offseasonLock = shouldUsePreviousSeasonBoard();
   const key = cacheKey('standings', seasonYear);
   const cached = readCache(key);
   if (cached) return cached;
@@ -485,12 +490,14 @@ async function getStandings() {
   });
 
   if (!entries.length) {
-    payload = await fetchJson(`${NFL_SITE}/standings`, 30 * 60 * 1000);
-    walk(payload, (node) => {
-      if (node?.team?.id && Array.isArray(node?.stats)) {
-        entries.push(node);
-      }
-    });
+    if (!offseasonLock) {
+      payload = await fetchJson(`${NFL_SITE}/standings`, 30 * 60 * 1000);
+      walk(payload, (node) => {
+        if (node?.team?.id && Array.isArray(node?.stats)) {
+          entries.push(node);
+        }
+      });
+    }
   }
 
   const standings = uniqBy(
@@ -547,13 +554,14 @@ function flattenStatisticsPayload(payload) {
 
 async function getTeamStatistics(teamId) {
   const seasonYear = getNFLSeasonYear();
+  const offseasonLock = shouldUsePreviousSeasonBoard();
   const key = cacheKey('team-stats', `${teamId}:${seasonYear}`);
   const cached = readCache(key);
   if (cached) return cached;
 
   let payload = await fetchJson(withQuery(`${NFL_SITE}/teams/${teamId}/statistics`, { season: seasonYear, seasontype: 2 }), 6 * 60 * 60 * 1000);
   let stats = flattenStatisticsPayload(payload);
-  if (!Object.keys(stats).length) {
+  if (!Object.keys(stats).length && !offseasonLock) {
     payload = await fetchJson(`${NFL_SITE}/teams/${teamId}/statistics`, 6 * 60 * 60 * 1000);
     stats = flattenStatisticsPayload(payload);
   }
@@ -562,6 +570,7 @@ async function getTeamStatistics(teamId) {
 
 async function fetchTeamSchedule(teamId) {
   const seasonYear = getNFLSeasonYear();
+  const offseasonLock = shouldUsePreviousSeasonBoard();
   const key = cacheKey('team-schedule', `${teamId}:${seasonYear}`);
   const cached = readCache(key);
   if (cached) return cached;
@@ -569,6 +578,14 @@ async function fetchTeamSchedule(teamId) {
     const schedule = await fetchJson(withQuery(`${NFL_SITE}/teams/${teamId}/schedule`, { season: seasonYear, seasontype: 2 }), 60 * 60 * 1000);
     return writeCache(key, schedule, 60 * 60 * 1000);
   } catch (_error) {
+    if (!offseasonLock) {
+      try {
+        const schedule = await fetchJson(`${NFL_SITE}/teams/${teamId}/schedule`, 60 * 60 * 1000);
+        return writeCache(key, schedule, 60 * 60 * 1000);
+      } catch (_fallbackError) {
+        // fall through
+      }
+    }
     return writeCache(key, { events: [] }, 15 * 60 * 1000);
   }
 }
@@ -724,12 +741,13 @@ async function fetchNews() {
 
 async function fetchLeaders() {
   const seasonYear = getNFLSeasonYear();
+  const offseasonLock = shouldUsePreviousSeasonBoard();
   const key = cacheKey('leaders', seasonYear);
   const cached = readCache(key);
   if (cached) return cached;
 
   let payload = await fetchJson(withQuery(`${NFL_SITE}/leaders`, { season: seasonYear, seasontype: 2 }), 60 * 60 * 1000);
-  if (!(payload?.leaders || payload?.categories || payload?.items)) {
+  if (!(payload?.leaders || payload?.categories || payload?.items) && !offseasonLock) {
     payload = await fetchJson(`${NFL_SITE}/leaders`, 60 * 60 * 1000);
   }
 
