@@ -26,7 +26,7 @@ import {
 } from '@/public/vendor/nhl/src/analytics.js';
 
 const CACHE = new Map();
-const WORLD_CACHE_VERSION = 'v12';
+const WORLD_CACHE_VERSION = 'v13';
 const DEFAULT_HEADSHOT = 'https://a.espncdn.com/i/headshots/nophoto.png';
 const MAX_PLAYERS_PER_SPORT = 2;
 const THIRD_PLAYER_CLEAR_MARGIN = 3;
@@ -41,7 +41,7 @@ const SOURCE_WEIGHTS = {
   mlb: 1.18,
   nba: 1.24,
   nhl: 1.2,
-  nfl: 1.14,
+  nfl: 1.04,
   cbb: 0.96,
   football: 1.12,
 };
@@ -315,6 +315,7 @@ function includeDiversityPicks(sorted) {
   const hasFullQuotaSet = WORLD_TOP5_SPORT_QUOTA.every(([sportKey]) =>
     sorted.some((candidate) => candidate.sportKey === sportKey),
   );
+  const hasFootballCandidate = sorted.some((candidate) => candidate.sportKey === 'football');
 
   function pushCandidate(candidate) {
     if (!candidate || selectedIds.has(candidate.id) || selected.length >= 5) return;
@@ -331,6 +332,7 @@ function includeDiversityPicks(sorted) {
   });
 
   sorted.forEach((candidate) => {
+    if (hasFootballCandidate && candidate.sportKey === 'nfl') return;
     if (hasFullQuotaSet && !quotaSports.includes(candidate.sportKey)) return;
     const quota = WORLD_TOP5_SPORT_QUOTA.find(([sportKey]) => sportKey === candidate.sportKey)?.[1];
     if (quota && (selectedCountBySport.get(candidate.sportKey) || 0) >= quota) return;
@@ -392,6 +394,7 @@ function includeDiversityPicks(sorted) {
   if (refined.length < 5) {
     sorted.forEach((candidate) => {
       if (refined.length >= 5) return;
+      if (hasFootballCandidate && candidate.sportKey === 'nfl') return;
       if (hasFullQuotaSet && !quotaSports.includes(candidate.sportKey)) return;
       const currentCount = refined.filter((entry) => entry.sportKey === candidate.sportKey).length;
       if (currentCount >= MAX_PLAYERS_PER_SPORT) return;

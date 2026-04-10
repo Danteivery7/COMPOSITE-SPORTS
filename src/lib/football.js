@@ -3,6 +3,7 @@ import { extractEspnOdds, moneylineToProbability } from '@/src/lib/odds';
 import { compareByStartTime, getEasternDateKey, isSameEasternDate } from '@/src/lib/time';
 
 const CACHE = new Map();
+const FOOTBALL_CACHE_VERSION = 'v2';
 const DEFAULT_HEADSHOT = 'https://a.espncdn.com/i/headshots/nophoto.png';
 const FINAL_VISIBILITY_HOURS = 12;
 const MATCH_DURATION_HOURS = 2.5;
@@ -146,7 +147,7 @@ const FOOTBALL_SIDE_ALIASES = {
 };
 
 function cacheKey(scope, league, extra = '') {
-  return `${scope}:${league}:${extra}`;
+  return `${FOOTBALL_CACHE_VERSION}:${scope}:${league}:${extra}`;
 }
 
 function readCache(key) {
@@ -1253,9 +1254,10 @@ function footballOverallFromPercentile(percentile) {
     [40, 70, 75, 82],
     [70, 88, 82, 89],
     [88, 96, 89, 94],
-    [96, 99, 94, 96.6],
-    [99, 99.7, 96.6, 97.9],
-    [99.7, 100, 97.9, 99],
+    [96, 99, 94, 96.1],
+    [99, 99.7, 96.1, 97.6],
+    [99.7, 99.93, 97.6, 98.4],
+    [99.93, 100, 98.4, 99],
   ];
 
   for (const [start, end, min, max] of segments) {
@@ -1274,8 +1276,10 @@ function applyFootballLeagueEliteCaps(players = []) {
     const rawRating = Number(player.rating || 0);
     const cappedRating =
       index === 0 ? Math.min(rawRating, 99) :
-      index === 1 ? Math.min(rawRating, 98.9) :
-      Math.min(rawRating, 97.9);
+      index === 1 ? Math.min(rawRating, 98.4) :
+      index === 2 ? Math.min(rawRating, 97.6) :
+      index <= 5 ? Math.min(rawRating, 96.9) :
+      Math.min(rawRating, 96.2);
     const rating = Math.round(cappedRating * 10) / 10;
     return {
       ...player,
