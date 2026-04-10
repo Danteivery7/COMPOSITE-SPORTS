@@ -456,11 +456,14 @@ function generatePlayerProps(player, currentStats, careerStats, bStats, pStats, 
     const carGP = g(careerStats, 'GP', 'gamesPlayed') || 1;
     const careerPitchStats = isOhtani && isTwoWay ? (careerStats?.pitching || {}) : careerStats;
     const careerBatStats = isOhtani && isTwoWay ? (careerStats?.batting || {}) : careerStats;
+    const LEAGUE_AVG = { ERA: 4.20, WHIP: 1.30, 'K/9': 8.5, 'H/9': 8.6, 'HR/9': 1.2 };
 
     let projK = 0, projIP = 0, projRunsAllowed = 0;
     let projHR = 0, projHits = 0, projTB = 0, projRBI = 0;
     let kConfidence = 0, ipConfidence = 0, raConfidence = 0;
     let hrConfidence = 0, hitsConfidence = 0, tbConfidence = 0, rbiConfidence = 0;
+    let ohtaniPitchingScore = null;
+    let ohtaniBattingScore = null;
 
     const props = [];
 
@@ -506,12 +509,39 @@ function generatePlayerProps(player, currentStats, careerStats, bStats, pStats, 
         
         const curKRate = curIP > 0 ? (curK / curIP) : 0;
         const carKRate = carK9 / 9;
+
+        if (isOhtani) {
+            const curPitchWHIP = g(pStats, 'WHIP');
+            const curPitchHits = g(pStats, 'H', 'hits');
+            const curPitchHR = g(pStats, 'HR', 'homeRuns');
+            const curPitchH9 = curIP > 0 ? (curPitchHits / curIP) * 9 : LEAGUE_AVG['H/9'];
+            const curPitchHR9 = curIP > 0 ? (curPitchHR / curIP) * 9 : LEAGUE_AVG['HR/9'];
+            const basePitchWHIP = g(careerPitchStats, 'WHIP') || LEAGUE_AVG.WHIP;
+            const basePitchH9 = careerIP > 0 ? ((g(careerPitchStats, 'H', 'hits') / careerIP) * 9) : LEAGUE_AVG['H/9'];
+            const basePitchHR9 = careerIP > 0 ? ((g(careerPitchStats, 'HR', 'homeRuns') / careerIP) * 9) : LEAGUE_AVG['HR/9'];
+
+            ohtaniPitchingScore = 0;
+            if ((curERA || 0) < carERA) ohtaniPitchingScore++;
+            if ((curPitchWHIP || 0) < basePitchWHIP) ohtaniPitchingScore++;
+            if ((carK9 || 0) > 0 && (g(pStats, 'K/9', 'strikeoutsPerNineInnings') || 0) > carK9) ohtaniPitchingScore++;
+            if (curPitchH9 < basePitchH9) ohtaniPitchingScore++;
+            if (curPitchHR9 < basePitchHR9) ohtaniPitchingScore++;
+        }
         
         // --- Advanced Dynamic Pick Logic (v3) ---
         // Expose a score logic even before aiAnalysis is returned
         const pScore = (curKRate > carKRate ? 1 : 0) + (projK >= 6.5 ? 1 : 0) + (curIP / Math.max(1, pGP) > 5.5 ? 1 : 0);
         let kPick = 'Under';
-        if (pScore >= 2) kPick = 'Over';
+        if (isOhtani && ohtaniPitchingScore !== null) {
+            if (ohtaniPitchingScore >= 4) {
+                projK = Math.max(5.5, projK);
+                kPick = 'Over';
+            } else if (ohtaniPitchingScore <= 1) {
+                kPick = 'Under';
+            } else {
+                kPick = projK >= 5.5 ? 'Over' : 'Under';
+            }
+        } else if (pScore >= 2) kPick = 'Over';
         else if (pScore === 0) kPick = 'Under';
         else kPick = (player.name.length % 2 === 0) ? 'Over' : 'Under'; // Deterministic mix
         
@@ -543,6 +573,21 @@ function generatePlayerProps(player, currentStats, careerStats, bStats, pStats, 
 
         // Dynamic Pick Logic for Batters: Tied to 5-point consensus principle
         const bScore = (curAVG > carAVG ? 1 : 0) + (curSLG > carSLG ? 1 : 0) + (projHR > 0.2 ? 1 : 0);
+
+        if (isOhtani) {
+            const curOPS = g(bStats, 'OPS', 'ops');
+            const curOBP = g(bStats, 'OBP', 'onBasePct');
+            const curBatH9 = gp > 0 ? (curH / gp) * 9 : 0;
+            const baseOPS = g(careerBatStats, 'OPS', 'ops') || 0.720;
+            const baseOBP = g(careerBatStats, 'OBP', 'onBasePct') || 0.315;
+            const baseH9 = carGP > 0 ? ((g(careerBatStats, 'H', 'hits') / carGP) * 9) : ((112 / 130) * 9);
+            ohtaniBattingScore = 0;
+            if ((curAVG || 0) > carAVG) ohtaniBattingScore++;
+            if ((curOPS || 0) > baseOPS) ohtaniBattingScore++;
+            if ((curSLG || 0) > carSLG) ohtaniBattingScore++;
+            if ((curOBP || 0) > baseOBP) ohtaniBattingScore++;
+            if ((curBatH9 || 0) > baseH9) ohtaniBattingScore++;
+        }
         
         const getPick = (score, seed) => {
             if (score >= 2) return 'Over';
@@ -550,10 +595,18 @@ function generatePlayerProps(player, currentStats, careerStats, bStats, pStats, 
             return (seed % 2 === 0) ? 'Over' : 'Under';
         };
 
-        props.push({ category: 'Home Runs', line: 0.5, confidence: hrConfidence, direction: getPick(bScore, player.name.length), unit: 'HR', isModel: true });
-        props.push({ category: 'Hits', line: projHits || 1.5, confidence: hitsConfidence, direction: getPick(bScore, player.name.length + 1), unit: 'H', isModel: true });
-        props.push({ category: 'Total Bases', line: projTB || 1.5, confidence: tbConfidence, direction: getPick(bScore, player.name.length + 2), unit: 'TB', isModel: true });
-        props.push({ category: 'RBI', line: projRBI || 0.5, confidence: rbiConfidence, direction: getPick(bScore, player.name.length + 3), unit: 'RBI', isModel: true });
+        const getOhtaniHitPick = (fallbackScore, seed) => {
+            if (ohtaniBattingScore !== null) {
+                if (ohtaniBattingScore >= 4) return 'Over';
+                if (ohtaniBattingScore <= 1) return 'Under';
+            }
+            return getPick(fallbackScore, seed);
+        };
+
+        props.push({ category: 'Home Runs', line: 0.5, confidence: hrConfidence, direction: getOhtaniHitPick(bScore, player.name.length), unit: 'HR', isModel: true });
+        props.push({ category: 'Hits', line: projHits || 1.5, confidence: hitsConfidence, direction: getOhtaniHitPick(bScore, player.name.length + 1), unit: 'H', isModel: true });
+        props.push({ category: 'Total Bases', line: projTB || 1.5, confidence: tbConfidence, direction: getOhtaniHitPick(bScore, player.name.length + 2), unit: 'TB', isModel: true });
+        props.push({ category: 'RBI', line: projRBI || 0.5, confidence: rbiConfidence, direction: getOhtaniHitPick(bScore, player.name.length + 3), unit: 'RBI', isModel: true });
     }
 
     let mergedProps = [...props];
@@ -581,9 +634,41 @@ function generatePlayerProps(player, currentStats, careerStats, bStats, pStats, 
         if (realProps.length > 0) {
             mergedProps = realProps.map(rp => {
                 let modelPick = 'Over', conf = 0.5, mappedModelLine = 0, finalUnit = '';
-                if (rp.category?.includes('Strikeout')) { mappedModelLine = projK; finalUnit = 'K'; modelPick = mappedModelLine >= rp.line ? 'Over' : 'Under'; conf = kConfidence + Math.abs(rp.line - mappedModelLine) * 0.1; }
+                if (rp.category?.includes('Strikeout')) {
+                    mappedModelLine = projK;
+                    finalUnit = 'K';
+                    modelPick = isOhtani && ohtaniPitchingScore !== null
+                        ? (ohtaniPitchingScore >= 4 ? 'Over' : ohtaniPitchingScore <= 1 ? 'Under' : (mappedModelLine >= rp.line ? 'Over' : 'Under'))
+                        : (mappedModelLine >= rp.line ? 'Over' : 'Under');
+                    conf = kConfidence + Math.abs(rp.line - mappedModelLine) * 0.1;
+                }
                 else if (rp.category?.includes('Outs')) { mappedModelLine = Math.floor(projIP) * 3 + (projIP % 1) * 3; finalUnit = 'Outs'; modelPick = mappedModelLine >= rp.line ? 'Over' : 'Under'; conf = ipConfidence + Math.abs(rp.line - mappedModelLine) * 0.08; }
-                else if (rp.category?.includes('Hits')) { mappedModelLine = projHits; finalUnit = 'H'; modelPick = mappedModelLine > rp.line ? 'Over' : 'Under'; conf = hitsConfidence + Math.abs(rp.line - mappedModelLine) * 0.15; }
+                else if (rp.category?.includes('Hits')) {
+                    mappedModelLine = projHits;
+                    finalUnit = 'H';
+                    modelPick = isOhtani && ohtaniBattingScore !== null
+                        ? (ohtaniBattingScore >= 4 ? 'Over' : ohtaniBattingScore <= 1 ? 'Under' : (mappedModelLine > rp.line ? 'Over' : 'Under'))
+                        : (mappedModelLine > rp.line ? 'Over' : 'Under');
+                    conf = hitsConfidence + Math.abs(rp.line - mappedModelLine) * 0.15;
+                }
+                else if (isOhtani && rp.category?.includes('Home Run')) {
+                    mappedModelLine = projHR || 0.5;
+                    finalUnit = 'HR';
+                    modelPick = ohtaniBattingScore >= 4 ? 'Over' : ohtaniBattingScore <= 1 ? 'Under' : (mappedModelLine >= rp.line ? 'Over' : 'Under');
+                    conf = hrConfidence + Math.abs(rp.line - mappedModelLine) * 0.15;
+                }
+                else if (isOhtani && rp.category?.includes('Total Base')) {
+                    mappedModelLine = projTB || 1.5;
+                    finalUnit = 'TB';
+                    modelPick = ohtaniBattingScore >= 4 ? 'Over' : ohtaniBattingScore <= 1 ? 'Under' : (mappedModelLine >= rp.line ? 'Over' : 'Under');
+                    conf = tbConfidence + Math.abs(rp.line - mappedModelLine) * 0.15;
+                }
+                else if (isOhtani && rp.category?.includes('RBI')) {
+                    mappedModelLine = projRBI || 0.5;
+                    finalUnit = 'RBI';
+                    modelPick = ohtaniBattingScore >= 4 ? 'Over' : ohtaniBattingScore <= 1 ? 'Under' : (mappedModelLine >= rp.line ? 'Over' : 'Under');
+                    conf = rbiConfidence + Math.abs(rp.line - mappedModelLine) * 0.15;
+                }
                 else { modelPick = Math.random() > 0.5 ? 'Over' : 'Under'; conf = 0.5; finalUnit = 'O/U'; }
                 return { ...rp, confidence: Math.min(0.99, conf), direction: modelPick, unit: finalUnit, isModel: false };
             });

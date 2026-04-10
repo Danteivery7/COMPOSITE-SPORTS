@@ -26,10 +26,16 @@ import {
 } from '@/public/vendor/nhl/src/analytics.js';
 
 const CACHE = new Map();
-const WORLD_CACHE_VERSION = 'v10';
+const WORLD_CACHE_VERSION = 'v11';
 const DEFAULT_HEADSHOT = 'https://a.espncdn.com/i/headshots/nophoto.png';
 const MAX_PLAYERS_PER_SPORT = 2;
 const THIRD_PLAYER_CLEAR_MARGIN = 3;
+const WORLD_TOP5_SPORT_QUOTA = [
+  ['nba', 2],
+  ['nhl', 1],
+  ['football', 1],
+  ['mlb', 1],
+];
 
 const SOURCE_WEIGHTS = {
   mlb: 1.18,
@@ -39,8 +45,6 @@ const SOURCE_WEIGHTS = {
   cbb: 0.96,
   football: 1.12,
 };
-
-const DIVERSITY_SPORTS = ['nba', 'nhl', 'football'];
 
 function settledValue(result, fallback) {
   return result.status === 'fulfilled' ? result.value : fallback;
@@ -306,21 +310,27 @@ function normalizeSourceCandidates(candidates, sourceWeight) {
 function includeDiversityPicks(sorted) {
   const selected = [];
   const selectedIds = new Set();
+  const selectedCountBySport = new Map();
 
   function pushCandidate(candidate) {
     if (!candidate || selectedIds.has(candidate.id) || selected.length >= 5) return;
     selected.push(candidate);
     selectedIds.add(candidate.id);
+    selectedCountBySport.set(candidate.sportKey, (selectedCountBySport.get(candidate.sportKey) || 0) + 1);
   }
 
-  DIVERSITY_SPORTS.forEach((sportKey) => {
-    const candidate = sorted.find((entry) => entry.sportKey === sportKey);
-    if (candidate && candidate.normalizedDominance >= 78) {
-      pushCandidate(candidate);
-    }
+  WORLD_TOP5_SPORT_QUOTA.forEach(([sportKey, count]) => {
+    sorted
+      .filter((entry) => entry.sportKey === sportKey)
+      .slice(0, count)
+      .forEach((candidate) => pushCandidate(candidate));
   });
 
-  sorted.forEach((candidate) => pushCandidate(candidate));
+  sorted.forEach((candidate) => {
+    const quota = WORLD_TOP5_SPORT_QUOTA.find(([sportKey]) => sportKey === candidate.sportKey)?.[1];
+    if (quota && (selectedCountBySport.get(candidate.sportKey) || 0) >= quota) return;
+    pushCandidate(candidate);
+  });
   const preliminary = selected
     .sort(
       (left, right) =>
@@ -374,7 +384,23 @@ function includeDiversityPicks(sorted) {
     });
   });
 
-  return refined;
+  if (refined.length < 5) {
+    sorted.forEach((candidate) => {
+      if (refined.length >= 5) return;
+      const currentCount = refined.filter((entry) => entry.sportKey === candidate.sportKey).length;
+      if (currentCount >= MAX_PLAYERS_PER_SPORT) return;
+      if (refined.some((entry) => entry.id === candidate.id)) return;
+      refined.push(candidate);
+    });
+  }
+
+  return refined
+    .sort(
+      (left, right) =>
+        right.normalizedDominance - left.normalizedDominance ||
+        Number(right.overall || 0) - Number(left.overall || 0),
+    )
+    .slice(0, 5);
 }
 
 async function getHubCandidates() {
