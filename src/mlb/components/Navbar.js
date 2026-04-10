@@ -22,6 +22,11 @@ export default function Navbar({ currentPage, onNavigate, theme, toggleTheme }) 
         setMobileOpen(false);
     };
 
+    const handleThemeToggle = () => {
+        toggleTheme();
+        setMobileOpen(false);
+    };
+
     return (
         <nav className="navbar">
             <div className="navbar-inner">
@@ -45,6 +50,11 @@ export default function Navbar({ currentPage, onNavigate, theme, toggleTheme }) 
                             </a>
                         </li>
                     ))}
+                    <li className="nav-mobile-theme-item">
+                        <button type="button" className="nav-mobile-theme-button" onClick={handleThemeToggle}>
+                            <span>{theme === 'dark' ? 'Light' : 'Dark'} Mode</span>
+                        </button>
+                    </li>
                     <li className="nav-mobile-hub-item">
                         <a href="/" className="nav-mobile-hub-link" target="_top">
                             <span>Back To Hub</span>

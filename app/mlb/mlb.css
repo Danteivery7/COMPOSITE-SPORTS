@@ -401,6 +401,10 @@
   display: none;
 }
 
+.nav-mobile-theme-item {
+  display: none;
+}
+
 .nav-mobile-toggle {
   display: none;
   background: none;
@@ -567,11 +571,17 @@
   .nav-mobile-hub-item {
     display: block;
     list-style: none;
+  }
+
+  .nav-mobile-theme-item {
+    display: block;
+    list-style: none;
     margin-top: 6px;
     padding-top: 10px;
     border-top: 1px solid var(--border-color);
   }
 
+  .nav-mobile-theme-button,
   .nav-mobile-hub-link {
     display: flex;
     align-items: center;
@@ -582,11 +592,24 @@
     font-size: 14px;
     font-weight: 600;
     background: rgba(255, 255, 255, 0.04);
+    border: 1px solid transparent;
+    cursor: pointer;
   }
 
+  .nav-mobile-hub-item {
+    display: block;
+    list-style: none;
+    margin-top: 6px;
+  }
+
+  .nav-mobile-theme-button:hover,
   .nav-mobile-hub-link:hover {
     color: var(--text-primary);
     background: rgba(255, 255, 255, 0.06);
+  }
+
+  .navbar-controls .theme-toggle {
+    display: none;
   }
 }
 
