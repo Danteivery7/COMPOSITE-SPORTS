@@ -27,7 +27,7 @@ import {
 } from '@/public/vendor/nhl/src/analytics.js';
 
 const CACHE = new Map();
-const WORLD_CACHE_VERSION = 'v15';
+const WORLD_CACHE_VERSION = 'v16';
 const DEFAULT_HEADSHOT = 'https://a.espncdn.com/i/headshots/nophoto.png';
 const MAX_PLAYERS_PER_SPORT = 2;
 const THIRD_PLAYER_CLEAR_MARGIN = 3;
@@ -36,6 +36,13 @@ const WORLD_TOP5_SPORT_QUOTA = [
   ['nhl', 1],
   ['football', 1],
   ['mlb', 1],
+];
+const WORLD_TOP5_LOCK = [
+  { sportKey: 'mlb', aliases: ['shohei ohtani', 'ohtani'] },
+  { sportKey: 'nba', aliases: ['nikola jokic', 'jokic'] },
+  { sportKey: 'nhl', aliases: ['connor mcdavid', 'mcdavid'] },
+  { sportKey: 'football', aliases: ['erling haaland', 'haaland'] },
+  { sportKey: 'nba', aliases: ['shai gilgeous-alexander', 'gilgeous-alexander', 'sga'] },
 ];
 
 const SOURCE_WEIGHTS = {
@@ -78,6 +85,13 @@ function uniqBy(items, getKey) {
   const map = new Map();
   items.forEach((item) => map.set(getKey(item), item));
   return Array.from(map.values());
+}
+
+function normalizePlayerName(value = '') {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
 }
 
 function isGenericHeadshot(source = '') {
@@ -348,6 +362,27 @@ function includeDiversityPicks(sorted) {
     .slice(0, 5);
 }
 
+function includeLockedTopFive(sorted) {
+  const locked = [];
+  const usedIds = new Set();
+
+  WORLD_TOP5_LOCK.forEach((entry) => {
+    const candidate = sorted.find((player) => {
+      if (!player || usedIds.has(player.id)) return false;
+      if (player.sportKey !== entry.sportKey) return false;
+      const normalizedName = normalizePlayerName(player.displayName);
+      return entry.aliases.some((alias) => normalizedName.includes(normalizePlayerName(alias)));
+    });
+
+    if (candidate) {
+      locked.push(candidate);
+      usedIds.add(candidate.id);
+    }
+  });
+
+  return locked.length === WORLD_TOP5_LOCK.length ? locked : null;
+}
+
 async function getHubCandidates() {
   const footballLeagueKeys = FOOTBALL_ROUTE_ORDER;
   const [mlbResult, nflResult, cbbResult, nbaResult, nhlResult, ...footballResults] = await Promise.allSettled([
@@ -505,14 +540,15 @@ export async function getWorldTopPlayers() {
     ),
   ];
 
-  const players = includeDiversityPicks(
-    uniqBy(normalized, (entry) => entry.id)
-      .sort(
-        (left, right) =>
-          right.normalizedDominance - left.normalizedDominance ||
-          Number(right.overall || 0) - Number(left.overall || 0),
-      ),
-  ).map((player, index) => ({
+  const sortedUnique = uniqBy(normalized, (entry) => entry.id)
+    .sort(
+      (left, right) =>
+        right.normalizedDominance - left.normalizedDominance ||
+        Number(right.overall || 0) - Number(left.overall || 0),
+    );
+
+  const lockedTopFive = includeLockedTopFive(sortedUnique);
+  const players = (lockedTopFive || includeDiversityPicks(sortedUnique)).map((player, index) => ({
     ...player,
     worldRank: index + 1,
   }));
