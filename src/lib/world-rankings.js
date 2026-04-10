@@ -26,7 +26,7 @@ import {
 } from '@/public/vendor/nhl/src/analytics.js';
 
 const CACHE = new Map();
-const WORLD_CACHE_VERSION = 'v13';
+const WORLD_CACHE_VERSION = 'v14';
 const DEFAULT_HEADSHOT = 'https://a.espncdn.com/i/headshots/nophoto.png';
 const MAX_PLAYERS_PER_SPORT = 2;
 const THIRD_PLAYER_CLEAR_MARGIN = 3;
@@ -310,18 +310,11 @@ function normalizeSourceCandidates(candidates, sourceWeight) {
 function includeDiversityPicks(sorted) {
   const selected = [];
   const selectedIds = new Set();
-  const selectedCountBySport = new Map();
-  const quotaSports = WORLD_TOP5_SPORT_QUOTA.map(([sportKey]) => sportKey);
-  const hasFullQuotaSet = WORLD_TOP5_SPORT_QUOTA.every(([sportKey]) =>
-    sorted.some((candidate) => candidate.sportKey === sportKey),
-  );
-  const hasFootballCandidate = sorted.some((candidate) => candidate.sportKey === 'football');
 
   function pushCandidate(candidate) {
-    if (!candidate || selectedIds.has(candidate.id) || selected.length >= 5) return;
+    if (!candidate || selectedIds.has(candidate.id) || candidate.sportKey === 'nfl' || selected.length >= 5) return;
     selected.push(candidate);
     selectedIds.add(candidate.id);
-    selectedCountBySport.set(candidate.sportKey, (selectedCountBySport.get(candidate.sportKey) || 0) + 1);
   }
 
   WORLD_TOP5_SPORT_QUOTA.forEach(([sportKey, count]) => {
@@ -331,79 +324,17 @@ function includeDiversityPicks(sorted) {
       .forEach((candidate) => pushCandidate(candidate));
   });
 
-  sorted.forEach((candidate) => {
-    if (hasFootballCandidate && candidate.sportKey === 'nfl') return;
-    if (hasFullQuotaSet && !quotaSports.includes(candidate.sportKey)) return;
-    const quota = WORLD_TOP5_SPORT_QUOTA.find(([sportKey]) => sportKey === candidate.sportKey)?.[1];
-    if (quota && (selectedCountBySport.get(candidate.sportKey) || 0) >= quota) return;
-    pushCandidate(candidate);
-  });
-  const preliminary = selected
-    .sort(
-      (left, right) =>
-        right.normalizedDominance - left.normalizedDominance ||
-        Number(right.overall || 0) - Number(left.overall || 0),
-    )
-    .slice(0, 5);
-
-  const sportCounts = preliminary.reduce((map, candidate) => {
-    map.set(candidate.sportKey, (map.get(candidate.sportKey) || 0) + 1);
-    return map;
-  }, new Map());
-
-  let refined = [...preliminary];
-
-  const crowdedSports = Array.from(sportCounts.entries())
-    .filter(([, count]) => count > MAX_PLAYERS_PER_SPORT)
-    .map(([sportKey]) => sportKey);
-
-  crowdedSports.forEach((sportKey) => {
-    const sportPlayers = refined
-      .filter((candidate) => candidate.sportKey === sportKey)
-      .sort((left, right) => right.normalizedDominance - left.normalizedDominance);
-
-    const overflowPlayers = sportPlayers.slice(MAX_PLAYERS_PER_SPORT);
-    overflowPlayers.forEach((overflowPlayer) => {
-      const replacement = sorted.find((candidate) => {
-        if (!candidate || candidate.id === overflowPlayer.id) return false;
-        if (refined.some((entry) => entry.id === candidate.id)) return false;
-        if (candidate.sportKey === sportKey) return false;
-        const existingCount = refined.filter((entry) => entry.sportKey === candidate.sportKey).length;
-        return existingCount < MAX_PLAYERS_PER_SPORT;
-      });
-
-      if (!replacement) return;
-      const keepOverflow =
-        Number(overflowPlayer.normalizedDominance || 0) >=
-        Number(replacement.normalizedDominance || 0) + THIRD_PLAYER_CLEAR_MARGIN;
-
-      if (!keepOverflow) {
-        refined = refined
-          .filter((entry) => entry.id !== overflowPlayer.id)
-          .concat(replacement)
-          .sort(
-            (left, right) =>
-              right.normalizedDominance - left.normalizedDominance ||
-              Number(right.overall || 0) - Number(left.overall || 0),
-          )
-          .slice(0, 5);
-      }
-    });
-  });
-
-  if (refined.length < 5) {
+  if (selected.length < 5) {
     sorted.forEach((candidate) => {
-      if (refined.length >= 5) return;
-      if (hasFootballCandidate && candidate.sportKey === 'nfl') return;
-      if (hasFullQuotaSet && !quotaSports.includes(candidate.sportKey)) return;
-      const currentCount = refined.filter((entry) => entry.sportKey === candidate.sportKey).length;
+      if (selected.length >= 5) return;
+      if (candidate.sportKey === 'nfl') return;
+      const currentCount = selected.filter((entry) => entry.sportKey === candidate.sportKey).length;
       if (currentCount >= MAX_PLAYERS_PER_SPORT) return;
-      if (refined.some((entry) => entry.id === candidate.id)) return;
-      refined.push(candidate);
+      pushCandidate(candidate);
     });
   }
 
-  return refined
+  return selected
     .sort(
       (left, right) =>
         right.normalizedDominance - left.normalizedDominance ||
