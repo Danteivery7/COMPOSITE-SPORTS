@@ -222,6 +222,64 @@ function resolveFootballHeadshot(playerId, ...sources) {
   return `https://a.espncdn.com/i/headshots/soccer/players/full/${id}.png`;
 }
 
+async function lookupSportsDbFootballHeadshot(displayName, teamName = '') {
+  const playerName = String(displayName || '').trim();
+  if (!playerName) return '';
+
+  const key = cacheKey('football-headshot-backup', normalizeKey(playerName), normalizeKey(teamName));
+  const cached = readCache(key);
+  if (typeof cached === 'string') return cached;
+
+  try {
+    const payload = await fetchJson(
+      `https://www.thesportsdb.com/api/v1/json/123/searchplayers.php?p=${encodeURIComponent(playerName.replace(/\s+/g, '_'))}`,
+      24 * 60 * 60 * 1000,
+    );
+    const playerKey = normalizeKey(playerName);
+    const teamKey = normalizeKey(teamName);
+    const candidates = (payload?.player || payload?.players || [])
+      .filter((entry) => {
+        const sport = normalizeKey(entry?.strSport || '');
+        return !sport || sport === 'soccer';
+      })
+      .map((entry) => {
+        const candidateName = normalizeKey(entry?.strPlayer || '');
+        const candidateTeam = normalizeKey(entry?.strTeam || '');
+        let score = 0;
+
+        if (candidateName === playerKey) score += 100;
+        else if (candidateName && playerKey && (candidateName.includes(playerKey) || playerKey.includes(candidateName))) score += 65;
+
+        if (teamKey && candidateTeam === teamKey) score += 40;
+        else if (teamKey && candidateTeam && (candidateTeam.includes(teamKey) || teamKey.includes(candidateTeam))) score += 20;
+
+        if (entry?.strCutout && !isGenericHeadshot(entry.strCutout)) score += 12;
+        if (entry?.strThumb && !isGenericHeadshot(entry.strThumb)) score += 8;
+
+        return { entry, score };
+      })
+      .filter((candidate) => candidate.score > 0)
+      .sort((left, right) => right.score - left.score);
+
+    const best = candidates[0]?.entry || null;
+    const image = best?.strCutout && !isGenericHeadshot(best.strCutout)
+      ? best.strCutout
+      : best?.strThumb && !isGenericHeadshot(best.strThumb)
+        ? best.strThumb
+        : '';
+
+    return writeCache(key, image, image ? 24 * 60 * 60 * 1000 : 6 * 60 * 60 * 1000);
+  } catch (_error) {
+    return writeCache(key, '', 60 * 60 * 1000);
+  }
+}
+
+async function resolveFootballHeadshotAsset({ playerId = '', displayName = '', shortName = '', teamName = '', currentHeadshot = '' } = {}) {
+  const lookupName = String(displayName || shortName || '').trim();
+  const sportsDbHeadshot = await lookupSportsDbFootballHeadshot(lookupName, teamName);
+  return resolveFootballHeadshot(playerId, sportsDbHeadshot);
+}
+
 function safeAverage(values) {
   const usable = values.filter((value) => Number.isFinite(value));
   if (!usable.length) return 0;
@@ -2277,4 +2335,5 @@ export {
   getFootballLanding,
   getFeaturedPlayers as getFootballFeaturedPlayers,
   computeRankings as computeFootballRankings,
+  resolveFootballHeadshotAsset,
 };

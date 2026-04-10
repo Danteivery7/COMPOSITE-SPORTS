@@ -72,16 +72,38 @@ function applyFootballHeadshotFallback(event) {
   currentTarget.src = 'https://a.espncdn.com/i/headshots/nophoto.png';
 }
 
+function buildFootballHeadshotFallbackUrl(player) {
+  const params = new URLSearchParams();
+  const id = String(player?.id || '').trim();
+  const displayName = String(player?.displayName || '').trim();
+  const shortName = String(player?.shortName || '').trim();
+  const teamName = String(player?.canonicalTeamName || player?.team?.displayName || player?.team?.abbreviation || '').trim();
+  const currentHeadshot = String(player?.headshot || '').trim();
+  if (id) params.set('playerId', id);
+  if (displayName) params.set('name', displayName);
+  if (shortName) params.set('shortName', shortName);
+  if (teamName) params.set('team', teamName);
+  if (currentHeadshot) params.set('src', currentHeadshot);
+  return `/api/football/headshot?${params.toString()}`;
+}
+
 function PlayerVisual({ player }) {
-  if (!player?.headshot) {
+  const primarySrc = typeof player?.headshot === 'string' && player.headshot.trim()
+    ? player.headshot
+    : player?.id
+      ? `https://a.espncdn.com/i/headshots/soccer/players/full/${player.id}.png`
+      : buildFootballHeadshotFallbackUrl(player);
+  const fallbackSrc = buildFootballHeadshotFallbackUrl(player);
+
+  if (!primarySrc) {
     return <span className="football-logo-fallback">{player?.displayName?.slice(0, 2)?.toUpperCase() || 'PL'}</span>;
   }
   return (
     <img
-      src={player.headshot}
+      src={primarySrc}
       alt={player.displayName}
       className="football-player-headshot"
-      data-fallback-src={`https://a.espncdn.com/i/headshots/soccer/players/full/${player.id}.png`}
+      data-fallback-src={fallbackSrc}
       onError={applyFootballHeadshotFallback}
     />
   );

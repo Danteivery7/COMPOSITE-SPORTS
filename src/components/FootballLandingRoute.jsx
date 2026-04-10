@@ -18,6 +18,21 @@ function applyFootballHeadshotFallback(event) {
   currentTarget.src = 'https://a.espncdn.com/i/headshots/nophoto.png';
 }
 
+function buildFootballHeadshotFallbackUrl(player) {
+  const params = new URLSearchParams();
+  const id = String(player?.id || '').trim();
+  const displayName = String(player?.displayName || '').trim();
+  const shortName = String(player?.shortName || '').trim();
+  const teamName = String(player?.canonicalTeamName || player?.team?.displayName || player?.team?.abbreviation || '').trim();
+  const currentHeadshot = String(player?.headshot || '').trim();
+  if (id) params.set('playerId', id);
+  if (displayName) params.set('name', displayName);
+  if (shortName) params.set('shortName', shortName);
+  if (teamName) params.set('team', teamName);
+  if (currentHeadshot) params.set('src', currentHeadshot);
+  return `/api/football/headshot?${params.toString()}`;
+}
+
 function formatKickoff(value) {
   if (!value) return 'Kickoff TBD';
   return new Date(value).toLocaleString('en-US', {
@@ -188,12 +203,12 @@ export default function FootballLandingRoute({ initialData = null }) {
               <div className="football-hero-player-row">
                 {topPlayers.slice(0, 3).map((player) => (
                   <div className="football-hero-player-chip" key={`${player.leagueKey}-${player.id}`}>
-                    {player.headshot ? (
+                    {(player.headshot || player.id || player.displayName) ? (
                       <img
-                        src={player.headshot}
+                        src={player.headshot || `https://a.espncdn.com/i/headshots/soccer/players/full/${player.id}.png`}
                         alt={player.displayName}
                         className="football-player-headshot"
-                        data-fallback-src={`https://a.espncdn.com/i/headshots/soccer/players/full/${player.id}.png`}
+                        data-fallback-src={buildFootballHeadshotFallbackUrl(player)}
                         onError={applyFootballHeadshotFallback}
                       />
                     ) : (
@@ -245,12 +260,12 @@ export default function FootballLandingRoute({ initialData = null }) {
                     <span className="football-chip">{player.leagueLabel}</span>
                   </div>
                   <div className="football-top-player-body">
-                    {player.headshot ? (
+                    {(player.headshot || player.id || player.displayName) ? (
                       <img
-                        src={player.headshot}
+                        src={player.headshot || `https://a.espncdn.com/i/headshots/soccer/players/full/${player.id}.png`}
                         alt={player.displayName}
                         className="football-player-headshot is-large"
-                        data-fallback-src={`https://a.espncdn.com/i/headshots/soccer/players/full/${player.id}.png`}
+                        data-fallback-src={buildFootballHeadshotFallbackUrl(player)}
                         onError={applyFootballHeadshotFallback}
                       />
                     ) : (

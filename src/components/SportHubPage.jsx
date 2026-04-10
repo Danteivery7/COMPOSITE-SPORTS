@@ -25,7 +25,14 @@ function getSportRailStep(rail) {
 function getSportHeadshotFallbackUrl(player) {
   const id = String(player?.playerId || player?.id || '').trim();
   if (!id) return '';
-  if (player?.sportKey === 'football') return `https://a.espncdn.com/i/headshots/soccer/players/full/${id}.png`;
+  if (player?.sportKey === 'football') {
+    const params = new URLSearchParams();
+    params.set('playerId', id);
+    if (player?.displayName) params.set('name', player.displayName);
+    if (player?.teamAbbr) params.set('team', player.teamAbbr);
+    if (player?.headshot) params.set('src', player.headshot);
+    return `/api/football/headshot?${params.toString()}`;
+  }
   if (player?.sportKey === 'mlb') return `https://a.espncdn.com/i/headshots/mlb/players/full/${id}.png`;
   if (player?.sportKey === 'nba') return `https://a.espncdn.com/i/headshots/nba/players/full/${id}.png`;
   if (player?.sportKey === 'nhl') return `https://a.espncdn.com/i/headshots/nhl/players/full/${id}.png`;
