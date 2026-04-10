@@ -84,6 +84,23 @@ export function getEasternDateFromKey(dateKey) {
   return { year, month, day };
 }
 
+export function getEasternResetDate({ resetHour = 6, input = new Date() } = {}) {
+  const parts = getEasternParts(input);
+  const midnightUtc = Date.UTC(parts.year, parts.month - 1, parts.day, 0, 0, 0);
+  const currentEtMs = midnightUtc + (((parts.hour * 60) + parts.minute) * 60 + parts.second) * 1000;
+  const resetUtc = midnightUtc + (resetHour * 60 * 60 * 1000);
+  if (currentEtMs >= resetUtc) {
+    return new Date(midnightUtc);
+  }
+  return new Date(midnightUtc - 24 * 60 * 60 * 1000);
+}
+
+export function addUtcDays(date, days) {
+  const copy = new Date(date.getTime());
+  copy.setUTCDate(copy.getUTCDate() + days);
+  return copy;
+}
+
 export function getEasternCycleWindow({ resetHour = 6, input = new Date() } = {}) {
   const parts = getEasternParts(input);
   const beforeReset = parts.hour < resetHour;

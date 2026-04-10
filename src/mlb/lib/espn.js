@@ -6,6 +6,7 @@
 
 import { cacheGet, cacheSet, CACHE_TTL } from './cache';
 import { getTeamByEspnId, ALL_TEAMS } from './teams';
+import { addUtcDays, getEasternCycleWindow, getEasternDateStamp, getEasternResetDate } from '@/src/lib/time';
 
 const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb';
 const ESPN_WEB = 'https://site.web.api.espn.com/apis/common/v3/sports/baseball/mlb';
@@ -27,33 +28,39 @@ export async function fetchScoreboard() {
     if (cached) return cached;
 
     try {
-        const now = new Date();
-        const currentHour = now.getHours();
-        
-        // ESPN date format: YYYYMMDD
-        const formatDate = (d) => {
-            const year = d.getFullYear();
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${year}${month}${day}`;
-        };
-        
-        const todayStr = formatDate(now);
-        let url = `${ESPN_BASE}/scoreboard`;
-        
-        // If it's past 10 AM, we want to ensure we're looking at today's slate,
-        // even if ESPN's default "current" day hasn't flipped yet.
-        if (currentHour >= 10) {
-            url += `?dates=${todayStr}`;
+        const cycleWindow = getEasternCycleWindow({ resetHour: 6 });
+        const cycleStart = getEasternResetDate({ resetHour: 6 });
+        const nextCycle = addUtcDays(cycleStart, 1);
+        const dateStamps = [getEasternDateStamp(cycleStart)];
+        if (cycleWindow.beforeReset) {
+            dateStamps.push(getEasternDateStamp(nextCycle));
         }
 
-        const res = await fetch(url, {
-            cache: 'no-store',
-            headers: { 'User-Agent': 'MLBRankings/1.0' },
-        });
+        const payloads = await Promise.all(
+            dateStamps.map(async (dateStamp) => {
+                const res = await fetch(`${ESPN_BASE}/scoreboard?dates=${dateStamp}`, {
+                    cache: 'no-store',
+                    headers: { 'User-Agent': 'MLBRankings/1.0' },
+                });
+                if (!res.ok) throw new Error(`ESPN scoreboard: ${res.status}`);
+                return res.json();
+            })
+        );
 
-        if (!res.ok) throw new Error(`ESPN scoreboard: ${res.status}`);
-        const data = await res.json();
+        const primary = payloads[payloads.length - 1] || payloads[0] || {};
+        const seenEvents = new Set();
+        const mergedEvents = payloads
+            .flatMap((payload) => payload?.events || [])
+            .filter((event) => {
+                const id = String(event?.id || '');
+                if (!id || seenEvents.has(id)) return false;
+                seenEvents.add(id);
+                return true;
+            });
+        const data = {
+            ...primary,
+            events: mergedEvents,
+        };
 
         const isPreseason = data.leagues?.[0]?.season?.type?.type === 1;
 

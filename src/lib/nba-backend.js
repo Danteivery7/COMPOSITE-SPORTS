@@ -1,6 +1,7 @@
 import path from 'path';
 import { promises as fs } from 'fs';
 import { normalizeEspnNewsArticle } from '@/src/lib/espn-news';
+import { addUtcDays, getEasternCycleWindow, getEasternDateStamp, getEasternResetDate } from '@/src/lib/time';
 
 const NBA_SITE_BASE = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba';
 const SNAPSHOT_FILE = path.join('/tmp', 'composite-nba-snapshot.json');
@@ -142,8 +143,28 @@ function isSnapshotFresh(snapshot) {
 }
 
 async function fetchScoreboard() {
-  const payload = await fetchJson(`${NBA_SITE_BASE}/scoreboard`);
-  return payload.events || [];
+  const cycleWindow = getEasternCycleWindow({ resetHour: 6 });
+  const cycleStart = getEasternResetDate({ resetHour: 6 });
+  const nextCycle = addUtcDays(cycleStart, 1);
+  const dateStamps = [getEasternDateStamp(cycleStart)];
+
+  if (cycleWindow.beforeReset) {
+    dateStamps.push(getEasternDateStamp(nextCycle));
+  }
+
+  const payloads = await Promise.all(
+    dateStamps.map((dateStamp) => fetchJson(`${NBA_SITE_BASE}/scoreboard?dates=${dateStamp}`)),
+  );
+
+  const seen = new Set();
+  return payloads
+    .flatMap((payload) => payload?.events || [])
+    .filter((event) => {
+      const id = String(event?.id || '');
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
 }
 
 async function fetchNews() {

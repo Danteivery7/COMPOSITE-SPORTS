@@ -27,7 +27,7 @@ import {
 const STORY_TTL_MS = 5 * 60 * 1000;
 const BETS_TTL_MS = 90 * 1000;
 const HERO_TTL_MS = 2 * 60 * 1000;
-const HUB_CACHE_VERSION = 'v15';
+const HUB_CACHE_VERSION = 'v16';
 export const HUB_HERO_SNAPSHOT_KEY = `hub-hero-${HUB_CACHE_VERSION}`;
 
 const EXTERNAL_NEWS_SOURCES = [
@@ -966,18 +966,18 @@ async function buildTopBetsSnapshot() {
   }
 
   const minimumLegsMet = selected.length >= 2;
-  const parlay = !cycle.beforeReset && minimumLegsMet ? buildParlayOdds(selected) : null;
+  const parlay = minimumLegsMet ? buildParlayOdds(selected) : null;
   const verifiedAt = new Date().toISOString();
   const betLegs = selected.map((bet) => ({
     ...bet,
     normalizedOdds: americanToDecimal(bet.americanOdds),
   }));
-  const status = cycle.beforeReset
-    ? 'building'
-    : minimumLegsMet
-      ? selected.length >= 3
-        ? 'live'
-        : 'two-leg'
+  const status = minimumLegsMet
+    ? selected.length >= 3
+      ? 'live'
+      : 'two-leg'
+    : cycle.beforeReset
+      ? 'building'
       : 'closed';
 
   return {
