@@ -7,9 +7,68 @@ import { getPlayerAccolades } from '@/src/mlb/lib/accolades';
 import { getTeamByEspnId } from '@/src/mlb/lib/teams';
 import { computeRankings } from '@/src/mlb/lib/rankings';
 
+function mapMlbPitchingSplit(raw = {}) {
+    return {
+        ERA: parseFloat(raw.era) || 0,
+        earnedRunAverage: parseFloat(raw.era) || 0,
+        IP: parseFloat(raw.inningsPitched) || 0,
+        innings: parseFloat(raw.inningsPitched) || 0,
+        inningsPitched: parseFloat(raw.inningsPitched) || 0,
+        K: parseInt(raw.strikeOuts) || 0,
+        SO: parseInt(raw.strikeOuts) || 0,
+        strikeouts: parseInt(raw.strikeOuts) || 0,
+        WHIP: parseFloat(raw.whip) || 0,
+        wins: parseInt(raw.wins) || 0,
+        W: parseInt(raw.wins) || 0,
+        losses: parseInt(raw.losses) || 0,
+        L: parseInt(raw.losses) || 0,
+        walks: parseInt(raw.baseOnBalls) || 0,
+        BB: parseInt(raw.baseOnBalls) || 0,
+        homeRuns: parseInt(raw.homeRuns) || 0,
+        HR: parseInt(raw.homeRuns) || 0,
+        gamesPlayed: parseInt(raw.gamesPlayed) || 0,
+        GP: parseInt(raw.gamesPlayed) || 0,
+        strikeoutsPerNineInnings: parseFloat(raw.strikeoutsPer9Inn) || 0,
+        'K/9': parseFloat(raw.strikeoutsPer9Inn) || 0,
+        winPct: parseFloat(raw.winPercentage) || 0,
+        'W%': parseFloat(raw.winPercentage) || 0,
+        hits: parseInt(raw.hits) || 0,
+        H: parseInt(raw.hits) || 0,
+    };
+}
+
+function mapMlbBattingSplit(raw = {}) {
+    return {
+        AVG: parseFloat(raw.avg) || 0,
+        avg: parseFloat(raw.avg) || 0,
+        SLG: parseFloat(raw.slg) || 0,
+        slugAvg: parseFloat(raw.slg) || 0,
+        OBP: parseFloat(raw.obp) || 0,
+        onBasePct: parseFloat(raw.obp) || 0,
+        OPS: parseFloat(raw.ops) || 0,
+        ops: parseFloat(raw.ops) || 0,
+        HR: parseInt(raw.homeRuns) || 0,
+        homeRuns: parseInt(raw.homeRuns) || 0,
+        GP: parseInt(raw.gamesPlayed) || 0,
+        gamesPlayed: parseInt(raw.gamesPlayed) || 0,
+        RBIs: parseInt(raw.rbi) || 0,
+        RBI: parseInt(raw.rbi) || 0,
+        hits: parseInt(raw.hits) || 0,
+        H: parseInt(raw.hits) || 0,
+        runs: parseInt(raw.runs) || 0,
+        R: parseInt(raw.runs) || 0,
+        walks: parseInt(raw.baseOnBalls) || 0,
+        BB: parseInt(raw.baseOnBalls) || 0,
+        stolenBases: parseInt(raw.stolenBases) || 0,
+        SB: parseInt(raw.stolenBases) || 0,
+        strikeouts: parseInt(raw.strikeOuts) || 0,
+        SO: parseInt(raw.strikeOuts) || 0,
+    };
+}
+
 export async function GET(request, { params }) {
     const { playerId } = await params;
-    const cacheKey = `player_detail_v19_${playerId}`;
+    const cacheKey = `player_detail_v20_${playerId}`;
     const cached = cacheGet(cacheKey);
     // Robust JSON fetcher to prevent 404s from killing the page
     const fetchJSON = async (url) => {
@@ -36,9 +95,9 @@ export async function GET(request, { params }) {
         const isOhtani = String(playerId) === '39832';
         const isRosterTwoWay = (bio.position?.abbreviation === 'SP/DH' || bio.position?.abbreviation === 'DH/SP') && isOhtani;
         const careerFromStats = currentStats?.career || { batting: {}, pitching: {} };
-        const ratingData = computePlayerRating(currentStats || { batting: {}, pitching: {} }, isRosterTwoWay ? 'two-way' : isPitcher, bio.position?.abbreviation, playerId, careerFromStats, bio.age);
+        const initialRatingData = computePlayerRating(currentStats || { batting: {}, pitching: {} }, isRosterTwoWay ? 'two-way' : isPitcher, bio.position?.abbreviation, playerId, careerFromStats, bio.age);
 
-        let isTwoWay = ratingData.type === 'two-way' || isRosterTwoWay;
+        let isTwoWay = isOhtani || initialRatingData.type === 'two-way' || isRosterTwoWay;
 
         let teamName = bio.team?.displayName || '';
         let teamAbbr = bio.team?.abbreviation || '';
@@ -67,7 +126,7 @@ export async function GET(request, { params }) {
             teamLogoAbbr: teamAbbr,
             batHand: bio.bats?.displayValue || null,
             throwHand: bio.throws?.displayValue || null,
-            rating: ratingData?.rating || 40,
+            rating: initialRatingData?.rating || 40,
             statusLabel: bio.status?.type || bio.status?.name || 'Active',
         };
 
@@ -118,68 +177,36 @@ export async function GET(request, { params }) {
                         const isCareer = block.type?.displayName === 'career';
                         const isSeason = block.type?.displayName === 'season';
                         const raw = block.splits?.[0]?.stat || {};
+                        const mappedPitching = mapMlbPitchingSplit(raw);
+                        const mappedBatting = mapMlbBattingSplit(raw);
 
                         if (isCareer) {
                             if (isPitchBlock) {
                                 careerPitching = {
                                     ...careerPitching,
-                                    ERA: parseFloat(raw.era) || 0,
-                                    IP: parseFloat(raw.inningsPitched) || 0,
-                                    K: parseFloat(raw.strikeOuts) || 0,
-                                    WHIP: parseFloat(raw.whip) || 0,
-                                    wins: parseInt(raw.wins) || 0,
-                                    losses: parseInt(raw.losses) || 0,
-                                    walks: parseInt(raw.baseOnBalls) || 0,
+                                    ...mappedPitching,
                                 };
                                 if (isPitcher) careerStats = careerPitching;
                             } else {
                                 careerBatting = {
                                     ...careerBatting,
-                                    AVG: parseFloat(raw.avg) || 0,
-                                    SLG: parseFloat(raw.slg) || 0,
-                                    OBP: parseFloat(raw.obp) || 0,
-                                    OPS: parseFloat(raw.ops) || 0,
-                                    HR: parseInt(raw.homeRuns) || 0,
-                                    GP: parseInt(raw.gamesPlayed) || 0,
-                                    RBIs: parseInt(raw.rbi) || 0,
-                                    hits: parseInt(raw.hits) || 0,
-                                    runs: parseInt(raw.runs) || 0,
-                                    walks: parseInt(raw.baseOnBalls) || 0,
-                                    stolenBases: parseInt(raw.stolenBases) || 0,
-                                    strikeouts: parseInt(raw.strikeOuts) || 0,
+                                    ...mappedBatting,
                                 };
                                 if (!isPitcher) careerStats = careerBatting;
                             }
                         }
 
                         if (isSeason) {
-                            if (isPitchBlock && Object.keys(pitchingStats).length < 3) {
+                            if (isPitchBlock && (isOhtani || Object.keys(pitchingStats).length < 3)) {
                                 pitchingStats = {
                                     ...pitchingStats,
-                                    ERA: parseFloat(raw.era) || 0,
-                                    IP: parseFloat(raw.inningsPitched) || 0,
-                                    K: parseFloat(raw.strikeOuts) || 0,
-                                    WHIP: parseFloat(raw.whip) || 0,
-                                    wins: parseInt(raw.wins) || 0,
-                                    losses: parseInt(raw.losses) || 0,
-                                    walks: parseInt(raw.baseOnBalls) || 0,
+                                    ...mappedPitching,
                                 };
                                 if (isPitcher) currentSeasonStats = pitchingStats;
-                            } else if (!isPitchBlock && Object.keys(battingStats).length < 3) {
+                            } else if (!isPitchBlock && (isOhtani || Object.keys(battingStats).length < 3)) {
                                 battingStats = {
                                     ...battingStats,
-                                    AVG: parseFloat(raw.avg) || 0,
-                                    SLG: parseFloat(raw.slg) || 0,
-                                    OBP: parseFloat(raw.obp) || 0,
-                                    OPS: parseFloat(raw.ops) || 0,
-                                    HR: parseInt(raw.homeRuns) || 0,
-                                    GP: parseInt(raw.gamesPlayed) || 0,
-                                    RBIs: parseInt(raw.rbi) || 0,
-                                    hits: parseInt(raw.hits) || 0,
-                                    runs: parseInt(raw.runs) || 0,
-                                    walks: parseInt(raw.baseOnBalls) || 0,
-                                    stolenBases: parseInt(raw.stolenBases) || 0,
-                                    strikeouts: parseInt(raw.strikeOuts) || 0,
+                                    ...mappedBatting,
                                 };
                                 if (!isPitcher || isTwoWay) currentSeasonStats = battingStats;
                             }
@@ -191,7 +218,12 @@ export async function GET(request, { params }) {
             }
         }
 
-        if (isPitcher) {
+        if (isTwoWay) {
+            battingStats.WAR = computeWAR(false, battingStats);
+            pitchingStats.WAR = computeWAR(true, pitchingStats);
+            careerBatting.WAR = computeWAR(false, careerBatting);
+            careerPitching.WAR = computeWAR(true, careerPitching);
+        } else if (isPitcher) {
             currentSeasonStats.WAR = computeWAR(true, currentSeasonStats);
             careerStats.WAR = computeWAR(true, careerStats);
         } else {
@@ -203,6 +235,19 @@ export async function GET(request, { params }) {
             if (String(playerId) === '39832') {
                 isTwoWay = true;
             }
+        }
+
+        if (isOhtani) {
+            isTwoWay = true;
+            const ohtaniRatingData = computePlayerRating(
+                { batting: battingStats, pitching: pitchingStats },
+                'two-way',
+                bio.position?.abbreviation || 'DH/SP',
+                playerId,
+                { batting: careerBatting, pitching: careerPitching },
+                bio.age
+            );
+            playerData.rating = ohtaniRatingData?.rating || playerData.rating;
         }
 
         let expectedStats = {};
@@ -290,13 +335,23 @@ export async function GET(request, { params }) {
             }
         }
 
-        const aiAnalysis = generatePlayerAnalysis(playerData, isTwoWay ? (isPitcher ? pitchingStats : battingStats) : currentSeasonStats, careerStats, gameLogRes?.logs || [], playerData.statusLabel, battingStats, pitchingStats, getPlayerAccolades(playerId).narrativeText, teamGP);
+        const aiAnalysis = generatePlayerAnalysis(
+            playerData,
+            isTwoWay ? (isPitcher ? pitchingStats : battingStats) : currentSeasonStats,
+            isTwoWay ? { batting: careerBatting, pitching: careerPitching } : careerStats,
+            gameLogRes?.logs || [],
+            playerData.statusLabel,
+            battingStats,
+            pitchingStats,
+            getPlayerAccolades(playerId).narrativeText,
+            teamGP
+        );
 
         const result = {
             player: {
                 ...playerData,
                 isTwoWay,
-                ratingType: ratingData.type,
+                ratingType: isOhtani ? 'two-way' : initialRatingData.type,
                 currentStats: currentSeasonStats,
                 battingStats,
                 pitchingStats,

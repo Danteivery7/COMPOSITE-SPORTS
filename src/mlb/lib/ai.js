@@ -53,6 +53,91 @@ export function generatePlayerAnalysis(player, current, career, gameLogs = [], s
         return 0;
     };
 
+    const getConsensusLabel = (score, warmLabel = 'Chilly') => {
+        if (score >= 4) return 'Sizzling';
+        if (score === 3) return 'Steady';
+        if (score >= 1) return warmLabel;
+        return 'Slump';
+    };
+
+    const getConsensusColor = (score) =>
+        score >= 4 ? '#10b981' : score === 3 ? '#3b82f6' : score >= 1 ? '#f59e0b' : '#ef4444';
+
+    if (isOhtani && isTwoWay) {
+        const careerBatting = career?.batting || {};
+        const careerPitching = career?.pitching || {};
+
+        const curPitchERA = getNum(pStats, 'ERA', 'earnedRunAverage');
+        const curPitchWHIP = getNum(pStats, 'WHIP');
+        const curPitchK9 = getNum(pStats, 'K/9', 'strikeoutsPerNineInnings');
+        const curPitchIP = getNum(pStats, 'IP', 'innings', 'inningsPitched');
+        const curPitchHits = getNum(pStats, 'H', 'hits');
+        const curPitchHR = getNum(pStats, 'HR', 'homeRuns');
+        const curPitchH9 = curPitchIP > 0 ? (curPitchHits / curPitchIP) * 9 : LEAGUE_AVG['H/9'];
+        const curPitchHR9 = curPitchIP > 0 ? (curPitchHR / curPitchIP) * 9 : LEAGUE_AVG['HR/9'];
+        const basePitchERA = getNum(careerPitching, 'ERA', 'earnedRunAverage') || LEAGUE_AVG.ERA;
+        const basePitchWHIP = getNum(careerPitching, 'WHIP') || LEAGUE_AVG.WHIP;
+        const basePitchK9 = getNum(careerPitching, 'K/9', 'strikeoutsPerNineInnings') || LEAGUE_AVG['K/9'];
+        const careerPitchIP = getNum(careerPitching, 'IP', 'innings', 'inningsPitched');
+        const careerPitchHits = getNum(careerPitching, 'H', 'hits');
+        const careerPitchHR = getNum(careerPitching, 'HR', 'homeRuns');
+        const basePitchH9 = careerPitchIP > 0 ? (careerPitchHits / careerPitchIP) * 9 : LEAGUE_AVG['H/9'];
+        const basePitchHR9 = careerPitchIP > 0 ? (careerPitchHR / careerPitchIP) * 9 : LEAGUE_AVG['HR/9'];
+
+        let pitchingScore = 0;
+        if ((curPitchERA || 0) < basePitchERA) pitchingScore++;
+        if ((curPitchWHIP || 0) < basePitchWHIP) pitchingScore++;
+        if ((curPitchK9 || 0) > basePitchK9) pitchingScore++;
+        if (curPitchH9 < basePitchH9) pitchingScore++;
+        if (curPitchHR9 < basePitchHR9) pitchingScore++;
+
+        const curBatAVG = getNum(bStats, 'AVG', 'avg', 'battingAverage');
+        const curBatOPS = getNum(bStats, 'OPS', 'ops');
+        const curBatSLG = getNum(bStats, 'SLG', 'slugAvg');
+        const curBatOBP = getNum(bStats, 'OBP', 'onBasePct');
+        const curBatGP = getNum(bStats, 'GP', 'gamesPlayed');
+        const curBatHits = getNum(bStats, 'H', 'hits');
+        const curBatH9 = curBatGP > 0 ? (curBatHits / curBatGP) * 9 : 0;
+        const baseBatAVG = getNum(careerBatting, 'AVG', 'avg') || 0.248;
+        const baseBatOPS = getNum(careerBatting, 'OPS', 'ops') || 0.720;
+        const baseBatSLG = getNum(careerBatting, 'SLG', 'slugAvg') || 0.405;
+        const baseBatOBP = getNum(careerBatting, 'OBP', 'onBasePct') || 0.315;
+        const careerBatGP = getNum(careerBatting, 'GP', 'gamesPlayed');
+        const careerBatHits = getNum(careerBatting, 'H', 'hits');
+        const baseBatH9 = careerBatGP > 0 ? (careerBatHits / careerBatGP) * 9 : ((112 / 130) * 9);
+
+        let battingScore = 0;
+        if ((curBatAVG || 0) > baseBatAVG) battingScore++;
+        if ((curBatOPS || 0) > baseBatOPS) battingScore++;
+        if ((curBatSLG || 0) > baseBatSLG) battingScore++;
+        if ((curBatOBP || 0) > baseBatOBP) battingScore++;
+        if ((curBatH9 || 0) > baseBatH9) battingScore++;
+
+        const totalConsensus = pitchingScore + battingScore;
+        const displayedScore = Math.max(0, Math.min(5, Math.round(totalConsensus / 2)));
+        const pitchingLabel = getConsensusLabel(pitchingScore, 'Challenged');
+        const battingLabel = getConsensusLabel(battingScore, 'Chilly');
+        const overallLabel = getConsensusLabel(displayedScore, 'Chilly');
+        const overallColor = getConsensusColor(displayedScore);
+        const gamesRemaining = Math.max(0, 162 - Math.max(cp, teamGP));
+
+        const pitchingNarrative = `${fullName}${accoladeIntro} is operating as a true two-way force in 2026. On the mound, he has logged ${fmt2(curPitchIP)} innings with a ${fmt2(curPitchERA || LEAGUE_AVG.ERA)} ERA, a ${fmt2(curPitchWHIP || LEAGUE_AVG.WHIP)} WHIP, and ${fmt2(curPitchK9 || LEAGUE_AVG['K/9'])} K/9. His pitching side is grading ${pitchingScore}/5 against his own established standards, which places that half of his board in the ${pitchingLabel.toLowerCase()} tier.`;
+        const anchorNarrative = `Because Ohtani is being graded as a legitimate two-way player, the board now reads both sides of his game together. His live consensus is ${totalConsensus}/10 overall, built from ${pitchingScore}/5 pitching signals and ${battingScore}/5 hitting signals, which displays as ${displayedScore}/5 on the main card. Over the remaining ${gamesRemaining} games, the model still anchors a meaningful share of his expectation to both his career hitting and career pitching baselines.`;
+        const hittingNarrative = `At the plate, ${name} is slashing ${fmt3(curBatAVG || 0.248)} with a ${fmt3(curBatOPS || 0.720)} OPS, ${fmtInt(getNum(bStats, 'HR', 'homeRuns'))} home runs, and a ${battingScore}/5 hitting consensus. That offensive side is currently grading as ${battingLabel.toLowerCase()}, which is why his profile should never read like a pitcher-only evaluation.`;
+
+        return {
+            narrative: `${pitchingNarrative}\n\n${anchorNarrative}`,
+            addonNarrative: hittingNarrative,
+            score: displayedScore,
+            label: overallLabel,
+            color: overallColor,
+            consensusTen: totalConsensus,
+            pitchingScore,
+            battingScore,
+            consensusDetail: `${totalConsensus}/10 total • Pitching ${pitchingScore}/5 • Hitting ${battingScore}/5`,
+        };
+    }
+
     // ── Consensus Assessment Logic ──────────────────────────────────────
     let consensusScore = 0;
     let consensusLabel = 'Steady';

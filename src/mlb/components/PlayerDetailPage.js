@@ -84,6 +84,11 @@ export default function PlayerDetailPage({ playerId, onBack }) {
                                 </div>
                             )}
                         </div>
+                        {p.aiAnalysis.consensusDetail && (
+                            <div style={{ marginBottom: '12px', fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                                {p.aiAnalysis.consensusDetail}
+                            </div>
+                        )}
                         <div style={{ fontSize: '15px', lineHeight: '1.7', color: 'var(--text-primary)', fontStyle: 'italic' }}>
                             {(p.aiAnalysis.narrative || p.aiAnalysis).split('\n\n').map((para, i) => (
                                 <p key={i} style={{ marginBottom: i < (p.aiAnalysis.narrative || p.aiAnalysis).split('\n\n').length - 1 ? '12px' : 0 }}>
@@ -91,6 +96,16 @@ export default function PlayerDetailPage({ playerId, onBack }) {
                                 </p>
                             ))}
                         </div>
+                        {p.aiAnalysis.addonNarrative && (
+                            <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                                <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--accent)', marginBottom: '8px' }}>
+                                    Two-Way Hitting Add-On
+                                </div>
+                                <p style={{ margin: 0, fontSize: '15px', lineHeight: '1.7', color: 'var(--text-primary)', fontStyle: 'italic' }}>
+                                    "{p.aiAnalysis.addonNarrative}"
+                                </p>
+                            </div>
+                        )}
                     </div>
                 )}
 
