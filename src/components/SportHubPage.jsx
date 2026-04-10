@@ -69,11 +69,34 @@ const ET_TIME_FORMATTER = new Intl.DateTimeFormat('en-US', {
   minute: '2-digit',
 });
 
+const EXPECTED_WORLD_TOP_FIVE = [
+  'shohei ohtani',
+  'nikola jokic',
+  'connor mcdavid',
+  'erling haaland',
+  'shai gilgeous alexander',
+];
+
+function normalizePlayerName(value = '') {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
 function formatEtLabel(value, fallback) {
   if (!value) return fallback;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return fallback;
   return `Last updated ${ET_TIME_FORMATTER.format(date)} ET`;
+}
+
+function hasExpectedWorldTopFive(hero) {
+  const players = hero?.worldBoard?.players || [];
+  if (players.length < EXPECTED_WORLD_TOP_FIVE.length) return false;
+  return EXPECTED_WORLD_TOP_FIVE.every((expected, index) =>
+    normalizePlayerName(players[index]?.displayName).includes(expected),
+  );
 }
 
 function hasRenderableHero(hero) {
@@ -114,6 +137,7 @@ export default function SportHubPage({ initialHero = null }) {
           !response.ok ||
           !Array.isArray(json?.worldBoard?.players) ||
           !json.worldBoard.players.length ||
+          !hasExpectedWorldTopFive(json) ||
           !Array.isArray(json?.heroStories) ||
           !json.heroStories.length;
 
