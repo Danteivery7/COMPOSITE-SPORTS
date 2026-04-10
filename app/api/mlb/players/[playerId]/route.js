@@ -28,6 +28,8 @@ function mapMlbPitchingSplit(raw = {}) {
         HR: parseInt(raw.homeRuns) || 0,
         gamesPlayed: parseInt(raw.gamesPlayed) || 0,
         GP: parseInt(raw.gamesPlayed) || 0,
+        gamesStarted: parseInt(raw.gamesStarted) || 0,
+        GS: parseInt(raw.gamesStarted) || 0,
         strikeoutsPerNineInnings: parseFloat(raw.strikeoutsPer9Inn) || 0,
         'K/9': parseFloat(raw.strikeoutsPer9Inn) || 0,
         winPct: parseFloat(raw.winPercentage) || 0,
@@ -449,8 +451,11 @@ function computeWAR(isPitcher, s) {
 
 function generatePlayerProps(player, currentStats, careerStats, bStats, pStats, nextOpp, isPitcher, isTwoWay, gameSummary = null) {
     const g = (obj, ...keys) => { for (const k of keys) if (obj?.[k]) return parseFloat(obj[k]) || 0; return 0; };
+    const isOhtani = String(player?.id) === '39832';
     const gp = g(currentStats, 'GP', 'gamesPlayed') || 1;
     const carGP = g(careerStats, 'GP', 'gamesPlayed') || 1;
+    const careerPitchStats = isOhtani && isTwoWay ? (careerStats?.pitching || {}) : careerStats;
+    const careerBatStats = isOhtani && isTwoWay ? (careerStats?.batting || {}) : careerStats;
 
     let projK = 0, projIP = 0, projRunsAllowed = 0;
     let projHR = 0, projHits = 0, projTB = 0, projRBI = 0;
@@ -463,18 +468,30 @@ function generatePlayerProps(player, currentStats, careerStats, bStats, pStats, 
         const curK = g(pStats, 'strikeouts', 'SO', 'K');
         const curIP = g(pStats, 'innings', 'IP', 'inningsPitched');
         const curERA = g(pStats, 'ERA', 'earnedRunAverage');
-        const carK9 = g(careerStats, 'K/9', 'strikeoutsPerNineInnings') || 8.5;
-        const carERA = g(careerStats, 'ERA', 'earnedRunAverage') || 4.20;
+        const carK9 = g(careerPitchStats, 'K/9', 'strikeoutsPerNineInnings') || 8.5;
+        const carERA = g(careerPitchStats, 'ERA', 'earnedRunAverage') || 4.20;
         const pGP = g(pStats, 'gamesPlayed', 'GP', 'G');
-        const carPGP = g(careerStats, 'gamesPlayed', 'GP', 'G');
-        const isStarter = (g(careerStats, 'gamesStarted', 'GS') / Math.max(1, carPGP)) > 0.5 || (carPGP > 0 && (g(careerStats, 'IP', 'inningsPitched') / carPGP) >= 4.0);
+        const pGS = g(pStats, 'gamesStarted', 'GS') || pGP;
+        const carPGP = g(careerPitchStats, 'gamesPlayed', 'GP', 'G');
+        const carGS = g(careerPitchStats, 'gamesStarted', 'GS') || carPGP;
+        const isStarter = (g(careerPitchStats, 'gamesStarted', 'GS') / Math.max(1, carPGP)) > 0.5 || (carPGP > 0 && (g(careerPitchStats, 'IP', 'inningsPitched') / carPGP) >= 4.0);
         const defaultIP = isStarter ? 5.5 : 1.0;
         const defaultK = isStarter ? (carK9 * defaultIP / 9) : (carK9 * defaultIP / 9);
         const ipPerApp = pGP > 0 ? curIP / pGP : defaultIP;
         const kPerApp = pGP > 0 ? (curK / pGP) : defaultK;
+        const ipPerStart = pGS > 0 ? curIP / pGS : ipPerApp;
+        const kPerStart = pGS > 0 ? curK / pGS : kPerApp;
+        const careerIP = g(careerPitchStats, 'IP', 'innings', 'inningsPitched');
+        const careerKs = g(careerPitchStats, 'strikeouts', 'SO', 'K');
+        const carIPPerStart = carGS > 0 ? careerIP / carGS : defaultIP;
+        const carKPerStart = carGS > 0 ? careerKs / carGS : defaultK;
         const oppFactor = nextOpp.oppRPG > 0 ? 4.4 / nextOpp.oppRPG : 1.0;
-        const blendedK = pGP > 0 ? (kPerApp * 0.6 + defaultK * 0.4) : defaultK;
-        const blendedIP = pGP > 0 ? (ipPerApp * 0.7 + defaultIP * 0.3) : defaultIP;
+        const blendedK = isOhtani
+            ? (pGS > 0 ? (kPerStart * 0.65 + carKPerStart * 0.35) : carKPerStart)
+            : (pGP > 0 ? (kPerApp * 0.6 + defaultK * 0.4) : defaultK);
+        const blendedIP = isOhtani
+            ? (pGS > 0 ? (ipPerStart * 0.65 + carIPPerStart * 0.35) : carIPPerStart)
+            : (pGP > 0 ? (ipPerApp * 0.7 + defaultIP * 0.3) : defaultIP);
 
         projK = Math.max(0.5, Math.round(blendedK * Math.min(1.2, oppFactor) * 2) / 2);
         projIP = Math.max(0.5, Math.round(Math.min(8.0, blendedIP) * 2) / 2);
@@ -483,7 +500,9 @@ function generatePlayerProps(player, currentStats, careerStats, bStats, pStats, 
         const blendedERA = curERA > 0 ? curERA * 0.4 + carERA * 0.6 : carERA;
         projRunsAllowed = Math.max(0.5, Math.round((blendedERA / 9 * projIP) / nextOpp.oppRPG * 4.4 * 2) / 2);
 
-        kConfidence = curIP > 10 ? 0.8 : curIP > 5 ? 0.6 : 0.4;
+        kConfidence = isOhtani
+            ? (pGS >= 4 ? 0.82 : pGS >= 2 ? 0.68 : 0.5)
+            : (curIP > 10 ? 0.8 : curIP > 5 ? 0.6 : 0.4);
         
         const curKRate = curIP > 0 ? (curK / curIP) : 0;
         const carKRate = carK9 / 9;
@@ -506,9 +525,9 @@ function generatePlayerProps(player, currentStats, careerStats, bStats, pStats, 
         const curAB = g(bStats, 'AB', 'atBats') || 1;
         const curAVG = g(bStats, 'AVG', 'avg') || curH / curAB;
         const curSLG = g(bStats, 'SLG', 'slugAvg') || 0;
-        const carHR = g(careerStats, 'HR', 'homeRuns');
-        const carAVG = g(careerStats, 'AVG', 'avg') || 0.248;
-        const carSLG = g(careerStats, 'SLG', 'slugAvg') || 0.400;
+        const carHR = g(careerBatStats, 'HR', 'homeRuns');
+        const carAVG = g(careerBatStats, 'AVG', 'avg') || 0.248;
+        const carSLG = g(careerBatStats, 'SLG', 'slugAvg') || 0.400;
         
         const blendedHRRate = (curHR / Math.max(1, gp)) * 0.4 + (carHR / Math.max(1, carGP)) * 0.6;
         const oppPitchFactor = nextOpp.oppERA > 0 ? nextOpp.oppERA / 4.20 : 1.0;
