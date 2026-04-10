@@ -2165,12 +2165,13 @@ async function getFootballLanding() {
   const leagueKeys = FOOTBALL_ROUTE_ORDER;
   const leagueData = (await Promise.allSettled(
     leagueKeys.map(async (leagueKey) => {
-      const [brand, rankings, scoreboard] = await Promise.all([
+      const [brand, rankings, scoreboard, playersCatalog] = await Promise.all([
         getLeagueBrand(leagueKey),
         computeRankings(leagueKey),
         fetchScoreboard(leagueKey),
+        getBootstrapPlayersCatalog(leagueKey, 450),
       ]);
-      return { leagueKey, brand, rankings, scoreboard, playersCatalog: getCachedPlayerCatalog(leagueKey) };
+      return { leagueKey, brand, rankings, scoreboard, playersCatalog };
     }),
   ))
     .filter((result) => result.status === 'fulfilled')

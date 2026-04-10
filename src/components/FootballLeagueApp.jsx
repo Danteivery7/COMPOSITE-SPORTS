@@ -728,7 +728,13 @@ function hasRenderableBootstrap(data) {
   return Boolean(
     data &&
     Array.isArray(data?.rankings) &&
-    data.rankings.length,
+    data.rankings.length &&
+    (
+      (Array.isArray(data?.featuredPlayers) && data.featuredPlayers.length) ||
+      (Array.isArray(data?.playersCatalog?.players) && data.playersCatalog.players.length) ||
+      (Array.isArray(data?.scoreboard) && data.scoreboard.length) ||
+      (Array.isArray(data?.news) && data.news.length)
+    ),
   );
 }
 

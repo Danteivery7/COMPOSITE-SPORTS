@@ -57,7 +57,11 @@ function hasRenderableLanding(data) {
   return Boolean(
     data &&
     Array.isArray(data?.leagues) &&
-    data.leagues.length,
+    data.leagues.length &&
+    (
+      (Array.isArray(data?.topPlayers) && data.topPlayers.length) ||
+      (Array.isArray(data?.topMatches) && data.topMatches.length)
+    ),
   );
 }
 
