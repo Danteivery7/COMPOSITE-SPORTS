@@ -310,9 +310,13 @@ function normalizeSourceCandidates(candidates, sourceWeight) {
 function includeDiversityPicks(sorted) {
   const selected = [];
   const selectedIds = new Set();
+  const quotaSports = WORLD_TOP5_SPORT_QUOTA.map(([sportKey]) => sportKey);
+  const hasFullQuotaSet = WORLD_TOP5_SPORT_QUOTA.every(([sportKey]) =>
+    sorted.some((candidate) => candidate.sportKey === sportKey),
+  );
 
   function pushCandidate(candidate) {
-    if (!candidate || selectedIds.has(candidate.id) || candidate.sportKey === 'nfl' || selected.length >= 5) return;
+    if (!candidate || selectedIds.has(candidate.id) || selected.length >= 5) return;
     selected.push(candidate);
     selectedIds.add(candidate.id);
   }
@@ -327,7 +331,7 @@ function includeDiversityPicks(sorted) {
   if (selected.length < 5) {
     sorted.forEach((candidate) => {
       if (selected.length >= 5) return;
-      if (candidate.sportKey === 'nfl') return;
+      if (hasFullQuotaSet && !quotaSports.includes(candidate.sportKey)) return;
       const currentCount = selected.filter((entry) => entry.sportKey === candidate.sportKey).length;
       if (currentCount >= MAX_PLAYERS_PER_SPORT) return;
       pushCandidate(candidate);
