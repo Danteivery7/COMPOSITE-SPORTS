@@ -7,6 +7,7 @@ import {
   FOOTBALL_LEAGUES,
   FOOTBALL_ROUTE_ORDER,
   PRIMARY_FOOTBALL_LEAGUE_KEYS,
+  getFootballPlayerCatalog,
 } from '@/src/lib/football';
 import { getFootballLeagueSnapshot, getGenericSportSnapshot } from '@/src/lib/live-sports-backend';
 import { getNbaBootstrapSnapshot } from '@/src/lib/nba-backend';
@@ -26,7 +27,7 @@ import {
 } from '@/public/vendor/nhl/src/analytics.js';
 
 const CACHE = new Map();
-const WORLD_CACHE_VERSION = 'v14';
+const WORLD_CACHE_VERSION = 'v15';
 const DEFAULT_HEADSHOT = 'https://a.espncdn.com/i/headshots/nophoto.png';
 const MAX_PLAYERS_PER_SPORT = 2;
 const THIRD_PLAYER_CLEAR_MARGIN = 3;
@@ -357,6 +358,12 @@ async function getHubCandidates() {
     getNHLCandidates(),
     ...footballLeagueKeys.map((leagueKey) => getFootballLeagueSnapshot(leagueKey)),
   ]);
+  const footballCatalogResults = await Promise.allSettled(
+    footballLeagueKeys.map(async (leagueKey) => ({
+      leagueKey,
+      catalog: await getFootballPlayerCatalog(leagueKey),
+    })),
+  );
 
   const mlb = settledValue(mlbResult, { players: [] });
   const nfl = settledValue(nflResult, { featuredPlayers: [] });
@@ -373,6 +380,9 @@ async function getHubCandidates() {
       leagueKey,
       board: result.value,
     }));
+  const footballCatalogs = footballCatalogResults
+    .filter((result) => result.status === 'fulfilled' && Array.isArray(result.value?.catalog?.players))
+    .map((result) => result.value);
 
   const mlbCandidates = (mlb.players || []).slice(0, 12).map((player) => ({
     id: `mlb-${player.id}`,
@@ -411,14 +421,9 @@ async function getHubCandidates() {
       teamLogo: player.team?.logo || '',
     })).filter((player) => player.playerId && Number.isFinite(player.overall));
 
-  const footballCandidates = footballBoards.flatMap(({ leagueKey, board }) => {
+  const footballCandidates = footballCatalogs.flatMap(({ leagueKey, catalog }) => {
     const league = FOOTBALL_LEAGUES[leagueKey];
-    const fifaRankByTeamId = Object.fromEntries(
-      (board?.rankings || [])
-        .filter((team) => team?.id && Number.isFinite(Number(team?.fifaRank)))
-        .map((team) => [String(team.id), Number(team.fifaRank)]),
-    );
-    return (board?.playersCatalog?.players || board?.featuredPlayers || []).slice(0, 12).map((player, index) => ({
+    return (catalog?.players || []).slice(0, 18).map((player, index) => ({
       id: `football-${player.id}`,
       playerId: String(player.id),
       displayName: player.displayName,
@@ -430,23 +435,16 @@ async function getHubCandidates() {
       overall: Number(player.rating || 72),
       overallLabel: String(Number(player.rating || 72)),
       signalCount: (player.leaders || []).length ? 2 : 1,
-      fifaRank: fifaRankByTeamId[String(player.team?.id || '')] || null,
       contextScore: clamp(
         Number(player.rating || 72) +
           getFootballLeagueStrengthBonus(player.canonicalLeagueKey || leagueKey) +
-          (Number.isFinite(fifaRankByTeamId[String(player.team?.id || '')])
-            ? clamp(((210 - fifaRankByTeamId[String(player.team?.id || '')]) / 210) * 0.9, 0.05, 0.9)
-            : 0) +
           Math.max(0, 4 - index) * 0.35,
         48,
         96,
       ),
       formScore: clamp(
         Number(player.rating || 72) +
-          Math.max(0, 5 - index) * 0.45 +
-          (Number.isFinite(fifaRankByTeamId[String(player.team?.id || '')])
-            ? clamp(((210 - fifaRankByTeamId[String(player.team?.id || '')]) / 210) * 0.45, 0.03, 0.45)
-            : 0),
+          Math.max(0, 5 - index) * 0.45,
         48,
         96,
       ),
@@ -471,8 +469,6 @@ async function getHubCandidates() {
       );
     if (shouldReplace) {
       list[existingIndex] = player;
-    } else if (!existing.fifaRank && player.fifaRank) {
-      list[existingIndex] = { ...existing, fifaRank: player.fifaRank };
     }
     return list;
   }, []);
