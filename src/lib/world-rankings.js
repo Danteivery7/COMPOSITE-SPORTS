@@ -27,7 +27,7 @@ import {
 } from '@/public/vendor/nhl/src/analytics.js';
 
 const CACHE = new Map();
-const WORLD_CACHE_VERSION = 'v16';
+const WORLD_CACHE_VERSION = 'v17';
 const DEFAULT_HEADSHOT = 'https://a.espncdn.com/i/headshots/nophoto.png';
 const MAX_PLAYERS_PER_SPORT = 2;
 const THIRD_PLAYER_CLEAR_MARGIN = 3;
@@ -362,19 +362,32 @@ function includeDiversityPicks(sorted) {
     .slice(0, 5);
 }
 
-function includeLockedTopFive(sorted) {
+function matchesLockedEntry(player, entry) {
+  if (!player || !entry) return false;
+  if (player.sportKey !== entry.sportKey) return false;
+  const normalizedName = normalizePlayerName(player.displayName);
+  return entry.aliases.some((alias) => normalizedName.includes(normalizePlayerName(alias)));
+}
+
+function resolveLockedCandidate(entry, sorted, sourcePools) {
+  const directMatch = sorted.find((player) => matchesLockedEntry(player, entry));
+  if (directMatch) return directMatch;
+
+  const rawPool = Array.isArray(sourcePools?.[entry.sportKey]) ? sourcePools[entry.sportKey] : [];
+  if (!rawPool.length) return null;
+
+  const normalizedPool = normalizeSourceCandidates(rawPool, SOURCE_WEIGHTS[entry.sportKey] || 1);
+  return normalizedPool.find((player) => matchesLockedEntry(player, entry)) || null;
+}
+
+function includeLockedTopFive(sorted, sourcePools) {
   const locked = [];
   const usedIds = new Set();
 
   WORLD_TOP5_LOCK.forEach((entry) => {
-    const candidate = sorted.find((player) => {
-      if (!player || usedIds.has(player.id)) return false;
-      if (player.sportKey !== entry.sportKey) return false;
-      const normalizedName = normalizePlayerName(player.displayName);
-      return entry.aliases.some((alias) => normalizedName.includes(normalizePlayerName(alias)));
-    });
+    const candidate = resolveLockedCandidate(entry, sorted, sourcePools);
 
-    if (candidate) {
+    if (candidate && !usedIds.has(candidate.id)) {
       locked.push(candidate);
       usedIds.add(candidate.id);
     }
@@ -547,7 +560,7 @@ export async function getWorldTopPlayers() {
         Number(right.overall || 0) - Number(left.overall || 0),
     );
 
-  const lockedTopFive = includeLockedTopFive(sortedUnique);
+  const lockedTopFive = includeLockedTopFive(sortedUnique, sourcePools);
   const players = (lockedTopFive || includeDiversityPicks(sortedUnique)).map((player, index) => ({
     ...player,
     worldRank: index + 1,
