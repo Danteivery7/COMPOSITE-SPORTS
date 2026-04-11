@@ -8,6 +8,7 @@ import { getTeam, ALL_TEAMS } from '@/src/mlb/lib/teams';
 import { computeRankings } from '@/src/mlb/lib/rankings';
 import { fetchTeamRoster, fetchTeamSchedule, fetchBatchPlayerStats } from '@/src/mlb/lib/espn';
 import { computePlayerRating } from '@/src/mlb/lib/players';
+import { computeTopPlayers, getCachedTopPlayers, getStaleTopPlayers } from '@/src/mlb/lib/topPlayers';
 import { cacheGet, cacheSet, CACHE_TTL } from '@/src/mlb/lib/cache';
 
 const refreshing = new Set();
@@ -17,10 +18,11 @@ async function computeTeamDetail(teamId) {
     if (!team) throw new Error('Team not found');
 
     // Fetch rankings, roster, and schedule in parallel
-    const [rankingsData, rosterData, scheduleData] = await Promise.all([
+    const [rankingsData, rosterData, scheduleData, topPlayersSnapshot] = await Promise.all([
         computeRankings(),
         fetchTeamRoster(team.espnId),
         fetchTeamSchedule(team.espnId),
+        Promise.resolve(getCachedTopPlayers(50) || getStaleTopPlayers()).then((snapshot) => snapshot || computeTopPlayers(50)),
     ]);
 
     // Find this team in rankings
@@ -37,15 +39,28 @@ async function computeTeamDetail(teamId) {
     const playerIds = players.map(p => p.id);
     const statsMap = await fetchBatchPlayerStats(playerIds, 50);
 
+    const syncedRatings = new Map(
+        (topPlayersSnapshot?.players || []).map((player) => [
+            String(player.id),
+            {
+                rating: player.rating,
+                ratingType: player.ratingType,
+                isTwoWay: player.isTwoWay,
+            },
+        ]),
+    );
+
     // Compute player ratings
     const ratedPlayers = players.map(p => {
         const stats = statsMap[p.id] || { batting: {}, pitching: {}, career: { batting: {}, pitching: {} } };
         const careerRaw = stats.career || { batting: {}, pitching: {} };
         const result = computePlayerRating(stats, p.isPitcher, p.position, p.id, careerRaw, p.age);
+        const synced = syncedRatings.get(String(p.id));
         return {
             ...p,
-            rating: result.rating,
-            ratingType: result.type,
+            rating: synced?.rating ?? result.rating,
+            ratingType: synced?.ratingType ?? result.type,
+            isTwoWay: synced?.isTwoWay ?? result.type === 'two-way',
             batHand: p.batHand || stats.batHand || '',
             throwHand: p.throwHand || stats.throwHand || '',
         };
