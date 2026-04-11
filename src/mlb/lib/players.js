@@ -84,6 +84,10 @@ const BATTER_WEIGHTS_DH = {
     ISOP: 8, HR: 10, RBI: 8, 'RC/27': 10, 'BB/K': 5,
 };
 
+function isReliefRole(position = '') {
+    return ['RP', 'CL', 'CP'].includes(String(position || '').toUpperCase());
+}
+
 // ── Helper: z-score ─────────────────────────────────────────────────────
 function zscore(value, mean, sd) {
     if (!sd || sd === 0) return 0;
@@ -182,7 +186,7 @@ export function rateBatter(stats, gp = 0) {
 export function ratePitcher(stats, position, gp = 0) {
     if (!stats || Object.keys(stats).length === 0) return { rating: 40, breakdown: {} };
 
-    const isReliever = ['RP', 'CL'].includes(position);
+    const isReliever = isReliefRole(position);
     const weights = isReliever ? PITCHER_WEIGHTS_RP : PITCHER_WEIGHTS_SP;
     const effectiveGP = gp || stats.GP || stats.gamesPlayed || 0;
 
@@ -241,6 +245,19 @@ export function ratePitcher(stats, position, gp = 0) {
     const rating = zToRating(avgZ);
 
     return { rating, breakdown, ipFactor };
+}
+
+function applyRelieverRoleAdjustment(rating, stats = {}, position = '') {
+    if (!isReliefRole(position)) return rating;
+
+    const ip = Number(stats.IP || stats.innings || stats.inningsPitched || 0);
+    const saves = Number(stats.SV || stats.saves || 0);
+    const holds = Number(stats.HLD || stats.holds || 0);
+    const leverageScore = Math.min(1, ((saves * 1.0) + (holds * 0.65)) / 22);
+    const workloadScore = Math.min(1, ip / 28);
+    const penalty = 7 - (leverageScore * 4) - (workloadScore * 2);
+
+    return Math.max(20, Math.round(Number(rating || 40) - penalty));
 }
 
 /**
@@ -527,7 +544,11 @@ export function computePlayerRating(rawStats, isPitcher, position = '', playerId
         }
 
         return {
-            rating: finalizeDisplayedMlbRating(finalPitchRating + accoladeBoost, seasonResult.ipFactor ?? 0, 'pitcher', playerId),
+            rating: applyRelieverRoleAdjustment(
+                finalizeDisplayedMlbRating(finalPitchRating + accoladeBoost, seasonResult.ipFactor ?? 0, 'pitcher', playerId),
+                normalized.pitching,
+                position,
+            ),
             breakdown: seasonResult.breakdown,
             type: 'pitcher',
         };
