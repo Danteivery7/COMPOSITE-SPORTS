@@ -27,7 +27,7 @@ import {
 const STORY_TTL_MS = 5 * 60 * 1000;
 const BETS_TTL_MS = 90 * 1000;
 const HERO_TTL_MS = 2 * 60 * 1000;
-const HUB_CACHE_VERSION = 'v19';
+const HUB_CACHE_VERSION = 'v20';
 export const HUB_HERO_SNAPSHOT_KEY = `hub-hero-${HUB_CACHE_VERSION}`;
 
 const EXTERNAL_NEWS_SOURCES = [
@@ -535,6 +535,7 @@ function buildFootballBetCandidates(board) {
     .map((prediction) => {
       const leaningHome = (prediction.homeWinProbability || 0) >= 50;
       const team = leaningHome ? prediction.home : prediction.away;
+      const game = board?.scoreboard?.find((entry) => entry.id === prediction.gameId);
       return {
         sport: 'football',
         league: board?.league?.label || 'Football',
@@ -546,9 +547,10 @@ function buildFootballBetCandidates(board) {
         americanOdds: prediction.americanOdds,
         projectedScore: `${prediction.away.abbreviation} ${prediction.projectedAwayScore} - ${prediction.home.abbreviation} ${prediction.projectedHomeScore}`,
         winProbability: leaningHome ? prediction.homeWinProbability : prediction.awayWinProbability,
-        teamLogo: leaningHome ? board?.scoreboard?.find((game) => game.id === prediction.gameId)?.home?.logo : board?.scoreboard?.find((game) => game.id === prediction.gameId)?.away?.logo,
-        opponentLogo: leaningHome ? board?.scoreboard?.find((game) => game.id === prediction.gameId)?.away?.logo : board?.scoreboard?.find((game) => game.id === prediction.gameId)?.home?.logo,
-        startTime: board?.scoreboard?.find((game) => game.id === prediction.gameId)?.startTime || null,
+        teamLogo: leaningHome ? game?.home?.logo : game?.away?.logo,
+        opponentLogo: leaningHome ? game?.away?.logo : game?.home?.logo,
+        startTime: game?.startTime || null,
+        state: game?.state || 'pre',
         edgeMagnitude: Math.max(Math.abs((prediction.marketEdge || 0) * 100), Math.abs(prediction.spreadEdge || 0), Math.abs(prediction.totalEdge || 0)),
       };
     });
@@ -560,6 +562,7 @@ function buildGenericBetCandidates(board, sportLabel) {
     .map((prediction) => {
       const leaningHome = (prediction.homeWinProbability || 0) >= 50;
       const team = leaningHome ? prediction.home : prediction.away;
+      const game = board?.scoreboard?.find((entry) => entry.id === prediction.gameId);
       return {
         sport: sportLabel.toLowerCase(),
         league: sportLabel,
@@ -571,9 +574,10 @@ function buildGenericBetCandidates(board, sportLabel) {
         americanOdds: prediction.americanOdds,
         projectedScore: `${prediction.away.abbreviation} ${prediction.projectedAwayScore} - ${prediction.home.abbreviation} ${prediction.projectedHomeScore}`,
         winProbability: leaningHome ? prediction.homeWinProbability : prediction.awayWinProbability,
-        teamLogo: leaningHome ? board?.scoreboard?.find((game) => game.id === prediction.gameId)?.home?.logo : board?.scoreboard?.find((game) => game.id === prediction.gameId)?.away?.logo,
-        opponentLogo: leaningHome ? board?.scoreboard?.find((game) => game.id === prediction.gameId)?.away?.logo : board?.scoreboard?.find((game) => game.id === prediction.gameId)?.home?.logo,
-        startTime: board?.scoreboard?.find((game) => game.id === prediction.gameId)?.startTime || null,
+        teamLogo: leaningHome ? game?.home?.logo : game?.away?.logo,
+        opponentLogo: leaningHome ? game?.away?.logo : game?.home?.logo,
+        startTime: game?.startTime || null,
+        state: game?.state || 'pre',
         edgeMagnitude: Math.max(Math.abs((prediction.marketEdge || 0) * 100), Math.abs(prediction.spreadEdge || 0), Math.abs(prediction.totalEdge || 0)),
       };
     });
@@ -583,8 +587,12 @@ async function buildMlbBetCandidates() {
   const scoreboard = await fetchMlbScoreboard();
   const nowMs = Date.now();
   const sameDayGames = (scoreboard?.games || [])
-    .filter((game) => ['pre', 'scheduled', 'created'].includes(String(game.state || 'pre')))
-    .filter((game) => game.startTime && new Date(game.startTime).getTime() > nowMs)
+    .filter((game) => ['pre', 'scheduled', 'created', 'in', 'live'].includes(String(game.state || 'pre')))
+    .filter((game) => {
+      if (!game.startTime) return false;
+      const startMs = new Date(game.startTime).getTime();
+      return ['in', 'live'].includes(String(game.state || '').toLowerCase()) || startMs > nowMs;
+    })
     .sort((left, right) => new Date(left.startTime).getTime() - new Date(right.startTime).getTime());
   const predictions = await Promise.allSettled(
     sameDayGames.slice(0, 12).map(async (game) => ({
@@ -616,6 +624,7 @@ async function buildMlbBetCandidates() {
         teamLogo: leaningAway ? game.away?.logo : game.home?.logo,
         opponentLogo: leaningAway ? game.home?.logo : game.away?.logo,
         startTime: game.startTime || null,
+        state: game.state || 'pre',
         edgeMagnitude: Math.abs(awayWinPct - homeWinPct),
       };
     })
@@ -632,8 +641,12 @@ async function buildNhlBetCandidates() {
   const nowMs = Date.now();
 
   return games
-    .filter((game) => ['pre', 'scheduled', 'created'].includes(String(game.state || 'pre')))
-    .filter((game) => game.startTime && new Date(game.startTime).getTime() > nowMs)
+    .filter((game) => ['pre', 'scheduled', 'created', 'in', 'live'].includes(String(game.state || 'pre')))
+    .filter((game) => {
+      if (!game.startTime) return false;
+      const startMs = new Date(game.startTime).getTime();
+      return ['in', 'live'].includes(String(game.state || '').toLowerCase()) || startMs > nowMs;
+    })
     .map((game) => {
       const homeStrength = strengthMap[game.home.teamId] || {};
       const awayStrength = strengthMap[game.away.teamId] || {};
@@ -661,6 +674,7 @@ async function buildNhlBetCandidates() {
         teamLogo: leaningHome ? game.home.logo : game.away.logo,
         opponentLogo: leaningHome ? game.away.logo : game.home.logo,
         startTime: game.startTime || null,
+        state: game.state || 'pre',
         edgeMagnitude: Math.abs(homePower - awayPower),
       };
     })
@@ -669,12 +683,14 @@ async function buildNhlBetCandidates() {
 
 function enrichBetCandidate(candidate, nowMs = Date.now()) {
   const startMs = candidate?.startTime ? new Date(candidate.startTime).getTime() : Number.NaN;
+  const isLive = ['in', 'live'].includes(String(candidate?.state || '').toLowerCase());
   const minutesUntilStart = Number.isFinite(startMs) ? Math.max(0, Math.round((startMs - nowMs) / 60000)) : Number.POSITIVE_INFINITY;
   return {
     ...candidate,
     startMs,
+    isLive,
     minutesUntilStart,
-    timeBucket: Number.isFinite(minutesUntilStart) ? Math.floor(minutesUntilStart / 90) : Number.POSITIVE_INFINITY,
+    timeBucket: isLive ? -1 : Number.isFinite(minutesUntilStart) ? Math.floor(minutesUntilStart / 90) : Number.POSITIVE_INFINITY,
   };
 }
 
@@ -891,14 +907,20 @@ async function buildTopBetsSnapshot() {
   const currentMs = Date.now();
 
   const nbaCandidates = (nbaSnapshot?.games || [])
-    .filter((event) => ['pre', 'scheduled', 'created'].includes(String(event?.competitions?.[0]?.status?.type?.state || 'pre')))
-    .filter((event) => event?.date && new Date(event.date).getTime() > currentMs)
+    .filter((event) => ['pre', 'scheduled', 'created', 'in', 'live'].includes(String(event?.competitions?.[0]?.status?.type?.state || 'pre')))
+    .filter((event) => {
+      if (!event?.date) return false;
+      const state = String(event?.competitions?.[0]?.status?.type?.state || '').toLowerCase();
+      const startMs = new Date(event.date).getTime();
+      return ['in', 'live'].includes(state) || startMs > currentMs;
+    })
     .sort((left, right) => new Date(left.date || 0).getTime() - new Date(right.date || 0).getTime())
     .slice(0, 10)
     .map((event) => {
       const competition = event.competitions?.[0];
       const away = competition?.competitors?.find((team) => team.homeAway === 'away');
       const home = competition?.competitors?.find((team) => team.homeAway === 'home');
+      const state = competition?.status?.type?.state || event?.status?.type?.state || 'pre';
       const odds = extractEspnOdds(competition, event?.pickcenter?.[0] || null);
       if (!home || !away || odds?.homeMoneyline == null || odds?.awayMoneyline == null) return null;
       const homeTeamStats = nbaSnapshot?.teamDetailedStats?.[String(home.team?.id)] || {};
@@ -922,6 +944,7 @@ async function buildTopBetsSnapshot() {
         teamLogo: leaningHome ? home.team?.logo || home.team?.logos?.[0]?.href : away.team?.logo || away.team?.logos?.[0]?.href,
         opponentLogo: leaningHome ? away.team?.logo || away.team?.logos?.[0]?.href : home.team?.logo || home.team?.logos?.[0]?.href,
         startTime: event.date,
+        state,
         edgeMagnitude: Math.abs(homeScore - awayScore),
       };
     })
@@ -931,9 +954,9 @@ async function buildTopBetsSnapshot() {
   const candidates = [...mlbCandidates, ...nflCandidates, ...footballCandidates, ...nbaCandidates, ...nhlCandidates, ...cbbCandidates]
     .filter((candidate) => candidate?.americanOdds !== null && candidate?.americanOdds !== undefined)
     .filter((candidate) => candidate?.startTime && isSameEasternDateKey(candidate.startTime, cycle.cycleDateEt))
-    .filter((candidate) => ['pre', 'scheduled', 'created'].includes(String(candidate?.state || 'pre')))
+    .filter((candidate) => ['pre', 'scheduled', 'created', 'in', 'live'].includes(String(candidate?.state || 'pre')))
     .map((candidate) => enrichBetCandidate(candidate, currentMs))
-    .filter((candidate) => Number.isFinite(candidate.startMs) && candidate.startMs > currentMs)
+    .filter((candidate) => candidate.isLive || (Number.isFinite(candidate.startMs) && candidate.startMs > currentMs))
     .sort(compareBetCandidates);
 
   const selected = [];
