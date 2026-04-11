@@ -33,9 +33,6 @@ export async function GET(request, { params }) {
             const t = comp.team || {};
             const recArr = Array.isArray(comp.record) ? comp.record : [];
             const summaryStr = recArr[0]?.summary || comp.record || '';
-            const totalGames = String(summaryStr).split('-').reduce((a, b) => parseInt(a) + (parseInt(b) || 0), 0);
-            const isStale = totalGames > 10;
-            const isPre = competitions.season?.type === 1 || isStale;
 
             return {
                 id: t.id,
@@ -45,7 +42,7 @@ export async function GET(request, { params }) {
                 logo: t.logos?.[0]?.href || `https://a.espncdn.com/i/teamlogos/mlb/500/scoreboard/${t.abbreviation?.toLowerCase()}.png`,
                 score: parseInt(comp.score) || 0,
                 winner: comp.winner,
-                record: isPre ? '0-0' : summaryStr,
+                record: summaryStr || '0-0',
             };
         };
 
@@ -223,6 +220,8 @@ export async function GET(request, { params }) {
                 if (sbGame) {
                     if (sbGame.home?.score !== undefined) result.game.home.score = sbGame.home.score;
                     if (sbGame.away?.score !== undefined) result.game.away.score = sbGame.away.score;
+                    if (sbGame.home?.record) result.game.home.record = sbGame.home.record;
+                    if (sbGame.away?.record) result.game.away.record = sbGame.away.record;
                     if (sbGame.state) result.game.state = sbGame.state;
                     if (sbGame.shortDetail) result.game.shortDetail = sbGame.shortDetail;
                     if (sbGame.statusDetail) result.game.statusDetail = sbGame.statusDetail;
