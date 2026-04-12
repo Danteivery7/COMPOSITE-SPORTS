@@ -27,7 +27,7 @@ import {
 } from '@/public/vendor/nhl/src/analytics.js';
 
 const CACHE = new Map();
-const WORLD_CACHE_VERSION = 'v17';
+const WORLD_CACHE_VERSION = 'v18';
 const DEFAULT_HEADSHOT = 'https://a.espncdn.com/i/headshots/nophoto.png';
 const MAX_PLAYERS_PER_SPORT = 2;
 const THIRD_PLAYER_CLEAR_MARGIN = 3;
@@ -380,6 +380,30 @@ function resolveLockedCandidate(entry, sorted, sourcePools) {
   return normalizedPool.find((player) => matchesLockedEntry(player, entry)) || null;
 }
 
+function ensureLockedSportCandidates(pool, rawPool, mapCandidate, sportKey) {
+  const current = Array.isArray(pool) ? [...pool] : [];
+  const sourceItems = Array.isArray(rawPool) ? rawPool : [];
+  const lockEntries = WORLD_TOP5_LOCK.filter((entry) => entry.sportKey === sportKey);
+
+  lockEntries.forEach((entry) => {
+    const alreadyIncluded = current.some((candidate) => matchesLockedEntry(candidate, entry));
+    if (alreadyIncluded) return;
+
+    const rawMatch = sourceItems.find((item) => {
+      const displayName = item?.displayName || item?.name || '';
+      return entry.aliases.some((alias) => normalizePlayerName(displayName).includes(normalizePlayerName(alias)));
+    });
+
+    if (!rawMatch) return;
+    const candidate = mapCandidate(rawMatch);
+    if (!candidate) return;
+    if (current.some((existing) => existing.id === candidate.id)) return;
+    current.push(candidate);
+  });
+
+  return current;
+}
+
 function includeLockedTopFive(sorted, sourcePools) {
   const locked = [];
   const usedIds = new Set();
@@ -432,7 +456,7 @@ async function getHubCandidates() {
     .filter((result) => result.status === 'fulfilled' && Array.isArray(result.value?.catalog?.players))
     .map((result) => result.value);
 
-  const mlbCandidates = (mlb.players || []).slice(0, 12).map((player) => ({
+  const mapMlbCandidate = (player) => ({
     id: `mlb-${player.id}`,
     playerId: String(player.id),
     displayName: player.name || player.displayName,
@@ -448,7 +472,14 @@ async function getHubCandidates() {
     formScore: clamp(Number(player.rating || 75) + (player.rank <= 5 ? 4 : 0), 50, 99),
     teamAbbr: player.teamAbbr || '',
     teamLogo: player.teamLogo || '',
-  }));
+  });
+
+  const mlbCandidates = ensureLockedSportCandidates(
+    (mlb.players || []).slice(0, 12).map(mapMlbCandidate),
+    mlb.players || [],
+    mapMlbCandidate,
+    'mlb',
+  );
 
   const genericCandidates = (board, sportKey, leagueLabel) =>
     (board?.playersCatalog?.players || board?.featuredPlayers || []).slice(0, 16).map((player, index) => ({
@@ -469,23 +500,23 @@ async function getHubCandidates() {
       teamLogo: player.team?.logo || '',
     })).filter((player) => player.playerId && Number.isFinite(player.overall));
 
-  const footballCandidates = footballCatalogs.flatMap(({ leagueKey, catalog }) => {
-    const league = FOOTBALL_LEAGUES[leagueKey];
-    return (catalog?.players || []).slice(0, 18).map((player, index) => ({
+  const mapFootballCandidate = (player, fallbackLeagueKey, index = 0) => {
+    const league = FOOTBALL_LEAGUES[fallbackLeagueKey] || FOOTBALL_LEAGUES[player.canonicalLeagueKey] || { label: 'Football' };
+    return ({
       id: `football-${player.id}`,
       playerId: String(player.id),
       displayName: player.displayName,
       headshot: resolveSportHeadshot('football', player.id, player.headshot),
       position: player.position || 'Football',
-      leagueLabel: (FOOTBALL_LEAGUES[player.canonicalLeagueKey || leagueKey] || league).label,
+      leagueLabel: (FOOTBALL_LEAGUES[player.canonicalLeagueKey || fallbackLeagueKey] || league).label,
       sportKey: 'football',
-      leagueKey: player.canonicalLeagueKey || leagueKey,
+      leagueKey: player.canonicalLeagueKey || fallbackLeagueKey,
       overall: Number(player.rating || 72),
       overallLabel: String(Number(player.rating || 72)),
       signalCount: (player.leaders || []).length ? 2 : 1,
       contextScore: clamp(
         Number(player.rating || 72) +
-          getFootballLeagueStrengthBonus(player.canonicalLeagueKey || leagueKey) +
+          getFootballLeagueStrengthBonus(player.canonicalLeagueKey || fallbackLeagueKey) +
           Math.max(0, 4 - index) * 0.35,
         48,
         96,
@@ -498,8 +529,10 @@ async function getHubCandidates() {
       ),
       teamAbbr: player.team?.abbreviation || '',
       teamLogo: player.team?.logo || '',
-    })).filter((player) => player.playerId && Number.isFinite(player.overall));
-  }).reduce((list, player) => {
+    });
+  };
+
+  const dedupeFootballCandidates = (candidates) => candidates.reduce((list, player) => {
     const existingIndex = list.findIndex((entry) => entry.playerId === player.playerId);
     if (existingIndex === -1) {
       list.push(player);
@@ -520,6 +553,24 @@ async function getHubCandidates() {
     }
     return list;
   }, []);
+
+  const footballRawPlayers = footballCatalogs.flatMap(({ leagueKey, catalog }) =>
+    (catalog?.players || []).map((player, index) => ({ ...player, __leagueKey: leagueKey, __index: index })),
+  );
+
+  const footballCandidates = dedupeFootballCandidates(
+    ensureLockedSportCandidates(
+      footballCatalogs.flatMap(({ leagueKey, catalog }) =>
+        (catalog?.players || [])
+          .slice(0, 18)
+          .map((player, index) => mapFootballCandidate(player, leagueKey, index))
+          .filter((entry) => entry.playerId && Number.isFinite(entry.overall)),
+      ),
+      footballRawPlayers,
+      (player) => mapFootballCandidate(player, player.__leagueKey, player.__index || 0),
+      'football',
+    ),
+  );
 
   return {
     mlb: mlbCandidates,
