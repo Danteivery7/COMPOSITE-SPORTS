@@ -27,7 +27,7 @@ import {
 const STORY_TTL_MS = 5 * 60 * 1000;
 const BETS_TTL_MS = 90 * 1000;
 const HERO_TTL_MS = 2 * 60 * 1000;
-const HUB_CACHE_VERSION = 'v22';
+const HUB_CACHE_VERSION = 'v23';
 export const HUB_HERO_SNAPSHOT_KEY = `hub-hero-${HUB_CACHE_VERSION}`;
 
 const EXTERNAL_NEWS_SOURCES = [
@@ -1040,11 +1040,11 @@ const getCachedTopBetsSnapshot = unstable_cache(
   { revalidate: Math.max(60, Math.floor(BETS_TTL_MS / 1000)) },
 );
 
-async function buildHubHeroSnapshot() {
+async function buildHubHeroSnapshot({ forceFeeds = false } = {}) {
   const footballLeagueKeys = FOOTBALL_ROUTE_ORDER;
   const [storiesResult, betsResult, worldBoardResult, mlbScoreboardResult, nbaSnapshotResult, nhlGamesResult, nflBoardResult, cbbBoardResult, footballBoardsResult] = await Promise.allSettled([
-    getHubTrendingStories(),
-    getHubTopBets(),
+    getHubTrendingStories({ force: forceFeeds }),
+    getHubTopBets({ force: forceFeeds }),
     getWorldTopPlayers(),
     fetchMlbScoreboard(),
     getNbaBootstrapSnapshot(),
@@ -1193,7 +1193,7 @@ export async function getHubHero({ force = false } = {}) {
   if (!force) {
     return getCachedHubHeroSnapshot();
   }
-  return getHotSnapshot(HUB_HERO_SNAPSHOT_KEY, () => buildHubHeroSnapshot(), {
+  return getHotSnapshot(HUB_HERO_SNAPSHOT_KEY, () => buildHubHeroSnapshot({ forceFeeds: true }), {
     ttlMs: HERO_TTL_MS,
     force,
   });
