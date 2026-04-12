@@ -27,7 +27,7 @@ import {
 } from '@/public/vendor/nhl/src/analytics.js';
 
 const CACHE = new Map();
-const WORLD_CACHE_VERSION = 'v18';
+const WORLD_CACHE_VERSION = 'v19';
 const DEFAULT_HEADSHOT = 'https://a.espncdn.com/i/headshots/nophoto.png';
 const MAX_PLAYERS_PER_SPORT = 2;
 const THIRD_PLAYER_CLEAR_MARGIN = 3;
@@ -44,6 +44,98 @@ const WORLD_TOP5_LOCK = [
   { sportKey: 'football', aliases: ['erling haaland', 'haaland'] },
   { sportKey: 'nba', aliases: ['shai gilgeous-alexander', 'gilgeous-alexander', 'sga'] },
 ];
+const LOCKED_FALLBACKS = {
+  mlb: {
+    id: 'locked-mlb-ohtani',
+    playerId: '39832',
+    displayName: 'Shohei Ohtani',
+    headshot: getSportHeadshotUrl('mlb', '39832'),
+    position: 'SP/DH',
+    leagueLabel: 'MLB',
+    sportKey: 'mlb',
+    leagueKey: 'mlb',
+    overall: 99,
+    overallLabel: '99',
+    signalCount: 3,
+    contextScore: 99,
+    formScore: 99,
+    teamAbbr: 'LAD',
+    teamLogo: 'https://a.espncdn.com/i/teamlogos/mlb/500/scoreboard/lad.png',
+    href: '/mlb?player=39832&from=hub',
+  },
+  'nba-jokic': {
+    id: 'locked-nba-jokic',
+    playerId: '3112335',
+    displayName: 'Nikola Jokic',
+    headshot: getSportHeadshotUrl('nba', '3112335'),
+    position: 'C',
+    leagueLabel: 'NBA',
+    sportKey: 'nba',
+    leagueKey: 'nba',
+    overall: 99,
+    overallLabel: '99.0',
+    signalCount: 3,
+    contextScore: 99,
+    formScore: 99,
+    teamAbbr: 'DEN',
+    teamLogo: 'https://a.espncdn.com/i/teamlogos/nba/500/scoreboard/den.png',
+    href: '/nba?from=hub',
+  },
+  nhl: {
+    id: 'locked-nhl-mcdavid',
+    playerId: '3041961',
+    displayName: 'Connor McDavid',
+    headshot: getSportHeadshotUrl('nhl', '3041961'),
+    position: 'C',
+    leagueLabel: 'NHL',
+    sportKey: 'nhl',
+    leagueKey: 'nhl',
+    overall: 99,
+    overallLabel: '99',
+    signalCount: 3,
+    contextScore: 99,
+    formScore: 99,
+    teamAbbr: 'EDM',
+    teamLogo: 'https://a.espncdn.com/i/teamlogos/nhl/500/scoreboard/edm.png',
+    href: '/nhl?from=hub',
+  },
+  football: {
+    id: 'locked-football-haaland',
+    playerId: '253989',
+    displayName: 'Erling Haaland',
+    headshot: '/api/football/headshot?playerId=253989&name=Erling%20Haaland&team=Manchester%20City',
+    position: 'ST',
+    leagueLabel: 'Premier League',
+    sportKey: 'football',
+    leagueKey: 'premier-league',
+    overall: 98.9,
+    overallLabel: '98.9',
+    signalCount: 3,
+    contextScore: 98.9,
+    formScore: 98.9,
+    teamAbbr: 'MCI',
+    teamLogo: 'https://a.espncdn.com/i/teamlogos/soccer/500/382.png',
+    href: '/football/premier-league?from=hub',
+  },
+  'nba-sga': {
+    id: 'locked-nba-sga',
+    playerId: '4278073',
+    displayName: 'Shai Gilgeous-Alexander',
+    headshot: getSportHeadshotUrl('nba', '4278073'),
+    position: 'G',
+    leagueLabel: 'NBA',
+    sportKey: 'nba',
+    leagueKey: 'nba',
+    overall: 98.8,
+    overallLabel: '98.8',
+    signalCount: 3,
+    contextScore: 98.8,
+    formScore: 98.8,
+    teamAbbr: 'OKC',
+    teamLogo: 'https://a.espncdn.com/i/teamlogos/nba/500/scoreboard/okc.png',
+    href: '/nba?from=hub',
+  },
+};
 
 const SOURCE_WEIGHTS = {
   mlb: 1.18,
@@ -373,11 +465,20 @@ function resolveLockedCandidate(entry, sorted, sourcePools) {
   const directMatch = sorted.find((player) => matchesLockedEntry(player, entry));
   if (directMatch) return directMatch;
 
+  const fallbackKey =
+    entry.sportKey === 'nba' && entry.aliases.some((alias) => alias.includes('jokic'))
+      ? 'nba-jokic'
+      : entry.sportKey === 'nba' && entry.aliases.some((alias) => alias.includes('shai') || alias.includes('sga'))
+        ? 'nba-sga'
+        : entry.sportKey;
+
   const rawPool = Array.isArray(sourcePools?.[entry.sportKey]) ? sourcePools[entry.sportKey] : [];
-  if (!rawPool.length) return null;
+  if (!rawPool.length) return LOCKED_FALLBACKS[fallbackKey] || null;
 
   const normalizedPool = normalizeSourceCandidates(rawPool, SOURCE_WEIGHTS[entry.sportKey] || 1);
-  return normalizedPool.find((player) => matchesLockedEntry(player, entry)) || null;
+  const normalizedMatch = normalizedPool.find((player) => matchesLockedEntry(player, entry));
+  if (normalizedMatch) return normalizedMatch;
+  return LOCKED_FALLBACKS[fallbackKey] || null;
 }
 
 function ensureLockedSportCandidates(pool, rawPool, mapCandidate, sportKey) {
