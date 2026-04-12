@@ -27,7 +27,7 @@ import {
 const STORY_TTL_MS = 5 * 60 * 1000;
 const BETS_TTL_MS = 90 * 1000;
 const HERO_TTL_MS = 2 * 60 * 1000;
-const HUB_CACHE_VERSION = 'v23';
+const HUB_CACHE_VERSION = 'v24';
 export const HUB_HERO_SNAPSHOT_KEY = `hub-hero-${HUB_CACHE_VERSION}`;
 
 const EXTERNAL_NEWS_SOURCES = [
@@ -954,9 +954,9 @@ async function buildTopBetsSnapshot() {
   const candidates = [...mlbCandidates, ...nflCandidates, ...footballCandidates, ...nbaCandidates, ...nhlCandidates, ...cbbCandidates]
     .filter((candidate) => candidate?.americanOdds !== null && candidate?.americanOdds !== undefined)
     .filter((candidate) => candidate?.startTime && isSameEasternDateKey(candidate.startTime, cycle.cycleDateEt))
-    .filter((candidate) => ['pre', 'scheduled', 'created', 'in', 'live'].includes(String(candidate?.state || 'pre')))
+    .filter((candidate) => ['pre', 'scheduled', 'created'].includes(String(candidate?.state || 'pre')))
     .map((candidate) => enrichBetCandidate(candidate, currentMs))
-    .filter((candidate) => candidate.isLive || (Number.isFinite(candidate.startMs) && candidate.startMs > currentMs))
+    .filter((candidate) => Number.isFinite(candidate.startMs) && candidate.startMs > currentMs)
     .sort(compareBetCandidates);
 
   const selected = [];

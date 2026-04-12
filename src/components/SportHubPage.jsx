@@ -387,7 +387,7 @@ export default function SportHubPage({ initialHero = null }) {
                   : hero?.status === 'building'
                     ? 'Building'
                     : betLegs.length
-                      ? `${betLegs.length} legs live`
+                      ? `${betLegs.length} legs ready`
                       : 'Refreshing today’s slate…'}
               </span>
             </div>
