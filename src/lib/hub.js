@@ -1134,6 +1134,9 @@ const getCachedHubHeroSnapshot = unstable_cache(
 );
 
 export async function getHubTrendingStories({ force = false } = {}) {
+  if (!force) {
+    return getCachedTrendingStoriesSnapshot();
+  }
   return getHotSnapshot(`hub-trending-stories-${HUB_CACHE_VERSION}`, () => buildTrendingStoriesSnapshot(), {
     ttlMs: STORY_TTL_MS,
     force,
@@ -1177,6 +1180,9 @@ export async function getHubStoryDetail(storyId, apiHref = '') {
 }
 
 export async function getHubTopBets({ force = false } = {}) {
+  if (!force) {
+    return getCachedTopBetsSnapshot();
+  }
   return getHotSnapshot(`hub-top-bets-${HUB_CACHE_VERSION}`, () => buildTopBetsSnapshot(), {
     ttlMs: BETS_TTL_MS,
     force,
@@ -1184,6 +1190,9 @@ export async function getHubTopBets({ force = false } = {}) {
 }
 
 export async function getHubHero({ force = false } = {}) {
+  if (!force) {
+    return getCachedHubHeroSnapshot();
+  }
   return getHotSnapshot(HUB_HERO_SNAPSHOT_KEY, () => buildHubHeroSnapshot(), {
     ttlMs: HERO_TTL_MS,
     force,
@@ -1205,9 +1214,9 @@ export async function warmHubSnapshots() {
       },
       { force: true, ttlMs: 15 * 60 * 1000 },
     ),
-    getHubTrendingStories({ force: true }),
-    getHubTopBets({ force: true }),
-    getHubHero({ force: true }),
+    getHubTrendingStories(),
+    getHubTopBets(),
+    getHubHero(),
     getGenericSportSnapshot('nfl', { force: true }),
     getGenericSportSnapshot('cbb', { force: true }),
     getFootballLandingSnapshot({ force: true }),

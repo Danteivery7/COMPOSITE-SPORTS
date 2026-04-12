@@ -5,8 +5,9 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   try {
+    const requestedForce = request.nextUrl.searchParams.get('force');
     const data = await getHubHero({
-      force: request.nextUrl.searchParams.get('force') === '1',
+      force: requestedForce === null ? true : requestedForce === '1',
     });
     return NextResponse.json(data);
   } catch (error) {
